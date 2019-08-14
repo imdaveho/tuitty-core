@@ -3,16 +3,20 @@
 //! enabling/disabling raw modes.
 // use std::io::Result;
 use std::str::FromStr;
-use std::io::Result;
-use crate::shared::TtyResult;
+use std::io::{Error, Result};
+use crate::shared::{TtyResult, TtyErrorKind};
 
 #[cfg(unix)]
 use libc::termios as Termios;
 
+#[cfg(windows)]
+use crate::shared::{Termios, Handle, ConsoleInfo};
+
 #[cfg(unix)]
 mod linux;
 
-// mod windows;
+#[cfg(windows)]
+mod windows;
 
 
 // (imdaveho) TODO: wrap the children functions into a single interface
@@ -123,16 +127,38 @@ impl FromStr for Color {
 
 
 pub fn enable_raw() -> Result<()> {
-    #[cfg(unix)]
-    linux::_enable_raw()
+    #[cfg(unix)] {
+        linux::_enable_raw()
+    }
+
+    #[cfg(windows)] {
+        windows::_enable_raw()
+    }
 }
 
-#[cfg(unix)]
-pub fn get_mode() -> Termios {
-    linux::_get_terminal_attr().unwrap()
+pub fn get_mode() -> Result<Termios> {
+    #[cfg(unix)] {
+        linux::_get_terminal_attr()
+    }
+
+    #[cfg(windows)] {
+        windows::_get_terminal_attr()
+    }
 }
 
-#[cfg(unix)]
 pub fn set_mode(termios: &Termios) -> Result<()> {
-    linux::_set_terminal_attr(termios)
+    #[cfg(unix)] {
+        linux::_set_terminal_attr(termios)
+    }
+
+    #[cfg(windows)] {
+        windows::_set_terminal_attr(termios)
+    }
+}
+
+#[cfg(windows)]
+pub fn disable_raw() -> Result<()> {
+    // (imdaveho) NOTE: is this necessary? should it mirror
+    // the Linux implementation?
+    windows::_disable_raw()
 }

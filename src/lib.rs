@@ -11,25 +11,33 @@ pub mod input;
 #[cfg(unix)]
 use libc::termios as Termios;
 
+#[cfg(windows)]
+use shared::Termios;
 
-#[cfg(unix)]
+
 struct Tty<'t> {
     id: usize,
     meta: Vec<Metadata<'t>>,
+    #[cfg(windows)]
+    altscrn: Option<shared::Handle>,
 }
 
 struct Metadata<'m> {
     ORIGINAL_MODE: Termios,
     is_raw: bool,
     content: &'m str,
+    #[cfg(windows)]
+    markpos: Option<(i16, i16)>,
 }
 
 impl<'m> Metadata<'m> {
     fn new() -> Metadata<'m> {
         Metadata {
-            ORIGINAL_MODE: output::get_mode(),
+            ORIGINAL_MODE: output::get_mode().unwrap(),
             is_raw: false,
             content: &"",
+            #[cfg(windows)]
+            markpos: None,
         }
     }
 
@@ -45,6 +53,8 @@ impl<'t> Tty<'t> {
         Tty {
             id: 0,
             meta: vec![Metadata::new()],
+            #[cfg(windows)]
+            altscrn: None,
         }
     }
 
@@ -94,7 +104,7 @@ impl<'t> Tty<'t> {
     // the unix native implementations are not really usable --
     // will consider adding it back in, if necessary.
 
-    fn goto(&self, col: u16, row: u16) {
+    fn goto(&self, col: i16, row: i16) {
         cursor::goto(col, row).unwrap();
     }
 
@@ -114,7 +124,7 @@ impl<'t> Tty<'t> {
         cursor::move_right(1).unwrap();
     }
 
-    fn dpad(&self, dir: &str, n: u16) {
+    fn dpad(&self, dir: &str, n: i16) {
         match dir {
             "up" => cursor::move_up(n).unwrap(),
             "dn" => cursor::move_down(n).unwrap(),
@@ -144,26 +154,47 @@ impl<'t> Tty<'t> {
         self.meta[self.id].is_raw = false;
     }
 
-    fn pos(&mut self) -> (u16, u16) {
-        if self.meta[self.id].is_raw {
-            cursor::pos_raw().unwrap()
-        } else {
-            // unix needs to be raw to use pos()
-            self.raw();
-            let (col, row) = cursor::pos_raw().unwrap();
-            // since the output was not in raw_mode before
-            // we need to revert back to the cooked state
-            self.cook();
-            return (col, row);
+    fn pos(&mut self) -> (i16, i16) {
+        #[cfg(unix)] {
+            if self.meta[self.id].is_raw {
+                cursor::pos_raw().unwrap()
+            } else {
+                // unix needs to be raw to use pos()
+                self.raw();
+                let (col, row) = cursor::pos_raw().unwrap();
+                // since the output was not in raw_mode before
+                // we need to revert back to the cooked state
+                self.cook();
+                return (col, row);
+            }
+        }
+
+        #[cfg(windows)] {
+            cursor::pos().unwrap()
         }
     }
 
+    #[cfg(unix)]
     fn mark(&self) {
-        cursor::save_pos().unwrap();
+        cursor::save_pos().unwrap()
     }
 
-    fn load(&mut self) {
+    #[cfg(unix)]
+    fn load(&self) {
         cursor::load_pos().unwrap();
+    }
+
+    #[cfg(windows)]
+    fn mark(&mut self) {
+        let mut meta = self.meta[self.id];
+        meta.markpos = Some(cursor::pos().unwrap());
+    }
+
+    #[cfg(windows)]
+    fn load(&self) {
+        let meta = self.meta[self.id];
+        let (col, row) = meta.markpos.unwrap();
+        self.goto(col, row);
     }
 
     fn hide_cursor(&self) {

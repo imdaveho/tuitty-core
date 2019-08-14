@@ -3,10 +3,17 @@ name = "tuitty"
 version = "0.1.0"
 authors = ["imdaveho"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = ""
+repository = "https://github.com/imdaveho/tuitty"
+documentation = ""
+license = "MIT"
+keywords = ["tty", "tui", "terminal", "console", "windows", "linux", "cli", "tuitty"]
+exclude = ["target", "Cargo.lock"]
+readme = "README.md"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.51"
+libc = "0.2.60"
 
-[dependencies]
+[target.'cfg(windows)'.dependencies]
+winapi = { version =  "0.3.7", features = ["wincon", "winbase", "consoleapi", "processenv", "handleapi"] }
+

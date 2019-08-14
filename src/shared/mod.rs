@@ -10,6 +10,9 @@ use std:: {
     io,
 };
 
+#[cfg(windows)]
+mod windows;
+pub use windows::{Handle, ConsoleInfo, Termios};
 
 /// Tuitty Error Handling
 /// ****************************************************************************

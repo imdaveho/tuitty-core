@@ -6,6 +6,9 @@ use crate::shared::TtyResult;
 #[cfg(unix)]
 mod linux;
 
+#[cfg(windows)]
+mod windows;
+
 
 /// Various styles of clearing the screen
 pub enum Clear {
@@ -35,20 +38,35 @@ pub enum Clear {
 /// assert_eq!(screen::clear(ClearStyle::NewLine).unwrap(), ());
 /// ```
 pub fn clear(clr: Clear) -> TtyResult<()> {
-    #[cfg(unix)]
-    linux::_clear(clr)
+    #[cfg(unix)] {
+        linux::_clear(clr)
+    }
+
+    #[cfg(windows)] {
+        windows::_clear(clr)
+    }
 }
 
     /// Get the size of the terminal screen.
 pub fn size() -> (u16, u16) {
-    #[cfg(unix)]
-    linux::_size()
+    #[cfg(unix)] {
+        linux::_size()
+    }
+
+    #[cfg(windows)] {
+        windows::_size()
+    }
 }
 
 /// Resize the terminal screen.
 pub fn resize(w: u16, h: u16) -> TtyResult<()> {
-    #[cfg(unix)]
-    linux::_resize(w, h)
+    #[cfg(unix)] {
+        linux::_resize(w, h)
+    }
+
+    #[cfg(windows)] {
+        windows::_resize(w, h)
+    }
 }
 
 // /// Scroll `n` lines up the current terminal screen.
@@ -65,14 +83,24 @@ pub fn resize(w: u16, h: u16) -> TtyResult<()> {
 
 /// Switch to the Alternative terminal screen.
 pub fn enable_alt() -> TtyResult<()> {
-    #[cfg(unix)]
-    linux::_enable_alt()
+    #[cfg(unix)] {
+        linux::_enable_alt()
+    }
+
+    #[cfg(windows)] {
+        windows::_enable_alt()
+    }
 }
 
 /// Switch back to the Main terminal screen.
 pub fn disable_alt() -> TtyResult<()> {
-    #[cfg(unix)]
-    linux::_disable_alt()
+    #[cfg(unix)] {
+        linux::_disable_alt()
+    }
+
+    #[cfg(windows)] {
+        windows::_disable_alt()
+    }
 }
 
 /// Unit tests

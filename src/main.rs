@@ -5,6 +5,13 @@ extern crate tuitty;
 
 
 fn main() {
+    let size = tuitty::screen::size();
+    println!("{}, {}", size.0, size.1);
+
+
+
+
+
     // let o = stdout();
     // let mut o = o.lock();
     // let t = "this is a long str that I believe wraps around but can't really determine if that is really the case or not\0";

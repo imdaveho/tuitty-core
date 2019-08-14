@@ -57,31 +57,3 @@ pub fn _set_terminal_attr(termios: &Termios) -> Result<()> {
         Ok(())
     }
 }
-
-// /// Transform the given termios mode into raw mode.
-// /// There is no effect until a subsequent call to tcsetattr().
-// /// Source: https://www.mkssoftware.com/docs/man3/cfmakeraw.3.asp
-// fn _termios_as_raw(termios: &mut Termios) {
-//     extern "C" {
-//         pub fn cfmakeraw(termpt: *mut Termios);
-//     }
-//     unsafe { cfmakeraw(termios) }
-// }
-
-// /// This function enables raw mode in the current screen.
-// pub fn _enable_raw() -> Result<()> {
-//     let mut ios = _get_terminal_attr()?;
-//     _raw_terminal_attr(&mut ios);
-//     _set_terminal_attr(&ios)?;
-//     Ok(())
-
-// }
-
-
-// pub fn _disable_raw(ios: &Termios) -> Result<()> {
-//     _set_terminal_attr(ios)?;
-//     // (imdaveho) TODO: move below into Tty top-level API wrapper
-//     // state.is_raw = true;
-//     // state.is_raw = false;
-//     Ok(())
-// }

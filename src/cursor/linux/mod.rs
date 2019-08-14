@@ -4,32 +4,32 @@ use crate::{csi, write_cout};
 use super::{Result, TtyResult};
 
 
-pub fn _goto(col: u16, row: u16) -> TtyResult<()> {
+pub fn _goto(col: i16, row: i16) -> TtyResult<()> {
     write_cout!(format!(csi!("{};{}H"), row + 1, col + 1))?;
     Ok(())
 }
 
-pub fn _move_up(n: u16) -> TtyResult<()> {
+pub fn _move_up(n: i16) -> TtyResult<()> {
     write_cout!(&format!(csi!("{}A"), n))?;
     Ok(())
 }
 
-pub fn _move_right(n: u16) -> TtyResult<()> {
+pub fn _move_right(n: i16) -> TtyResult<()> {
     write_cout!(&format!(csi!("{}C"), n))?;
     Ok(())
 }
 
-pub fn _move_down(n: u16) -> TtyResult<()> {
+pub fn _move_down(n: i16) -> TtyResult<()> {
     write_cout!(&format!(csi!("{}B"), n))?;
     Ok(())
 }
 
-pub fn _move_left(n: u16) -> TtyResult<()> {
+pub fn _move_left(n: i16) -> TtyResult<()> {
     write_cout!(&format!(csi!("{}D"), n))?;
     Ok(())
 }
 
-pub fn _pos_raw() -> Result<(u16, u16)> {
+pub fn _pos_raw() -> Result<(i16, i16)> {
     // Where is the cursor?
     // Use `ESC [ 6 n`.
     let mut stdout = io::stdout();
@@ -70,7 +70,7 @@ pub fn _pos_raw() -> Result<(u16, u16)> {
         .parse::<usize>()
         .unwrap();
 
-    Ok(((cols - 1) as u16, (rows - 1) as u16))
+    Ok(((cols - 1) as i16, (rows - 1) as i16))
 }
 
 pub fn _save_pos() -> TtyResult<()> {
