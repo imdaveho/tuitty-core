@@ -24,7 +24,7 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
     let bsize = info.buffer_size();
     let attrs = info.attributes();
 
-    match clr {
+    return match clr {
         Clear::All => {
             // get sum cells before cursor
             let cells_to_write = bsize.0 as u32 * bsize.1 as u32;
@@ -36,9 +36,6 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
             _fill_chars(&conout, start_location, cells_to_write, ' ')?;
             _fill_attrs(&conout, start_location, cells_to_write, attrs)?;            
 
-            // put the cursor back at cell 0,0
-            // let cursor = Cursor::new()?;
-            // cursor.goto(0, 0)?;
             Ok(())
         }
         Clear::CursorDn => {
@@ -63,7 +60,7 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
             Ok(())
         }
         Clear::CursorUp => {
-            let (mut x, mut y) = (pos.0, pos.1);
+            let (x, y) = (pos.0, pos.1);
             let cells_to_write = (bsize.0 as u32 * y as u32) + (x as u32 + 1);
             let start_location = (0, 0);
 
@@ -81,7 +78,6 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
             _fill_chars(&conout, start_location, cells_to_write, ' ')?;
             _fill_attrs(&conout, start_location, cells_to_write, attrs)?;
 
-            // TODO: cursor (0, pos.1)
             Ok(())
         }
         Clear::NewLn => {
@@ -92,11 +88,9 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
             _fill_chars(&conout, start_location, cells_to_write, ' ')?;
             _fill_attrs(&conout, start_location, cells_to_write, attrs)?;
 
-            // TODO: cursor (pos.0, pos.1)
             Ok(())
         }
     };
-    Ok(())
 }
 
 fn _fill_chars(h: &Handle, s: (i16, i16), n: u32, c: char) -> Result<u32> {
@@ -153,7 +147,7 @@ pub fn _resize(w: u16, h: u16) -> TtyResult<()> {
     let info = ConsoleInfo::of(&handle)?;
 
     let (buf_w, buf_h) = info.buffer_size();
-    let (left, right, bottom, top) = info.window_pos();
+    let (left, _, _, top) = info.window_pos();
 
     let (mut new_w, mut new_h) = (buf_w, buf_h);
 

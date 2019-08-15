@@ -1,8 +1,18 @@
 use std::io::{Result, stdin};
-use crate::shared::{TtyResult, TtyErrorKind};
+use crate::shared::{TtyResult, Handle};
 
 #[cfg(unix)]
 mod linux;
+
+#[cfg(unix)]
+use linux::{SyncReader, AsyncReader};
+
+#[cfg(windows)]
+mod windows;
+
+#[cfg(windows)]
+use windows::{SyncReader, AsyncReader};
+
 
 pub fn read_line() -> Result<String> {
     let mut rv = String::new();
@@ -13,30 +23,64 @@ pub fn read_line() -> Result<String> {
 }
 
 pub fn read_char() -> Result<char> {
-    #[cfg(unix)]
-    linux::_read_char()
+    #[cfg(unix)] {
+        linux::_read_char()
+    }
+
+    #[cfg(windows)] {
+        windows::_read_char()
+    }
 }
 
-pub fn read_async() -> linux::AsyncReader { // for now until windows
-    linux::_read_async()
+pub fn read_async() -> AsyncReader {
+    #[cfg(unix)] {
+        linux::_read_async()
+    }
+
+    #[cfg(windows)] {
+        windows::_read_async()
+    }
 }
 
-pub fn read_sync() -> linux::SyncReader {
-    linux::_read_sync()
+pub fn read_sync() -> SyncReader {
+    #[cfg(unix)] {
+        linux::_read_sync()
+    }
+
+    #[cfg(windows)] {
+        windows::_read_sync()
+    }
 }
 
-pub fn read_until_async(delimiter: u8) -> linux::AsyncReader {
-    linux::_read_until_async(delimiter)
+pub fn read_until_async(delimiter: u8) -> AsyncReader {
+    #[cfg(unix)] {
+        linux::_read_until_async(delimiter)
+    }
+
+    #[cfg(windows)] {
+        windows::_read_until_async(delimiter)
+    }
+
 }
 
 pub fn enable_mouse_input() -> TtyResult<()> {
-    #[cfg(unix)]
-    linux::_enable_mouse_mode()
+    #[cfg(unix)] {
+        linux::_enable_mouse_mode()
+    }
+
+    #[cfg(windows)] {
+        windows::_enable_mouse_mode()
+    }
 }
 
 pub fn disable_mouse_input() -> TtyResult<()> {
-    #[cfg(unix)]
-    linux::_disable_mouse_mode()
+    #[cfg(unix)] {
+        linux::_disable_mouse_mode()
+    }
+
+    #[cfg(windows)] {
+        windows::_disable_mouse_mode()
+    }
 }
 
 

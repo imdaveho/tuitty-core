@@ -10,6 +10,7 @@ use winapi::um::{
         CreateConsoleScreenBuffer, GetConsoleScreenBufferInfo, SetConsoleActiveScreenBuffer,
         CONSOLE_TEXTMODE_BUFFER, CONSOLE_SCREEN_BUFFER_INFO
     },
+    consoleapi::{GetConsoleMode, SetConsoleMode},
 };
 
 use winapi::shared::{
@@ -26,10 +27,20 @@ use std::mem::{size_of, zeroed};
 // Generic struct to store settings of the terminal
 // mainly used to save the temrinal's original mode
 // like how it is used in Unix-based systems
+#[derive(Clone, Copy)]
 pub struct Termios {
     pub mode: u32,
-    pub color: u16,
 }
+
+impl Termios {
+    pub fn update_mode(&mut self) {
+        self.mode = Handle::conout()
+            .unwrap()
+            .get_mode()
+            .unwrap();
+        }
+}
+
 
 pub struct Handle(pub HANDLE);
 
@@ -133,8 +144,10 @@ impl Handle {
         if self.0 == stdin.0 || self.0 == stdout.0 {
             return Ok(());
         } else {
-            if !(CloseHandle(self.0) == 0) {
-                return Err(Error::last_os_error())
+            unsafe {
+                if !(CloseHandle(self.0) == 0) {
+                    return Err(Error::last_os_error())
+                }
             }
         }
         Ok(())
@@ -143,6 +156,25 @@ impl Handle {
     pub fn show(&self) -> Result<()> {
         unsafe {
             if !(SetConsoleActiveScreenBuffer(self.0) == 0) {
+                return Err(Error::last_os_error());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn get_mode(&self) -> Result<u32> {
+        let mut mode = 0;
+        unsafe {
+            if !(GetConsoleMode(self.0, &mut mode) == 0 ) {
+                return Err(Error::last_os_error());
+            }
+        }
+        Ok(mode)
+    }
+
+    pub fn set_mode(&self, mode: &u32) -> Result<()> {
+        unsafe {
+            if !(SetConsoleMode(self.0, *mode) == 0) {
                 return Err(Error::last_os_error());
             }
         }

@@ -105,7 +105,7 @@ pub fn _set_bg(bg_color: Color) -> TtyResult<()> {
     Ok(())
 }
 
-pub fn _set_attr(attr: u16) -> TtyResult<()> {
+pub fn _set_attr(_: u16) -> TtyResult<()> {
     // (imdaveho) TODO: need to implement windows attrs:
     // * Bold = 1,
     // * Dim = 2,
@@ -118,16 +118,5 @@ pub fn _set_attr(attr: u16) -> TtyResult<()> {
 pub fn _reset() -> TtyResult<()> {
     // (imdaveho) TODO: this should be at `Tty` level 
     // to be able to use `Termios.color`
-    Ok(())
-}
-
-pub fn _init_console_color(termios: &mut Termios) -> Result<()> {
-    let handle = Handle::conout()?;
-    let info = ConsoleInfo::of(&handle)?;
-
-    let mut color: u16;
-    let attrs = info.attributes();
-
-    termios.color = attrs;
     Ok(())
 }

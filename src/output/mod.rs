@@ -6,11 +6,10 @@ use std::str::FromStr;
 use std::io::{Error, Result};
 use crate::shared::{TtyResult, TtyErrorKind};
 
-#[cfg(unix)]
-use libc::termios as Termios;
+use crate::Termios;
 
 #[cfg(windows)]
-use crate::shared::{Termios, Handle, ConsoleInfo};
+use crate::shared::{Handle, ConsoleInfo};
 
 #[cfg(unix)]
 mod linux;
@@ -146,19 +145,12 @@ pub fn get_mode() -> Result<Termios> {
     }
 }
 
+#[cfg(unix)]
 pub fn set_mode(termios: &Termios) -> Result<()> {
-    #[cfg(unix)] {
-        linux::_set_terminal_attr(termios)
-    }
-
-    #[cfg(windows)] {
-        windows::_set_terminal_attr(termios)
-    }
+    linux::_set_terminal_attr(termios)
 }
 
 #[cfg(windows)]
 pub fn disable_raw() -> Result<()> {
-    // (imdaveho) NOTE: is this necessary? should it mirror
-    // the Linux implementation?
     windows::_disable_raw()
 }

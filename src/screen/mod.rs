@@ -82,14 +82,9 @@ pub fn resize(w: u16, h: u16) -> TtyResult<()> {
 // }
 
 /// Switch to the Alternative terminal screen.
+#[cfg(unix)]
 pub fn enable_alt() -> TtyResult<()> {
-    #[cfg(unix)] {
-        linux::_enable_alt()
-    }
-
-    #[cfg(windows)] {
-        windows::_enable_alt()
-    }
+    linux::_enable_alt()
 }
 
 /// Switch back to the Main terminal screen.

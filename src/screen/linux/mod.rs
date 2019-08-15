@@ -12,8 +12,6 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
     match clr {
         Clear::All => {
             write_cout!(csi!("2J"))?;
-            // (imdaveho) NOTE: clone of goto(0, 0)
-            // write_cout!(format!(csi!("{};{}H"), 0 + 1, 0 + 1))?;
         }
         Clear::CursorDn => {
             write_cout!(csi!("J"))?;
