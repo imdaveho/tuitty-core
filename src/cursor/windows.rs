@@ -31,7 +31,7 @@ pub fn _goto(col: i16, row: i16) -> TtyResult<()> {
     let handle = Handle::conout()?;
 
     unsafe {
-        if !(SetConsoleCursorPosition(handle.0, pos) == 0) {
+        if SetConsoleCursorPosition(handle.0, pos) == 0 {
             return Err(TtyErrorKind::IoError(Error::last_os_error()));
         }
     }
@@ -98,7 +98,7 @@ pub fn _hide() -> TtyResult<()> {
     };
     let handle = Handle::conout()?;
     unsafe {
-        if !(SetConsoleCursorInfo(handle.0, &cursor_info) == 0) {
+        if SetConsoleCursorInfo(handle.0, &cursor_info) == 0 {
             return Err(TtyErrorKind::IoError(Error::last_os_error()));
         }
     }
@@ -112,7 +112,7 @@ pub fn _show() -> TtyResult<()> {
     };
     let handle = Handle::conout()?;
     unsafe {
-        if !(SetConsoleCursorInfo(handle.0, &cursor_info) == 0) {
+        if SetConsoleCursorInfo(handle.0, &cursor_info) == 0 {
             return Err(TtyErrorKind::IoError(Error::last_os_error()));
         }
     }

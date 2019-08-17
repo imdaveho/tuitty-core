@@ -24,24 +24,6 @@ use std::ptr::null_mut;
 use std::mem::{size_of, zeroed};
 
 
-// Generic struct to store settings of the terminal
-// mainly used to save the temrinal's original mode
-// like how it is used in Unix-based systems
-#[derive(Clone, Copy)]
-pub struct Termios {
-    pub mode: u32,
-}
-
-impl Termios {
-    pub fn update_mode(&mut self) {
-        self.mode = Handle::conout()
-            .unwrap()
-            .get_mode()
-            .unwrap();
-        }
-}
-
-
 pub struct Handle(pub HANDLE);
 
 impl Handle {
@@ -49,7 +31,7 @@ impl Handle {
         unsafe {
             let handle = GetStdHandle(STD_OUTPUT_HANDLE);
 
-            if !(handle == INVALID_HANDLE_VALUE) {
+            if handle == INVALID_HANDLE_VALUE {
                 return Err(Error::last_os_error());
             }
 
@@ -74,7 +56,7 @@ impl Handle {
             )
         };
 
-        if !(handle == INVALID_HANDLE_VALUE) {
+        if handle == INVALID_HANDLE_VALUE {
             return Err(Error::last_os_error());
         }
         Ok(Handle(handle))
@@ -84,7 +66,7 @@ impl Handle {
         unsafe {
             let handle = GetStdHandle(STD_INPUT_HANDLE);
 
-            if !(handle == INVALID_HANDLE_VALUE) {
+            if handle == INVALID_HANDLE_VALUE {
                 return Err(Error::last_os_error());
             }
         Ok(Handle(handle))
@@ -108,7 +90,7 @@ impl Handle {
             )
         };
 
-        if !(handle == INVALID_HANDLE_VALUE) {
+        if handle == INVALID_HANDLE_VALUE {
             return Err(Error::last_os_error());
         }
         Ok(Handle(handle))
@@ -130,7 +112,7 @@ impl Handle {
                 CONSOLE_TEXTMODE_BUFFER,
                 NULL,
             );
-            if !(handle == INVALID_HANDLE_VALUE) {
+            if handle == INVALID_HANDLE_VALUE {
                 return Err(Error::last_os_error());
             }
             Ok(Handle(handle))
@@ -145,7 +127,7 @@ impl Handle {
             return Ok(());
         } else {
             unsafe {
-                if !(CloseHandle(self.0) == 0) {
+                if CloseHandle(self.0) == 0 {
                     return Err(Error::last_os_error())
                 }
             }
@@ -155,7 +137,7 @@ impl Handle {
 
     pub fn show(&self) -> Result<()> {
         unsafe {
-            if !(SetConsoleActiveScreenBuffer(self.0) == 0) {
+            if SetConsoleActiveScreenBuffer(self.0) == 0 {
                 return Err(Error::last_os_error());
             }
         }
@@ -165,7 +147,7 @@ impl Handle {
     pub fn get_mode(&self) -> Result<u32> {
         let mut mode = 0;
         unsafe {
-            if !(GetConsoleMode(self.0, &mut mode) == 0 ) {
+            if GetConsoleMode(self.0, &mut mode) == 0 {
                 return Err(Error::last_os_error());
             }
         }
@@ -174,12 +156,14 @@ impl Handle {
 
     pub fn set_mode(&self, mode: &u32) -> Result<()> {
         unsafe {
-            if !(SetConsoleMode(self.0, *mode) == 0) {
+            if SetConsoleMode(self.0, *mode) == 0 {
                 return Err(Error::last_os_error());
             }
         }
         Ok(())
     }
+
+    pub fn write(&self) {}
 }
 
 
@@ -189,7 +173,7 @@ impl ConsoleInfo {
     pub fn of(handle: &Handle) -> Result<ConsoleInfo> {
         unsafe {
             let mut info: CONSOLE_SCREEN_BUFFER_INFO = zeroed();
-            if !(GetConsoleScreenBufferInfo(handle.0, &mut info) == 0) {
+            if GetConsoleScreenBufferInfo(handle.0, &mut info) == 0 {
                 return Err(Error::last_os_error());
             }
             Ok(ConsoleInfo(info))

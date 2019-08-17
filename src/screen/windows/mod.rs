@@ -1,15 +1,16 @@
 //! Platform specific functions for the library.
-use super::{Clear, TtyResult};
-use winapi::{
-    um::{
-        wincon::{
-            SetConsoleScreenBufferSize, FillConsoleOutputCharacterA, FillConsoleOutputAttribute,
-            SetConsoleWindowInfo, GetLargestConsoleWindowSize, COORD, SMALL_RECT,
-        },
-    },
+use super::Clear;
+use winapi::um::wincon::{
+    GetLargestConsoleWindowSize, COORD, SMALL_RECT,
+    SetConsoleScreenBufferSize, SetConsoleWindowInfo, 
+    FillConsoleOutputCharacterA, FillConsoleOutputAttribute,
+    COMMON_LVB_LEADING_BYTE as LB, COMMON_LVB_TRAILING_BYTE as TB,
+    COMMON_LVB_GRID_HORIZONTAL as TH, COMMON_LVB_GRID_LVERTICAL as LV, 
+    COMMON_LVB_GRID_RVERTICAL as RV, COMMON_LVB_REVERSE_VIDEO as REV, 
+    COMMON_LVB_UNDERSCORE as UN,
 };
 
-use crate::shared::{Handle, ConsoleInfo, TtyErrorKind};
+use crate::shared::{Handle, ConsoleInfo, TtyResult, TtyErrorKind};
 use std::io::{Error, Result};
 
 mod alternate;
@@ -22,7 +23,12 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
 
     let pos = info.cursor_pos();
     let bsize = info.buffer_size();
-    let attrs = info.attributes();
+    // Because the current Handle could have attributes that modify the 
+    // surrounding console cell (eg. underscore or left vertical), we 
+    // strip them out of the resulting attribute before clearing the
+    // screen. If you do not do this, artifacts may result instead of 
+    // the intended blank screen. This maintains fg and bg colors.
+    let curr_at = info.attributes() & !(LB | TB | TH | LV | RV | REV | UN);
 
     return match clr {
         Clear::All => {
@@ -34,7 +40,7 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
             // clear the entire screen
             let conout = Handle::conout()?;
             _fill_chars(&conout, start_location, cells_to_write, ' ')?;
-            _fill_attrs(&conout, start_location, cells_to_write, attrs)?;            
+            _fill_attrs(&conout, start_location, cells_to_write, curr_at)?;            
 
             Ok(())
         }
@@ -55,7 +61,7 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
 
             let conout = Handle::conout()?;
             _fill_chars(&conout, start_location, cells_to_write, ' ')?;
-            _fill_attrs(&conout, start_location, cells_to_write, attrs)?;
+            _fill_attrs(&conout, start_location, cells_to_write, curr_at)?;
             
             Ok(())
         }
@@ -66,7 +72,7 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
 
             let conout = Handle::conout()?;
             _fill_chars(&conout, start_location, cells_to_write, ' ')?;
-            _fill_attrs(&conout, start_location, cells_to_write, attrs)?;
+            _fill_attrs(&conout, start_location, cells_to_write, curr_at)?;
             
             Ok(())
         }
@@ -76,7 +82,7 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
 
             let conout = Handle::conout()?;
             _fill_chars(&conout, start_location, cells_to_write, ' ')?;
-            _fill_attrs(&conout, start_location, cells_to_write, attrs)?;
+            _fill_attrs(&conout, start_location, cells_to_write, curr_at)?;
 
             Ok(())
         }
@@ -86,7 +92,7 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
 
             let conout = Handle::conout()?;
             _fill_chars(&conout, start_location, cells_to_write, ' ')?;
-            _fill_attrs(&conout, start_location, cells_to_write, attrs)?;
+            _fill_attrs(&conout, start_location, cells_to_write, curr_at)?;
 
             Ok(())
         }
@@ -97,8 +103,8 @@ fn _fill_chars(h: &Handle, s: (i16, i16), n: u32, c: char) -> Result<u32> {
     let mut written = 0;
     let coord = COORD { X: s.0, Y: s.1, };
     unsafe {
-        if !(FillConsoleOutputCharacterA(
-            h.0, c as i8, n, coord, &mut written) == 0) {
+        if FillConsoleOutputCharacterA(
+            h.0, c as i8, n, coord, &mut written) == 0 {
             return Err(Error::last_os_error());
         }
     }
@@ -109,19 +115,19 @@ fn _fill_attrs(h: &Handle, s: (i16, i16), n: u32, a: u16) -> Result<u32> {
     let mut written = 0;
     let coord = COORD { X: s.0, Y: s.1, };
     unsafe {
-        if !(FillConsoleOutputAttribute(
-            h.0, a, n, coord, &mut written) == 0) {
+        if FillConsoleOutputAttribute(
+            h.0, a, n, coord, &mut written) == 0 {
             return Err(Error::last_os_error());
         }
     }
     Ok(written)
 }
 
-pub fn _size() -> (u16, u16) {
+pub fn _size() -> (i16, i16) {
     if let Ok(handle) = Handle::conout() {
         if let Ok(info) = ConsoleInfo::of(&handle) {
             let size = info.terminal_size();
-            ((size.0 + 1) as u16, (size.1 + 1) as u16)
+            ((size.0 + 1), (size.1 + 1))
         } else {
             (0, 0)
         }
@@ -130,7 +136,7 @@ pub fn _size() -> (u16, u16) {
     }
 }
 
-pub fn _resize(w: u16, h: u16) -> TtyResult<()> {
+pub fn _resize(w: i16, h: i16) -> TtyResult<()> {
     if w <= 0 {
         return Err(TtyErrorKind::ResizingError(String::from(
             "Cannot set the terminal width lower than 1",
@@ -155,24 +161,24 @@ pub fn _resize(w: u16, h: u16) -> TtyResult<()> {
     // buffer to be large enough.  Include window position.
     let mut resize_buffer = false;
 
-    if buf_w < left + w as i16 {
-        if left >= i16::max_value() - w as i16 {
+    if buf_w < left + w {
+        if left >= i16::max_value() - w {
             return Err(TtyErrorKind::ResizingError(String::from(
                 "Argument out of range when setting terminal width.",
             )));
         }
 
-        new_w = left + w as i16;
+        new_w = left + w;
         resize_buffer = true;
     }
-    if buf_h < top + h as i16 {
-        if top >= i16::max_value() - h as i16 {
+    if buf_h < top + h {
+        if top >= i16::max_value() - h {
             return Err(TtyErrorKind::ResizingError(String::from(
                 "Argument out of range when setting terminal height.",
             )));
         }
 
-        new_h = top + h as i16;
+        new_h = top + h;
         resize_buffer = true;
     }
 
@@ -187,12 +193,12 @@ pub fn _resize(w: u16, h: u16) -> TtyResult<()> {
     }
 
     unsafe {
-        if !(SetConsoleWindowInfo(handle.0, 1, &SMALL_RECT {
+        if SetConsoleWindowInfo(handle.0, 1, &SMALL_RECT {
             Left: left,
-            Right: left + w as i16,  
-            Bottom: top + h as i16, 
+            Right: left + w,  
+            Bottom: top + h, 
             Top: top
-        }) == 0) {
+        }) == 0 {
             return Err(resize_error);
         }
     }
@@ -209,13 +215,13 @@ pub fn _resize(w: u16, h: u16) -> TtyResult<()> {
         (bounds.X, bounds.Y)
     };
 
-    if w as i16 > bound_w {
+    if w > bound_w {
         return Err(TtyErrorKind::ResizingError(format!(
             "Argument width: {} out of range when setting terminal width.", w
         )));
     }
 
-    if h as i16 > bound_h {
+    if h > bound_h {
         return Err(TtyErrorKind::ResizingError(format!(
             "Argument height: {} out of range when setting terminal height.", h
         )));
@@ -226,12 +232,13 @@ pub fn _resize(w: u16, h: u16) -> TtyResult<()> {
 
 fn _set_size(h: &Handle, x: i16, y: i16) -> Result<()> {
     unsafe {
-        if !(SetConsoleScreenBufferSize(h.0, COORD {X: x, Y: y}, ) == 0) {
+        if SetConsoleScreenBufferSize(h.0, COORD {X: x, Y: y}, ) == 0 {
             return Err(Error::last_os_error());
         }
     }
     Ok(())
 }
+
 
 // pub fn _scroll_up(n: i16) -> TtyResult<()> {
 //     let handle = Handle::conout()?;
@@ -242,12 +249,12 @@ fn _set_size(h: &Handle, x: i16, y: i16) -> Result<()> {
 //     if top >= n {
 //         let stdout = Handle::stdout()?;
 //         unsafe {
-//             if !(SetConsoleWindowInfo(stdout.0, 0, &SMALL_RECT {
+//             if SetConsoleWindowInfo(stdout.0, 0, &SMALL_RECT {
 //                 Left: left,
 //                 Right: right,  
 //                 Bottom: n, 
 //                 Top: top - n,
-//             }) == 0) {
+//             }) == 0 {
 //                 return Err(TtyErrorKind::ResizingError(String::from(
 //                     "Something went wrong when scrolling up the console."
 //                 )));
@@ -267,12 +274,12 @@ fn _set_size(h: &Handle, x: i16, y: i16) -> Result<()> {
 //     if bottom < buf_h - n {
 //         let stdout = Handle::stdout()?;
 //         unsafe {
-//             if !(SetConsoleWindowInfo(stdout.0, 0, &SMALL_RECT {
+//             if SetConsoleWindowInfo(stdout.0, 0, &SMALL_RECT {
 //                 Left: left,
 //                 Right: right,  
 //                 Bottom: bottom + n,
 //                 Top: top + n,
-//             }) == 0) {
+//             }) == 0 {
 //                 return Err(TtyErrorKind::ResizingError(String::from(
 //                     "Something went wrong when scrolling down the console."
 //                 )));

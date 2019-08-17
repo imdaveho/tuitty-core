@@ -89,20 +89,20 @@ pub fn _read_sync() -> SyncReader {
 }
 
 pub fn _enable_mouse_mode() -> TtyResult<()> {
-    let handle = Handle::conout()?;
+    let handle = Handle::conin()?;
     let mode = handle.get_mode()?;
     let mouse_mode = mode | MOUSE_MODE;
     handle.set_mode(&mouse_mode)?;
     Ok(())
 }
 
-pub fn _disable_mouse_mode() -> TtyResult<()> {
-    let handle = Handle::conout()?;
-    let mode = handle.get_mode()?;
-    let mouse_mode = mode | !MOUSE_MODE;
-    handle.set_mode(&mouse_mode)?;
-    Ok(())
-}
+// pub fn _disable_mouse_mode() -> TtyResult<()> {
+//     let handle = Handle::conin()?;
+//     let mode = handle.get_mode()?;
+//     let mouse_mode = mode & !MOUSE_MODE;
+//     handle.set_mode(&mouse_mode)?;
+//     Ok(())
+// }
 
 
 pub struct AsyncReader {

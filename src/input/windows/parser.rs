@@ -149,7 +149,8 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
 
 
 /// Describes an input event in the console input buffer.
-/// These records can be read from the input buffer by using the `ReadConsoleInput` or `PeekConsoleInput` function, or written to the input buffer by using the `WriteConsoleInput` function.
+/// These records can be read from the input buffer by using the `ReadConsoleInput` or `PeekConsoleInput` function, 
+/// or written to the input buffer by using the `WriteConsoleInput` function.
 ///
 /// [Ms Docs](https://docs.microsoft.com/en-us/windows/console/input-record-str)
 #[derive(Clone)]

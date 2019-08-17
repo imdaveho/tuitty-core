@@ -12,7 +12,9 @@ use std:: {
 
 #[cfg(windows)]
 mod windows;
-pub use windows::{Handle, ConsoleInfo, Termios};
+
+#[cfg(windows)]
+pub use windows::{Handle, ConsoleInfo};
 
 /// Tuitty Error Handling
 /// ****************************************************************************

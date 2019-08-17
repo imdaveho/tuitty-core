@@ -5,7 +5,7 @@ use super::*;
 
 
 // Reference: redox-os/termion/blob/master/src/event.rs
-pub(crate) fn parse_event<I>(item: u8, iter: &mut I) -> TtyResult<InputEvent>
+pub fn parse_event<I>(item: u8, iter: &mut I) -> TtyResult<InputEvent>
 where I: Iterator<Item = u8> {
     let error = TtyErrorKind::IoError(Error::new(
         ErrorKind::Other,

@@ -1,6 +1,6 @@
 //! Implements platform specific functions to style text output to the terminal.
 use crate::{csi, write_cout};
-use super::{Color, Style, Attribute, TtyResult, Write};
+use super::{Color, Style, TextStyle, TtyResult, Write};
 
 
 fn stylize(style: Style) -> String {
@@ -9,29 +9,28 @@ fn stylize(style: Style) -> String {
     let color: Color;
 
     match style {
-        Style::Fg(_color) => {
-            if _color == Color::Reset {
-                ansi_value.push_str("39");
+        Style::Fg(c) => {
+            if c == Color::Reset {
+                ansi_value.push_str("39;");
                 return ansi_value;
             } else {
                 ansi_value.push_str("38;");
-                color = _color;
+                color = c;
             }
         }
-        Style::Bg(_color) => {
-            if _color == Color::Reset {
-                ansi_value.push_str("49");
+        Style::Bg(c) => {
+            if c == Color::Reset {
+                ansi_value.push_str("49;");
                 return ansi_value;
             } else {
                 ansi_value.push_str("48;");
-                color = _color;
+                color = c;
             }
         }
-        Style::Attr(_attr) => {
-            ansi_value.push_str(_attr.to_string().as_str());
+        Style::Tx(t) => {
+            ansi_value.push_str(t.to_string().as_str());
             return ansi_value;
         }
-
     }
 
     let rgb_val: String;
@@ -84,11 +83,66 @@ pub fn _set_bg(bg_color: Color) -> TtyResult<()> {
     Ok(())
 }
 
-pub fn _set_attr(attr: Attribute) -> TtyResult<()> {
+pub fn _set_tx(text_style: TextStyle) -> TtyResult<()> {
     write_cout!(&format!(
         csi!("{}m"),
-        stylize(Style::Attr(attr)),
+        stylize(Style::Tx(text_style)),
     ))?;
+    Ok(())
+}
+
+pub fn _set_all(fg: &str, bg: &str, tx: &str) -> TtyResult<()> {
+    let fg_color = Color::from(fg);
+    let fg_str = stylize(Style::Fg(Color::from(fg)));
+
+    let bg_color = Color::from(bg);
+    let bg_str = stylize(Style::Bg(Color::from(bg)));
+
+    // The tx param is should be a comma separated string.
+    let tx_arr: Vec<&str> = tx.split(',').map(|t| t.trim()).collect();
+    let mut dimmed = false;
+    let tx_str = String::new();
+    for s in tx_arr.iter() {
+        match *s {
+            "bold" => {
+                if !dimmed {
+                    tx_str.push_str(
+                    format!(
+                        csi!("{}m"), 
+                        stylize(Style::Tx(TextStyle::from(*s)))
+                    ).as_str())
+                }
+            }
+            "dim" => {
+                tx_str.push_str(
+                    format!(
+                        csi!("{}m"), 
+                        stylize(Style::Tx(TextStyle::from(*s)))
+                ).as_str())
+                dimmed = true;
+            }
+            "underline" | "reverse" | "hide" => {
+                tx_str.push_str(
+                    format!(
+                        csi!("{}m"), 
+                        stylize(Style::Tx(TextStyle::from(*s)))
+                ).as_str())
+            }
+            "" => (),
+            _ => {
+                tx_str.push_str(
+                    format!(
+                        csi!("{}m"), 
+                        stylize(Style::Tx(TextStyle::from(*s)))
+                ).as_str())
+                break;
+            }
+        }
+    }
+
+    write_cout!(&format!(
+        csi!("{}{}{}"),
+        fg_str, bg_str, tx_str))?;
     Ok(())
 }
 

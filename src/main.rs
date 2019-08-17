@@ -1,233 +1,210 @@
 extern crate tuitty;
+use winapi::um::{
+    wincon::{
+        SetConsoleTextAttribute,
+        WriteConsoleOutputW,
+        COORD, CHAR_INFO, SMALL_RECT,
+    },
+    consoleapi::{WriteConsoleA, WriteConsoleW},
+};
 
-// use std::{thread, time};
-// use std::io::{stdout, Write};
+use winapi::um::wincontypes::CHAR_INFO_Char;
+use std::mem::zeroed;
+use winapi::shared::ntdef::{NULL, VOID};
 
 
 fn main() {
-    let size = tuitty::screen::size();
-    println!("{}, {}", size.0, size.1);
+    // let handle = tuitty::Handle::conout().unwrap();
+    // let info = tuitty::ConsoleInfo::of(&handle).unwrap();
+    // let attrs = info.attributes();
+    
+    // // println!("attributes: {}", attrs);
 
+    // let blue = 0x0001;
+    // let green = 0x0002;
+    // let red = 0x0004;
+    // let intense = 0x0008;
 
+    // // let lead_byte = 0x0100;
+    // // let tral_byte = 0x0200;
+    // // let top_horiz = 0x0400;
+    // // let left_vert = 0x0800;
+    // // let right_vert = 0x1000;
+    // // let reverse = 0x4000;
+    // let underln = 0x8000;
 
+    // let white = red | green | blue;
 
+    // let color = white;
 
-    // let o = stdout();
-    // let mut o = o.lock();
-    // let t = "this is a long str that I believe wraps around but can't really determine if that is really the case or not\0";
-    // o.write(t.as_bytes());
-    // o.flush();
-    // let delay = time::Duration::from_millis(3000);
-    // thread::sleep(delay);
-
-
-
-
-
-    // tuitty::screen::clear(tuitty::screen::ClearStyle::All).unwrap();
-
-
-
-
-
-    // let delay = time::Duration::from_secs(1);
-
-    // tuitty::output::linux::_set_fg(tuitty::output::Color::from("magenta")).unwrap();
-    // print!("Magenta, ");
-    // stdout().flush().unwrap();
-
-    // thread::sleep(delay);
-
-    // tuitty::output::linux::_set_fg(tuitty::output::Color::Yellow).unwrap();
-    // print!("Yellow, ");
-    // stdout().flush().unwrap();
-
-    // thread::sleep(delay);
-
-    // // tuitty::output::linux::_set_fg(tuitty::output::Color::Reset).unwrap();
-    // // print!("Reset\n");
-    // // stdout().flush().unwrap();
-
-    // tuitty::output::linux::_set_fg(tuitty::output::Color::Reset).unwrap();
-    // tuitty::output::linux::_set_attr(tuitty::output::Attribute::Underline).unwrap();
-    // println!("This is after yellow was set as Fg.");
-
-
-
-
-    // for col in 0..10 {
-    //     for row in 0..5 {
-    //         tuitty::cursor::goto(row, col).unwrap();
-    //         let delay = time::Duration::from_millis(200);
-    //         thread::sleep(delay);
+    // unsafe {
+    //     if SetConsoleTextAttribute(handle.0, green) == 0 {
+    //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
+    //         panic!("Something went wrong with setting the text attribute")
     //     }
     // }
 
+    // println!("Hello");
 
-    // let (w, a, s, d) = (
-    //     tuitty::cursor::move_up,
-    //     tuitty::cursor::move_left,
-    //     tuitty::cursor::move_down,
-    //     tuitty::cursor::move_right
-    // );
+    // unsafe {
+    //     if SetConsoleTextAttribute(handle.0, attrs & !intense) == 0 {
+    //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
+    //         panic!("Something went wrong with setting the text attribute")
+    //     }
+    // }
 
-    // tuitty::screen::clear(tuitty::screen::ClearStyle::All).unwrap();
+    // println!("Hello");
 
-    // tuitty::cursor::goto(10, 10).unwrap();
-    // thread::sleep(time::Duration::from_secs(1));
 
-    // tuitty::cursor::save_pos().unwrap();
 
-    // use std::time;
+    // println!("something after");
+    // println!("setting the attr");
+
+    // // RESET
+    // unsafe {
+    //     if SetConsoleTextAttribute(handle.0, attrs) == 0 {
+    //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
+    //         panic!("Something went wrong with setting the text attribute")
+    //     }
+    // }
+
+    // println!("Hello");
+
+
+    // // SWITCH TO ALT SCREEN
+    // let altern = tuitty::Handle::buffer().unwrap();
+    // tuitty::clear("newln");
+
+    // altern.show().unwrap();
+
+    // tuitty::clear("all");
+
+    // unsafe {
+    //     if SetConsoleTextAttribute(altern.0, red|intense) == 0 {
+    //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
+    //         panic!("Something went wrong with setting the text attribute")
+    //     }
+    // }
+    // // https://docs.microsoft.com/en-us/windows/console/writeconsoleoutput
+    // // https://docs.microsoft.com/en-us/windows/console/reading-and-writing-blocks-of-characters-and-attributes
+    // let words = "something after in altern; with widechar: 𝕊 🗻 ∈ 🌏".encode_utf16();
+    // // let words = "something after in altern; with widechar: 𝕊 🗻∈🌏".as_bytes();
+    // let char_info_buffer = words
+    //     // .iter()
+    //     .map(|ch| unsafe {
+    //         let mut char_info: CHAR_INFO = zeroed();
+    //         char_info.Attributes = blue | intense;
+    //         // *char_info.Char.UnicodeChar_mut() = *ch as u16;
+    //         *char_info.Char.UnicodeChar_mut() = ch;
+    //         char_info
+    //     }).collect::<Vec<CHAR_INFO>>();
+    
+    // let length = char_info_buffer.len();
+    // let bsize = tuitty::size();
+    // let rows = length as i16 / bsize.0 + 1;
+    
+    // // // println!("{}", rows);
+
+    // // // this informs how much of the pointer the function needs to traverse
+    // let buf_size = COORD {X: length as i16, Y: rows}; 
+    // let buf_cord = COORD {X: 0, Y: 0};
+    // let mut dest_rect = SMALL_RECT {
+    //     Top: 0,
+    //     Left: 0,
+    //     Bottom: bsize.1,
+    //     Right: bsize.0,
+    // };
+    
+    // // let words = "A good choice of font for your coding can make a huge difference and improve your productivity, \
+    // // so take a look at the fonts in this post that can make your text editor or terminal emulator look little bit nicer. \
+    // // Andale® Mono — is a monospaced sans-serif typeface designed by Steve Matteson for terminal emulation and software \
+    // // development environments, originally for the Taligent project by Apple Inc. and IBM. The Andalé design was originally \
+    // // created by Monotype, as part of Andalé font families. Aperçu — Aperçu was started in December 2009, and has been \
+    // // trialled and tested through a number of design comissions taken on by The Entente through 2010. The conceit behind Aperçu \
+    // // was to create a synopsis or amalgamation of classic realist typefaces: Johnston, Gill Sans, Neuzeit & Franklin Gothic.";
+
+    // // let chars = words.encode_utf16().map(|x| x).collect::<Vec<u16>>();
+    // // let words_ptr = chars;
+    // // let length = words_ptr.len() as u32;
+    // // let mut size = 0;
+
+    // unsafe {
+    //     // // https://docs.microsoft.com/en-us/windows/console/writeconsole
+    //     // if WriteConsoleW(
+    //     //     altern.0,
+    //     //     words_ptr.as_ptr() as *const VOID,
+    //     //     length, 
+    //     //     &mut size, NULL
+    //     // ) == 0 {
+    //     //     panic!("Something went wrong writing in altern")
+    //     // }
+
+    //     if WriteConsoleOutputW(
+    //         altern.0,
+    //         char_info_buffer.as_ptr(),
+    //         buf_size, buf_cord, 
+    //         &mut dest_rect
+    //     ) == 0 {
+    //         panic!("Something went wrong writing in altern")
+    //     }
+
+    // }
+
+    // // if size == length {
+    // //     println!("write success!");
+    // // }
+
+    //                 // unsafe {
+    //                 //     if SetConsoleTextAttribute(handle.0, red) == 0 {
+    //                 //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
+    //                 //         panic!("Something went wrong with setting the text attribute")
+    //                 //     }
+    //                 // }
+
+    //                 // use std::io::Write;
+
+    //                 // let stdout = ::std::io::stdout();
+    //                 // let mut stdout = stdout.lock();
+
+    //                 // // stdout.flush().unwrap();
+    //                 // stdout.write("\x1B[?1049h".as_bytes()).unwrap();
+    //                 // // tuitty::clear("all");
+    //                 // stdout.write("\x1B[2J".as_bytes()).unwrap();
+    //                 // stdout.flush().unwrap();
+
+    //                 // stdout.write("something after alt\0".as_bytes()).unwrap();
+    //                 // stdout.write("setting the attr alt\n".as_bytes()).unwrap();
+
+    //                 // stdout.flush().unwrap();
+
+    //                 // println!("something after");
+    //                 // println!("setting the attr");
+
+    //                 // stdout.write("\x1B[?1049l".as_bytes()).unwrap();
+
+
+    // use std::time::Duration;
     // use std::thread;
 
-    // let delay = time::Duration::from_millis(200);
-    // thread::sleep(delay);
-
-    // w(1).unwrap();
-    // thread::sleep(delay);
-    // d(1).unwrap();
-    // thread::sleep(delay);
-    // s(1).unwrap();
-    // thread::sleep(delay);
-    // a(1).unwrap();
-    // thread::sleep(delay);
-
-    // tuitty::cursor::hide().unwrap();
-    // thread::sleep(delay);
-
-    // use std::io::stdout;
-    // use std::io::Write;
-
-    // w(1).unwrap();
-    // print!("w");
-    // stdout().flush().unwrap();
-    // thread::sleep(delay);
-    // d(1).unwrap();
-    // print!("d");
-    // stdout().flush().unwrap();
-    // thread::sleep(delay);
-    // s(1).unwrap();
-    // a(1).unwrap();
-    // print!("s");
-    // stdout().flush().unwrap();
-    // thread::sleep(delay);
-    // a(3).unwrap();
-    // print!("a");
-    // stdout().flush().unwrap();
-    // thread::sleep(time::Duration::from_secs(1));
-
-    // tuitty::cursor::show().unwrap();
-    // thread::sleep(time::Duration::from_secs(1));
-    // tuitty::cursor::load_pos().unwrap();
-    // thread::sleep(time::Duration::from_secs(1));
+    // thread::sleep(Duration::from_secs(4));
+    // handle.show().unwrap();
+    // altern.close().unwrap();
 
 
-
-
-
-    // use std::io::{stdout, Write};
-    // use std::{time, thread};
-
-    // // struct AltScreen;
-
-    // // impl AltScreen {
-    // //     fn new() -> ::std::io::Result<AltScreen> {
-    // //         Ok(AltScreen)
-    // //     }
-
-    // //     fn enable(&self) {
-    // //         tuitty::screen::enable_alt().unwrap();
-    // //     }
-
-    // //     fn disable(&self) {
-    // //         tuitty::screen::disable_alt().unwrap();
-    // //     }
-    // // }
-
-    // // impl Drop for AltScreen {
-    // //     fn drop(&mut self) {
-    // //         self.disable();
-    // //     }
-    // // }
-
-    // tuitty::screen::clear(tuitty::screen::ClearStyle::CursorDown).unwrap();
-    // println!("This is the main screen!");
-    // thread::sleep(time::Duration::from_secs(1));
-
-    // // if let Ok(alt) = AltScreen::new() {
-    // //     alt.enable();
-    // //     for i in 1..5 {
-    // //         tuitty::cursor::goto(10, 2).unwrap();
-    // //         thread::sleep(time::Duration::from_millis(500));
-    // //         print!("{} of 5 items processed", i);
-    // //         stdout().flush().unwrap();
-    // //     }
-    // // }
-
-    // // {
-    // tuitty::screen::enable_alt().unwrap();
-    // for i in 1..5 {
-    //     tuitty::cursor::goto(10, 2).unwrap();
-    //     thread::sleep(time::Duration::from_millis(500));
-    //     print!("{} of 5 items processed", i);
-    //     stdout().flush().unwrap();
-    // }
-    // tuitty::screen::disable_alt().unwrap();
-    // // }
-
-    // tuitty::screen::clear(tuitty::screen::ClearStyle::CurrentLine).unwrap();
-    // thread::sleep(time::Duration::from_millis(250));
-    // tuitty::cursor::goto(0, 2).unwrap();
-    // println!("...and you've returned!");
-    // thread::sleep(time::Duration::from_secs(1));
-
-
-
-
-
-    // use std::io::{stdout, Write};
-    // use std::fmt::Display;
-    // use std::{time, thread};
-
-    // let out = stdout();
-    // let mut out = out.lock();
-    // // out.write("\x1Bc".as_bytes()).unwrap();
-
-    // #[derive(Copy, Clone)]
-    // pub enum CursorStyle {
-    //     Reset = 0,
-    //     BlinkBlock = 1,
-    //     SolidBlock = 2,
-    //     BlinkUnderline = 3,
-    //     SolidUnderline = 4,
-    //     BlinkBeam = 5,
-    //     SolidBeam = 6,
-    // }
-
-    // impl Display for CursorStyle {
-    //     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-    //         write!(f, "{}", *self as u16)
+    
+    // // RESET
+    // unsafe {
+    //     if SetConsoleTextAttribute(handle.0, attrs) == 0 {
+    //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
+    //         panic!("Something went wrong with setting the text attribute")
     //     }
     // }
 
-    // let cur_style = CursorStyle::Reset.to_string();
-    // let cur_stylestr = format!("\x1B[{} q", cur_style.as_str());
+    use std::io::Write;
 
-    // out.write(cur_stylestr.as_bytes()).unwrap();
-    // out.flush().unwrap();
+    let stdout = ::std::io::stdout();
+    let mut stdout = stdout.lock();
 
-    // thread::sleep(time::Duration::from_millis(1250));
-
-
-
-
-
-    // use std::io::Write;
-
-    // let s = String::from("\x1B[31hello\x1B[0m\n");
-    // let stdout = std::io::stdout();
-    // let mut stdout = stdout.lock();
-    // stdout.write(s.as_bytes()).unwrap();
-    // stdout.flush().unwrap();
+    stdout.write("\x1B[38;5;1m\x1B[39;mHello,\x1B[0m \x1B[38;5;10;1mHello, \x1B[38;5;10;2mHello, \x1B[38;5;10;4mHello \x1B[0m\n".as_bytes()).unwrap();
+    stdout.flush().unwrap();
 }

@@ -29,7 +29,7 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
     Ok(())
 }
 
-pub fn _size() -> (u16, u16) {
+pub fn _size() -> (i16, i16) {
     // (TimonPost) NOTE: from crossterm_terminal/src/sys/unix.rs
     // http://rosettacode.org/wiki/Terminal_control/Dimensions#Library:_BSD_libc
     let mut size = winsize {
@@ -47,10 +47,11 @@ pub fn _size() -> (u16, u16) {
     }
 }
 
-pub fn _resize(w: u16, h: u16) -> TtyResult<()> {
+pub fn _resize(w: i16, h: i16) -> TtyResult<()> {
     write_cout!(&format!(csi!("8;{};{}t"), h, w))?;
     Ok(())
 }
+
 
 // pub fn _scroll_up(n: i16) -> TtyResult<()> {
 //     write_cout!(&format!(csi!("{}S"), n))?;
