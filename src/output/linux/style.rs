@@ -1,6 +1,8 @@
 //! Implements platform specific functions to style text output to the terminal.
-use crate::{csi, write_cout};
-use super::{Color, Style, TextStyle, TtyResult, Write};
+use super::{
+    Color, Style, TextStyle, TtyResult,
+    Write, csi, write_cout
+};
 
 
 fn stylize(style: Style) -> String {
@@ -128,7 +130,7 @@ pub fn _set_all(fg: &str, bg: &str, tx: &str) -> TtyResult<()> {
                         stylize(Style::Tx(TextStyle::from(*s)))
                 ).as_str())
             }
-            "" => (),
+            "" => "m",
             _ => {
                 tx_str.push_str(
                     format!(

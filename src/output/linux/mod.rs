@@ -1,4 +1,5 @@
 //! Platform specific functions for the library.
+use crate::{csi, write_cout};
 use std::io::Write;
 use std::fmt::Display;
 use super::{Color, TtyResult, Result, Termios, Style};
@@ -9,6 +10,12 @@ pub use raw::*;
 
 mod style;
 pub use style::*;
+
+
+pub fn _write<D: Display>(value: D) -> Result<usize> {
+    write_cout!(format!("{}", value))?;
+    Ok(0)
+}
 
 
 #[derive(Copy, Clone, PartialEq)]

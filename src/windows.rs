@@ -5,15 +5,15 @@ use crate::input;
 use crate::shared::{ConsoleInfo, Handle};
 use crate::{AsyncReader, SyncReader};
 
+pub type Termios = u32;
 
-type Termios = u32;
 
 pub struct Tty {
     id: usize,
     meta: Vec<Metadata>,
     original_mode: Termios,
-    altscreen: Option<Handle>,
-    reset_color: u16,
+    pub altscreen: Option<Handle>, // TODO: implement exit() where it cleans up before ending program
+    reset_attrs: u16,
 }
 
 struct Metadata {
@@ -33,7 +33,7 @@ impl Tty {
             }],
             original_mode: output::get_mode().unwrap(),
             altscreen: None,
-            reset_color: ConsoleInfo::of(
+            reset_attrs: ConsoleInfo::of(
                 &Handle::conout().unwrap()
             ).unwrap().attributes(),
         }
@@ -44,17 +44,17 @@ pub fn clear(method: &str) {
     match method {
         "all" => {
             screen::clear(screen::Clear::All).unwrap();
-            cursor::goto(0, 0);
+            goto(0, 0);
         }
         "newln" => {
             let (col, row) = cursor::pos().unwrap();
             screen::clear(screen::Clear::NewLn).unwrap();
-            cursor::goto(col, row);
+            goto(col, row);
         }
         "currentln" => {
             let (_, row) = cursor::pos().unwrap();
             screen::clear(screen::Clear::CurrentLn).unwrap();
-            cursor::goto(0, row);
+            goto(0, row);
         }
         "cursorup" => {
             screen::clear(screen::Clear::CursorUp).unwrap();
@@ -67,7 +67,7 @@ pub fn clear(method: &str) {
 }
 
 pub fn size() -> (i16, i16) {
-    return screen::size();
+    screen::size()
 }
 
 pub fn resize(w: i16, h: i16) {
@@ -75,6 +75,13 @@ pub fn resize(w: i16, h: i16) {
 }
 
 pub fn switch(tty: &mut Tty) {
+    // This function is used primarily to create
+    // a new "screen" by creating some Metadata
+    // that reflects any changes in the mode as
+    // with enabling raw input or mouse events.
+    // On Windows, the new buffer that is created
+    // is a fresh instance to the defaults: where
+    // raw mode and mouse mode are disabled.
     if tty.altscreen.is_none() {
         tty.altscreen = Some(
             Handle::buffer().unwrap());
@@ -89,6 +96,8 @@ pub fn switch(tty: &mut Tty) {
             // do you need to enable the alternate.
             handle.show().unwrap();
         }
+        // Create the new `Metadata` to describe the
+        // new screen.
         let metas = &mut tty.meta;
         let rstate = metas[tty.id].is_raw_enabled;
         let mstate = metas[tty.id].is_mouse_enabled;
@@ -162,6 +171,14 @@ pub fn raw(tty: &mut Tty) {
 }
 
 pub fn cook(tty: &mut Tty) {
+    // "cooked" vs "raw" mode terminology from Wikipedia:
+    // https://en.wikipedia.org/wiki/Terminal_mode
+    // A terminal mode is one of a set of possible states of a
+    // terminal or pseudo terminal character device in Unix-like
+    // systems and determines how characters written to the terminal
+    // are interpreted. In cooked mode data is preprocessed before
+    // being given to a program, while raw mode passes the data as-is
+    // to the program without interpreting any of the special characters.
     let mut m = &mut tty.meta[tty.id];
     output::disable_raw().unwrap();
     m.is_raw_enabled = false;
@@ -207,7 +224,7 @@ pub fn right() {
 pub fn dpad(dir: &str, n: i16) {
     // Case-insensitive.
     let d = dir.to_lowercase();
-    if n >= 0 {
+    if n > 0 {
         match d.as_str() {
             "up" => cursor::move_up(n).unwrap(),
             "dn" => cursor::move_down(n).unwrap(),
@@ -259,4 +276,65 @@ pub fn read_async() -> AsyncReader {
 
 pub fn read_until_async(delimiter: u8) -> AsyncReader {
     input::read_until_async(delimiter)
+}
+
+pub fn set_fg(tty: &Tty, col: &str) {
+    let fg_col = output::Color::from(col);
+    output::fg(fg_col, tty.reset_attrs).unwrap();
+}
+
+pub fn set_bg(tty: &Tty, col: &str) {
+    let bg_col = output::Color::from(col);
+    output::bg(bg_col, tty.reset_attrs).unwrap();
+}
+
+pub fn set_txsty(tx: &str) {
+    let tx_sty = output::TextStyle::from(tx);
+    output::txsty(tx_sty).unwrap();
+}
+
+pub fn set_fg_rgb(tty: &Tty, r: u8, g: u8, b: u8) {
+    let fg_col = output::Color::Rgb{
+        r: r,
+        g: g,
+        b: b,
+    };
+    output::fg(fg_col, tty.reset_attrs).unwrap();
+}
+
+pub fn set_bg_rgb(tty: &Tty, r: u8, g: u8, b: u8) {
+    let bg_col = output::Color::Rgb{
+        r: r,
+        g: g,
+        b: b,
+    };
+    output::bg(bg_col, tty.reset_attrs).unwrap();
+}
+
+pub fn set_fg_ansi(tty: &Tty, v: u8) {
+    let fg_col = output::Color::AnsiValue(v);
+    output::fg(fg_col, tty.reset_attrs).unwrap();
+}
+
+pub fn set_bg_ansi(tty: &Tty, v: u8) {
+    let bg_col = output::Color::AnsiValue(v);
+    output::bg(bg_col, tty.reset_attrs).unwrap();
+}
+
+pub fn set_style(tty: &Tty, fg: &str, bg: &str, tx: &str) {
+    // The params fg is a single word, bg is 
+    // also a single word, however the tx
+    // param can be treated as a comma-separated
+    // list of words that match the various text
+    // styles that are supported: "bold", "dim",
+    // "underline", "reverse", "hide", and "reset".
+    output::set_style(fg, bg, tx, tty.reset_attrs).unwrap();
+}
+
+pub fn reset(tty: &Tty) {
+    output::reset(tty.reset_attrs).unwrap();
+}
+
+pub fn writeout(s: &str) {
+    output::writeout(s).unwrap();
 }

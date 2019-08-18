@@ -8,7 +8,7 @@ use std::io::{Error, Result};
 use crate::shared::{Handle, ConsoleInfo};
 
 #[cfg(windows)]
-type Termios = u32;
+use crate::Termios;
 
 #[cfg(unix)]
 mod linux;
@@ -19,9 +19,10 @@ pub use linux::{
     _set_bg as bg,
     _set_tx as txsty,
     _set_all as set_style,
+    _reset as reset,
     _enable_raw as enable_raw,
     _get_terminal_attr as get_mode,
-    _reset as reset,
+    _write as writeout,
     _set_terminal_attr as set_mode,
 };
 
@@ -34,8 +35,10 @@ pub use windows::{
     _set_bg as bg,
     _set_tx as txsty,
     _set_all as set_style,
+    _reset as reset,
     _enable_raw as enable_raw,
     _get_terminal_attr as get_mode,
+    _write as writeout,
     _disable_raw as disable_raw,
 };
 

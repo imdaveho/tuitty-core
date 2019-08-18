@@ -133,14 +133,14 @@ fn match_tx(text_style: TextStyle, at: u16) -> Attrs {
     }
 }
 
-pub fn _set_fg(color: Color, orig: u16) -> Result<()> {
+pub fn _set_fg(color: Color, reset: u16) -> Result<()> {
     let handle = Handle::conout()?;
     let info = ConsoleInfo::of(&handle)?;
     let curr_at = info.attributes();
     let mut attr: Attrs = stylize(Style::Fg(color), curr_at);
     if attr ==  <u16>::max_value() {
         // Reset Fg from Original
-        attr = (orig & 0x000f)
+        attr = (reset & 0x000f)
         | (curr_at & 0x00f0)
         | (curr_at & 0xdf00);
     }
@@ -152,15 +152,15 @@ pub fn _set_fg(color: Color, orig: u16) -> Result<()> {
     Ok(())
 }
 
-pub fn _set_bg(color: Color, orig: u16) -> Result<()> {
+pub fn _set_bg(color: Color, reset: u16) -> Result<()> {
     let handle = Handle::conout()?;
     let info = ConsoleInfo::of(&handle)?;
     let curr_at = info.attributes();
     let mut attr: Attrs = stylize(Style::Bg(color), curr_at);
     if attr == <u16>::max_value() {
-        // Reset Fg from Original
+        // Reset Fg from stored attrs
         attr = (curr_at & 0x000f)
-        | (orig & 0x00f0)
+        | (reset & 0x00f0)
         | (curr_at & 0xdf00);
     }
     unsafe {
@@ -171,7 +171,7 @@ pub fn _set_bg(color: Color, orig: u16) -> Result<()> {
     Ok(())
 }
 
-pub fn _set_tx(text_style: TextStyle) -> Result<()> { 
+pub fn _set_tx(text_style: TextStyle) -> Result<()> {
     let handle = Handle::conout()?;
     let info = ConsoleInfo::of(&handle)?;
     let curr_at = info.attributes();
@@ -184,14 +184,14 @@ pub fn _set_tx(text_style: TextStyle) -> Result<()> {
     Ok(())
 }
 
-pub fn _set_all(fg: &str, bg: &str, tx: &str, orig: u16) -> Result<()> {
+pub fn _set_all(fg: &str, bg: &str, tx: &str, reset: u16) -> Result<()> {
     let handle = Handle::conout()?;
     let info = ConsoleInfo::of(&handle)?;
     let curr_at = info.attributes();
     // Start with getting only the Fg Attributes.
     let (fg_attr, bg_attr, mut attrs): (u16, u16, u16);
     match fg {
-        "reset" => fg_attr = orig & 0x000f,
+        "reset" => fg_attr = reset & 0x000f,
         _ => {
             let mask_fg = 0x000f;
             let attr: Fg = stylize(Style::Fg(Color::from(fg)), curr_at);
@@ -203,7 +203,7 @@ pub fn _set_all(fg: &str, bg: &str, tx: &str, orig: u16) -> Result<()> {
     }
     // Then getting only the Bg Attributes.
     match bg {
-        "reset" => bg_attr = orig & 0x00f0,
+        "reset" => bg_attr = reset & 0x00f0,
         _ => {
             let mask_bg = 0x00f0;
             let attr: Bg = stylize(Style::Bg(Color::from(bg)), curr_at);
@@ -248,5 +248,15 @@ pub fn _set_all(fg: &str, bg: &str, tx: &str, orig: u16) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+pub fn _reset(reset: u16) -> Result<()> {
+    let handle = Handle::conout()?;
+    unsafe {
+        if SetConsoleTextAttribute(handle.0, reset) == 0 {
+            return Err(Error::last_os_error());
+        }
+    }
     Ok(())
 }

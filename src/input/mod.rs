@@ -1,11 +1,10 @@
-use std::io::{Result, stdin};
 use crate::shared::{TtyResult, Handle};
 
 #[cfg(unix)]
 mod linux;
 
 #[cfg(unix)]
-use linux::{
+pub use linux::{
     _read_char as read_char,
     _read_sync as read_sync,
     _read_async as read_async,
@@ -30,7 +29,8 @@ pub use windows::{
     SyncReader, 
 };
 
-
+// (imdaveho) TODO: Check to see if it works in legacy cmd.exe.
+// use std::io::{Result, stdin};
 // pub fn read_line() -> Result<String> {
 //     let mut rv = String::new();
 //     stdin().read_line(&mut rv)?;
@@ -94,60 +94,3 @@ pub enum KeyEvent {
     ShiftRight,
     ShiftLeft,
 }
-
-
-// pub fn read_char() -> Result<char> {
-//     #[cfg(unix)] {
-//         linux::_read_char()
-//     }
-
-//     #[cfg(windows)] {
-//         windows::_read_char()
-//     }
-// }
-
-// pub fn read_async() -> AsyncReader {
-//     #[cfg(unix)] {
-//         linux::_read_async()
-//     }
-
-//     #[cfg(windows)] {
-//         windows::_read_async()
-//     }
-// }
-
-// pub fn read_sync() -> SyncReader {
-//     #[cfg(unix)] {
-//         linux::_read_sync()
-//     }
-
-//     #[cfg(windows)] {
-//         windows::_read_sync()
-//     }
-// }
-
-// pub fn read_until_async(delimiter: u8) -> AsyncReader {
-//     #[cfg(unix)] {
-//         linux::_read_until_async(delimiter)
-//     }
-
-//     #[cfg(windows)] {
-//         windows::_read_until_async(delimiter)
-//     }
-
-// }
-
-// pub fn enable_mouse_input() -> TtyResult<()> {
-//     #[cfg(unix)] {
-//         linux::_enable_mouse_mode()
-//     }
-
-//     #[cfg(windows)] {
-//         windows::_enable_mouse_mode()
-//     }
-// }
-
-// #[cfg(unix)]
-// pub fn disable_mouse_input() -> TtyResult<()> {
-//     linux::_disable_mouse_mode()
-// }
