@@ -41,7 +41,7 @@ pub fn _size() -> (i16, i16) {
     let r = unsafe { ioctl(STDOUT_FILENO, TIOCGWINSZ.into(), &mut size) };
 
     if r == 0 {
-        (size.ws_col, size.ws_row)
+        (size.ws_col as i16, size.ws_row as i16)
     } else {
         (0, 0)
     }

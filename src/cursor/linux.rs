@@ -1,7 +1,7 @@
 //! Platform specific functions for the library.
-use std::io::{self, Write, BufRead};
+use std::io::{self, Write, BufRead, Result};
 use crate::{csi, write_cout};
-use super::{Result, TtyResult};
+use super::{TtyResult};
 
 
 pub fn _goto(col: i16, row: i16) -> TtyResult<()> {

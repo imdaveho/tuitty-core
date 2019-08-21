@@ -94,50 +94,47 @@ pub fn _set_tx(text_style: TextStyle) -> TtyResult<()> {
 }
 
 pub fn _set_all(fg: &str, bg: &str, tx: &str) -> TtyResult<()> {
-    let fg_color = Color::from(fg);
     let fg_str = stylize(Style::Fg(Color::from(fg)));
-
-    let bg_color = Color::from(bg);
     let bg_str = stylize(Style::Bg(Color::from(bg)));
 
     // The tx param is should be a comma separated string.
     let tx_arr: Vec<&str> = tx.split(',').map(|t| t.trim()).collect();
     let mut dimmed = false;
-    let tx_str = String::new();
+    let mut tx_str = String::new();
     for s in tx_arr.iter() {
         match *s {
             "bold" => {
                 if !dimmed {
                     tx_str.push_str(
                     format!(
-                        csi!("{}m"), 
+                        csi!("{}m"),
                         stylize(Style::Tx(TextStyle::from(*s)))
                     ).as_str())
                 }
-            }
+            },
             "dim" => {
                 tx_str.push_str(
                     format!(
-                        csi!("{}m"), 
+                        csi!("{}m"),
                         stylize(Style::Tx(TextStyle::from(*s)))
-                ).as_str())
-                dimmed = true;
-            }
+                ).as_str());
+                dimmed = true
+            },
             "underline" | "reverse" | "hide" => {
                 tx_str.push_str(
                     format!(
-                        csi!("{}m"), 
+                        csi!("{}m"),
                         stylize(Style::Tx(TextStyle::from(*s)))
                 ).as_str())
-            }
-            "" => "m",
+            },
+            "" => tx_str.push_str("m"),
             _ => {
                 tx_str.push_str(
                     format!(
-                        csi!("{}m"), 
+                        csi!("{}m"),
                         stylize(Style::Tx(TextStyle::from(*s)))
-                ).as_str())
-                break;
+                ).as_str());
+                break
             }
         }
     }
@@ -145,6 +142,7 @@ pub fn _set_all(fg: &str, bg: &str, tx: &str) -> TtyResult<()> {
     write_cout!(&format!(
         csi!("{}{}{}"),
         fg_str, bg_str, tx_str))?;
+
     Ok(())
 }
 

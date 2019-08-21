@@ -2,7 +2,10 @@
 //! of the TTY. It also handles styling and
 //! enabling/disabling raw modes.
 use std::str::FromStr;
-use std::io::{Error, Result};
+use std::io::Result;
+
+#[cfg(unix)]
+use crate::{Termios, TtyResult};
 
 #[cfg(windows)]
 use crate::shared::{Handle, ConsoleInfo};

@@ -2,7 +2,7 @@
 use crate::{csi, write_cout};
 use std::io::Write;
 use std::fmt::Display;
-use super::{Color, TtyResult, Result, Termios, Style};
+use super::{Color, TtyResult, Result, Termios, Style, FromStr};
 
 
 mod raw;
@@ -12,7 +12,7 @@ mod style;
 pub use style::*;
 
 
-pub fn _write<D: Display>(value: D) -> Result<usize> {
+pub fn _write<D: Display>(value: D) -> TtyResult<usize> {
     write_cout!(format!("{}", value))?;
     Ok(0)
 }
@@ -44,13 +44,13 @@ impl FromStr for TextStyle {
     type Err = ();
     fn from_str(src: &str) -> ::std::result::Result<Self, Self::Err> {
         match src.as_ref() {
-            "bold" => Ok(Attribute::Bold),
-            "dim" => Ok(Attribute::Dim),
-            "underline" => Ok(Attribute::Underline), 
-            "reverse" => Ok(Attribute::Reverse),
-            "hide" => Ok(Attribute::Hide),
-            "reset" => Ok(Attribute::Reset),
-            _ => Ok(Attribute::Reset),
+            "bold" => Ok(TextStyle::Bold),
+            "dim" => Ok(TextStyle::Dim),
+            "underline" => Ok(TextStyle::Underline),
+            "reverse" => Ok(TextStyle::Reverse),
+            "hide" => Ok(TextStyle::Hide),
+            "reset" => Ok(TextStyle::Reset),
+            _ => Ok(TextStyle::Reset),
         }
     }
 }

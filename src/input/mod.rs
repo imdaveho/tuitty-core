@@ -1,4 +1,4 @@
-use crate::shared::{TtyResult, Handle};
+use crate::{TtyResult, TtyErrorKind};
 
 #[cfg(unix)]
 mod linux;
@@ -12,7 +12,7 @@ pub use linux::{
     _enable_mouse_mode as enable_mouse_input,
     _disable_mouse_mode as disable_mouse_input,
     AsyncReader,
-    SyncReader, 
+    SyncReader,
 };
 
 #[cfg(windows)]
@@ -26,7 +26,7 @@ pub use windows::{
     _read_until_async as read_until_async,
     _enable_mouse_mode as enable_mouse_input,
     AsyncReader,
-    SyncReader, 
+    SyncReader,
 };
 
 // (imdaveho) TODO: Check to see if it works in legacy cmd.exe.

@@ -31,7 +31,7 @@ pub fn _write<D: Display>(value: D) -> Result<usize> {
             &mut size, NULL
         ) == 0 {
             return Err(Error::last_os_error());
-        }   
+        }
     }
     Ok(size as usize)
 }

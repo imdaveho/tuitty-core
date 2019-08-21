@@ -13,10 +13,12 @@ pub use windows::*;
 #[cfg(windows)]
 pub use shared::{Handle, ConsoleInfo};
 
-#[cfg(linux)]
+#[cfg(unix)]
 mod linux;
-#[cfg(linux)]
+#[cfg(unix)]
 pub use linux::*;
+#[cfg(unix)]
+pub use shared::{TtyResult, TtyErrorKind};
 
 use input::{AsyncReader, SyncReader};
 

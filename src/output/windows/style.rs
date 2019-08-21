@@ -44,7 +44,7 @@ fn stylize(style: Style, at: u16) -> Attrs {
             attr = fg | bg | tx;
         }
     }
-    
+
     attr
 }
 

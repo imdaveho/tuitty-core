@@ -2,13 +2,12 @@ use crate::screen;
 use crate::cursor;
 use crate::output;
 use crate::input;
-use crate::shared::{ConsoleInfo, Handle};
 use crate::{AsyncReader, SyncReader};
 
-use libc::termios as Termios;
+pub use libc::termios as Termios;
 
 
-struct Tty {
+pub struct Tty {
     id: usize,
     meta: Vec<Metadata>,
     original_mode: Termios,
@@ -20,7 +19,7 @@ struct Metadata {
 }
 
 impl Tty {
-    pub fn init() {
+    pub fn init() -> Tty {
         Tty {
             id: 0,
             meta: vec![Metadata {
@@ -36,7 +35,7 @@ pub fn clear(method: &str) {
     match method {
         "all" => {
             screen::clear(screen::Clear::All).unwrap();
-            cursor::goto(0, 0);
+            goto(0, 0);
         }
         "newln" => {
             screen::clear(screen::Clear::NewLn).unwrap();
@@ -84,7 +83,6 @@ pub fn switch(tty: &mut Tty) {
     metas.push(Metadata{
         is_raw_enabled: rstate,
         is_mouse_enabled: mstate,
-        saved_position: None,
     });
     tty.id = tty.meta.len() - 1;
     // Ensure that raw and mouse modes are disabled.
@@ -97,17 +95,19 @@ pub fn main(tty: &mut Tty) {
         // This function only works if the
         // User is not already on the main
         // screen buffer.
-        let m = &tty.meta[0];
+        let metas = &tty.meta;
+        let rstate = metas[0].is_raw_enabled;
+        let mstate = metas[0].is_mouse_enabled;
         tty.id = 0;
         screen::disable_alt().unwrap();
 
-        if m.is_raw_enabled {
+        if rstate {
             output::enable_raw().unwrap();
         } else {
             cook(tty);
         }
 
-        if m.is_mouse_enabled {
+        if mstate {
             input::enable_mouse_input().unwrap();
         } else {
             input::disable_mouse_input().unwrap();
@@ -126,15 +126,17 @@ pub fn switch_to(tty: &mut Tty, id: usize) {
         } else {
             // Restore the mode of the alternate
             // screen that you're switching to.
-            let m = &tty.meta[id];
+            let metas = &tty.meta;
+            let rstate = metas[id].is_raw_enabled;
+            let mstate = metas[id].is_mouse_enabled;
             tty.id = id;
-            if m.is_raw_enabled {
+            if rstate {
                 output::enable_raw().unwrap();
             } else {
                 cook(tty);
             }
 
-            if m.is_mouse_enabled {
+            if mstate {
                 input::enable_mouse_input().unwrap();
             } else {
                 input::disable_mouse_input().unwrap();
@@ -162,7 +164,7 @@ pub fn cook(tty: &mut Tty) {
     // being given to a program, while raw mode passes the data as-is
     // to the program without interpreting any of the special characters.
     let mut m = &mut tty.meta[tty.id];
-    output::set_mode(m.mode).unwrap();
+    output::set_mode(&tty.original_mode).unwrap();
     m.is_raw_enabled = false;
 }
 
@@ -212,8 +214,8 @@ pub fn dpad(dir: &str, n: i16) {
     } 
 }
 
-pub fn pos(tty: &mut Tty) {
-    if &tty.meta[tty.id].is_raw {
+pub fn pos(tty: &mut Tty) -> (i16, i16) {
+    if tty.meta[tty.id].is_raw_enabled {
         cursor::pos_raw().unwrap()
     } else {
         // Unix needs to be raw to use pos().
@@ -242,7 +244,7 @@ pub fn show_cursor() {
     cursor::show().unwrap();
 }
 
-pub fn read_char() {
+pub fn read_char() -> char {
     input::read_char().unwrap()
 }
 
