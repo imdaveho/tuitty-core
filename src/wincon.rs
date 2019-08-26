@@ -121,7 +121,7 @@ pub fn main(tty: &mut Tty) {
         stdout.set_mode(mode).unwrap();
         tty.id = 0;
         screen::disable_alt().unwrap();
-        
+
         if m.is_raw_enabled {
             output::enable_raw().unwrap();
         }
@@ -147,6 +147,13 @@ pub fn switch_to(tty: &mut Tty, id: usize) {
             let mode = &tty.original_mode;
             if let Some(handle) = &tty.altscreen {
                 handle.set_mode(mode).unwrap();
+                // Only show the altscreen handle if there
+                // is a switch from the main screen. Other-
+                // wise, the altscreen is already showing
+                // and there is no need to call `show()`.
+                if tty.id == 0 {
+                    handle.show().unwrap();
+                }
                 tty.id = id;
 
                 if m.is_raw_enabled {

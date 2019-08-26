@@ -1,14 +1,18 @@
-//! Platform specific functions for the library.
-use std::io::Write;
+// ANSI functions for configuring the terminal size and clearing the screen.
+
+use std::io::{Result, Write};
 use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 use crate::{csi, write_cout};
-use super::{Clear, TtyResult};
+use super::Clear;
 
 mod alternate;
-pub use alternate::*;
+pub use alternate::{
+    enable_alt,
+    disable_alt,
+};
 
 
-pub fn _clear(clr: Clear) -> TtyResult<()> {
+pub fn clear(clr: Clear) -> Result<()> {
     match clr {
         Clear::All => {
             write_cout!(csi!("2J"))?;
@@ -29,8 +33,8 @@ pub fn _clear(clr: Clear) -> TtyResult<()> {
     Ok(())
 }
 
-pub fn _size() -> (i16, i16) {
-    // (TimonPost) NOTE: from crossterm_terminal/src/sys/unix.rs
+pub fn size() -> (i16, i16) {
+    // Reference source:
     // http://rosettacode.org/wiki/Terminal_control/Dimensions#Library:_BSD_libc
     let mut size = winsize {
         ws_row: 0,
@@ -47,18 +51,22 @@ pub fn _size() -> (i16, i16) {
     }
 }
 
-pub fn _resize(w: i16, h: i16) -> TtyResult<()> {
+pub fn resize(w: i16, h: i16) -> Result<()> {
     write_cout!(&format!(csi!("8;{};{}t"), h, w))?;
     Ok(())
 }
 
 
-// pub fn _scroll_up(n: i16) -> TtyResult<()> {
+// NOTE: Native ANSI scroll functions commented out because they do not behave
+// as modern implementations of scrolling should. Essentially the scroll also
+// clears sections of the screen.
+
+// pub fn _scroll_up(n: i16) -> Result<()> {
 //     write_cout!(&format!(csi!("{}S"), n))?;
 //     Ok(())
 // }
 
-// pub fn _scroll_dn(n: i16) -> TtyResult<()> {
+// pub fn _scroll_dn(n: i16) -> Result<()> {
 //     write_cout!(&format!(csi!("{}T"), n))?;
 //     Ok(())
 // }

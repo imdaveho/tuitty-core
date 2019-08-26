@@ -2,9 +2,12 @@ use crate::screen;
 use crate::cursor;
 use crate::output;
 use crate::input;
-use crate::{AsyncReader, SyncReader};
 
 pub use libc::termios as Termios;
+pub use input::ansi::{
+    AsyncAnsiReader as AsyncReader,
+    SyncAnsiReader as SyncReader
+};
 
 
 pub struct Tty {
@@ -26,7 +29,7 @@ impl Tty {
                 is_raw_enabled: false,
                 is_mouse_enabled: false,
             }],
-            original_mode: output::get_mode().unwrap(),
+            original_mode: output::ansi::get_mode().unwrap(),
         }
     }
 }
@@ -34,31 +37,31 @@ impl Tty {
 pub fn clear(method: &str) {
     match method {
         "all" => {
-            screen::clear(screen::Clear::All).unwrap();
+            screen::ansi::clear(screen::Clear::All).unwrap();
             goto(0, 0);
         }
         "newln" => {
-            screen::clear(screen::Clear::NewLn).unwrap();
+            screen::ansi::clear(screen::Clear::NewLn).unwrap();
         }
         "currentln" => {
-            screen::clear(screen::Clear::CurrentLn).unwrap();
+            screen::ansi::clear(screen::Clear::CurrentLn).unwrap();
         }
         "cursorup" => {
-            screen::clear(screen::Clear::CursorUp).unwrap();
+            screen::ansi::clear(screen::Clear::CursorUp).unwrap();
         }
         "cursordn" => {
-            screen::clear(screen::Clear::CursorDn).unwrap();
+            screen::ansi::clear(screen::Clear::CursorDn).unwrap();
         }
         _ => ()
     }
 }
 
 pub fn size() -> (i16, i16) {
-    screen::size()
+    screen::ansi::size()
 }
 
 pub fn resize(w: i16, h: i16) {
-    screen::resize(w, h).unwrap();
+    screen::ansi::resize(w, h).unwrap();
 }
 
 pub fn switch(tty: &mut Tty) {
@@ -73,7 +76,7 @@ pub fn switch(tty: &mut Tty) {
         // if you're on another screen
         // since Unix systems only have
         // a single "alternate screen".
-        screen::enable_alt().unwrap();
+        screen::ansi::enable_alt().unwrap();
     }
     // Create the new `Metadata` to describe the
     // new screen.
@@ -87,7 +90,7 @@ pub fn switch(tty: &mut Tty) {
     tty.id = tty.meta.len() - 1;
     // Ensure that raw and mouse modes are disabled.
     cook(tty);
-    input::disable_mouse_input().unwrap();
+    input::ansi::disable_mouse_mode().unwrap();
 }
 
 pub fn main(tty: &mut Tty) {
@@ -99,18 +102,18 @@ pub fn main(tty: &mut Tty) {
         let rstate = metas[0].is_raw_enabled;
         let mstate = metas[0].is_mouse_enabled;
         tty.id = 0;
-        screen::disable_alt().unwrap();
+        screen::ansi::disable_alt().unwrap();
 
         if rstate {
-            output::enable_raw().unwrap();
+            output::ansi::enable_raw().unwrap();
         } else {
             cook(tty);
         }
 
         if mstate {
-            input::enable_mouse_input().unwrap();
+            input::ansi::enable_mouse_mode().unwrap();
         } else {
-            input::disable_mouse_input().unwrap();
+            input::ansi::disable_mouse_mode().unwrap();
         }
     }
 }
@@ -131,15 +134,15 @@ pub fn switch_to(tty: &mut Tty, id: usize) {
             let mstate = metas[id].is_mouse_enabled;
             tty.id = id;
             if rstate {
-                output::enable_raw().unwrap();
+                output::ansi::enable_raw().unwrap();
             } else {
                 cook(tty);
             }
 
             if mstate {
-                input::enable_mouse_input().unwrap();
+                input::ansi::enable_mouse_mode().unwrap();
             } else {
-                input::disable_mouse_input().unwrap();
+                input::ansi::disable_mouse_mode().unwrap();
             }
         }
     }
@@ -150,7 +153,7 @@ pub fn switch_to(tty: &mut Tty, id: usize) {
 
 pub fn raw(tty: &mut Tty) {
     let mut m = &mut tty.meta[tty.id];
-    output::enable_raw().unwrap();
+    output::ansi::enable_raw().unwrap();
     m.is_raw_enabled = true;
 }
 
@@ -164,40 +167,40 @@ pub fn cook(tty: &mut Tty) {
     // being given to a program, while raw mode passes the data as-is
     // to the program without interpreting any of the special characters.
     let mut m = &mut tty.meta[tty.id];
-    output::set_mode(&tty.original_mode).unwrap();
+    output::ansi::set_mode(&tty.original_mode).unwrap();
     m.is_raw_enabled = false;
 }
 
 pub fn enable_mouse(tty: &mut Tty) {
     let mut m = &mut tty.meta[tty.id];
-    input::enable_mouse_input().unwrap();
+    input::ansi::enable_mouse_mode().unwrap();
     m.is_mouse_enabled = true;
 }
 
 pub fn disable_mouse(tty: &mut Tty) {
     let mut m = &mut tty.meta[tty.id];
-    input::disable_mouse_input().unwrap();
+    input::ansi::disable_mouse_mode().unwrap();
     m.is_mouse_enabled = false;
 }
 
 pub fn goto(col: i16, row: i16) {
-    cursor::goto(col, row).unwrap();
+    cursor::ansi::goto(col, row).unwrap();
 }
 
 pub fn up() {
-    cursor::move_up(1).unwrap();
+    cursor::ansi::move_up(1).unwrap();
 }
 
 pub fn dn() {
-    cursor::move_down(1).unwrap();
+    cursor::ansi::move_down(1).unwrap();
 }
 
 pub fn left() {
-    cursor::move_left(1).unwrap();
+    cursor::ansi::move_left(1).unwrap();
 }
 
 pub fn right() {
-    cursor::move_right(1).unwrap();
+    cursor::ansi::move_right(1).unwrap();
 }
 
 pub fn dpad(dir: &str, n: i16) {
@@ -205,22 +208,22 @@ pub fn dpad(dir: &str, n: i16) {
     let d = dir.to_lowercase();
     if n > 0 {
         match d.as_str() {
-            "up" => cursor::move_up(n).unwrap(),
-            "dn" => cursor::move_down(n).unwrap(),
-            "left" => cursor::move_left(n).unwrap(),
-            "right" => cursor::move_right(n).unwrap(),
+            "up" => cursor::ansi::move_up(n).unwrap(),
+            "dn" => cursor::ansi::move_down(n).unwrap(),
+            "left" => cursor::ansi::move_left(n).unwrap(),
+            "right" => cursor::ansi::move_right(n).unwrap(),
             _ => ()
         }
-    } 
+    }
 }
 
 pub fn pos(tty: &mut Tty) -> (i16, i16) {
     if tty.meta[tty.id].is_raw_enabled {
-        cursor::pos_raw().unwrap()
+        cursor::ansi::pos_raw().unwrap()
     } else {
         // Unix needs to be raw to use pos().
         raw(tty);
-        let (col, row) = cursor::pos_raw().unwrap();
+        let (col, row) = cursor::ansi::pos_raw().unwrap();
         // Since the output was not in raw_mode before
         // we need to revert back to the cooked state.
         cook(tty);
@@ -229,50 +232,50 @@ pub fn pos(tty: &mut Tty) -> (i16, i16) {
 }
 
 pub fn mark() {
-    cursor::save_pos().unwrap()
+    cursor::ansi::save_pos().unwrap()
 }
 
 pub fn load() {
-    cursor::load_pos().unwrap()
+    cursor::ansi::load_pos().unwrap()
 }
 
 pub fn hide_cursor() {
-    cursor::hide().unwrap();
+    cursor::ansi::hide().unwrap();
 }
 
 pub fn show_cursor() {
-    cursor::show().unwrap();
+    cursor::ansi::show().unwrap();
 }
 
 pub fn read_char() -> char {
-    input::read_char().unwrap()
+    input::ansi::read_char().unwrap()
 }
 
 pub fn read_sync() -> SyncReader {
-    input::read_sync()
+    input::ansi::read_sync()
 }
 
 pub fn read_async() -> AsyncReader {
-    input::read_async()
+    input::ansi::read_async()
 }
 
 pub fn read_until_async(delimiter: u8) -> AsyncReader {
-    input::read_until_async(delimiter)
+    input::ansi::read_until_async(delimiter)
 }
 
 pub fn set_fg(col: &str) {
     let fg_col = output::Color::from(col);
-    output::fg(fg_col).unwrap();
+    output::ansi::set_fg(fg_col).unwrap();
 }
 
 pub fn set_bg(col: &str) {
     let bg_col = output::Color::from(col);
-    output::bg(bg_col).unwrap();
+    output::ansi::set_bg(bg_col).unwrap();
 }
 
-pub fn set_txsty(tx: &str) {
-    let tx_sty = output::TextStyle::from(tx);
-    output::txsty(tx_sty).unwrap();
+pub fn set_tx(tx: &str) {
+    let tx = output::TextStyle::from(tx);
+    output::ansi::set_tx(tx).unwrap();
 }
 
 pub fn set_fg_rgb(r: u8, g: u8, b: u8) {
@@ -281,7 +284,7 @@ pub fn set_fg_rgb(r: u8, g: u8, b: u8) {
         g: g,
         b: b,
     };
-    output::fg(fg_col).unwrap();
+    output::ansi::set_fg(fg_col).unwrap();
 }
 
 pub fn set_bg_rgb(r: u8, g: u8, b: u8) {
@@ -290,33 +293,33 @@ pub fn set_bg_rgb(r: u8, g: u8, b: u8) {
         g: g,
         b: b,
     };
-    output::bg(bg_col).unwrap();
+    output::ansi::set_bg(bg_col).unwrap();
 }
 
 pub fn set_fg_ansi(v: u8) {
     let fg_col = output::Color::AnsiValue(v);
-    output::fg(fg_col).unwrap();
+    output::ansi::set_fg(fg_col).unwrap();
 }
 
 pub fn set_bg_ansi(v: u8) {
     let bg_col = output::Color::AnsiValue(v);
-    output::bg(bg_col).unwrap();
+    output::ansi::set_bg(bg_col).unwrap();
 }
 
 pub fn set_style(fg: &str, bg: &str, tx: &str) {
-    // The params fg is a single word, bg is 
+    // The params fg is a single word, bg is
     // also a single word, however the tx
     // param can be treated as a comma-separated
     // list of words that match the various text
     // styles that are supported: "bold", "dim",
     // "underline", "reverse", "hide", and "reset".
-    output::set_style(fg, bg, tx).unwrap();
+    output::ansi::set_all(fg, bg, tx).unwrap();
 }
 
 pub fn reset() {
-    output::reset().unwrap();
+    output::ansi::reset().unwrap();
 }
 
 pub fn writeout(s: &str) {
-    output::writeout(s).unwrap();
+    output::ansi::writeout(s).unwrap();
 }

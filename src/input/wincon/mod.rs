@@ -1,15 +1,13 @@
-//! This is a Windows specific implementation for input handling.
+// Windows Console API specific functions for handling and parsing user input.
+
+use std::sync::mpsc;
+use std::time::Duration;
 use std::{char, thread};
 use std::io::{Error, ErrorKind, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
-use std::time::Duration;
+use std::sync::{mpsc::{Receiver, Sender}, Arc};
 use winapi::um::winnt::INT;
-use super::{Handle, InputEvent, KeyEvent, TtyResult};
-use std::sync::{
-    mpsc::{Receiver, Sender},
-    Arc,
-};
+use super::{Handle, InputEvent, MouseEvent, MouseButton, KeyEvent};
 
 
 mod parser;
@@ -23,14 +21,15 @@ extern "C" {
 }
 
 
-pub fn _read_char() -> Result<char> {
+pub fn read_char() -> Result<char> {
     // _getwch is without echo and _getwche is with echo
     let pressed_char = unsafe { _getwche() };
 
-    // we could return error but maybe option to keep listening until valid character is inputted.
+    // we could return error but maybe option to keep listening until valid
+    // character is inputted.
     if pressed_char == 0 || pressed_char == 0xe0 {
         return Err(Error::new(ErrorKind::Other,
-            "Given input char is not a valid char, mostly occurs 
+            "Given input char is not a valid char, mostly occurs
             when pressing special keys",
         ));
     }
@@ -46,8 +45,8 @@ pub fn _read_char() -> Result<char> {
     }
 }
 
-pub fn _read_async() -> AsyncReader {
-    AsyncReader::new(Box::new(move |event_tx, kill_switch| loop {
+pub fn read_async() -> AsyncWinConReader {
+    AsyncWinConReader::new(Box::new(move |event_tx, kill_switch| loop {
         for i in read_input_events().unwrap().1 {
             if event_tx.send(i).is_err() {
                 return;
@@ -57,13 +56,13 @@ pub fn _read_async() -> AsyncReader {
         if kill_switch.load(Ordering::SeqCst) {
             return;
         }
-        // (imdaveho) NOTE: what is?
+        // (imdaveho) NOTE: what dis?
         thread::sleep(Duration::from_millis(1));
     }))
 }
 
-pub fn _read_until_async(delimiter: u8) -> AsyncReader {
-    AsyncReader::new(Box::new(move |event_tx, kill_switch| loop {
+pub fn read_until_async(delimiter: u8) -> AsyncWinConReader {
+    AsyncWinConReader::new(Box::new(move |event_tx, kill_switch| loop {
         for event in read_input_events().unwrap().1 {
             if let InputEvent::Keyboard(KeyEvent::Char(key)) = event {
                 if (key as u8) == delimiter {
@@ -84,11 +83,11 @@ pub fn _read_until_async(delimiter: u8) -> AsyncReader {
     }))
 }
 
-pub fn _read_sync() -> SyncReader {
-    SyncReader
+pub fn read_sync() -> SyncWinConReader {
+    SyncWinConReader
 }
 
-pub fn _enable_mouse_mode() -> TtyResult<()> {
+pub fn enable_mouse_mode() -> Result<()> {
     let handle = Handle::conin()?;
     let mode = handle.get_mode()?;
     let mouse_mode = mode | MOUSE_MODE;
@@ -96,7 +95,7 @@ pub fn _enable_mouse_mode() -> TtyResult<()> {
     Ok(())
 }
 
-// pub fn _disable_mouse_mode() -> TtyResult<()> {
+// pub fn disable_mouse_mode() -> Result<()> {
 //     let handle = Handle::conin()?;
 //     let mode = handle.get_mode()?;
 //     let mouse_mode = mode & !MOUSE_MODE;
@@ -105,15 +104,17 @@ pub fn _enable_mouse_mode() -> TtyResult<()> {
 // }
 
 
-pub struct AsyncReader {
+pub struct AsyncWinConReader {
     event_rx: Receiver<InputEvent>,
     shutdown: Arc<AtomicBool>,
 }
 
-impl AsyncReader {
-    /// Construct a new instance of the `AsyncReader`.
-    /// The reading will immediately start when calling this function.
-    pub fn new(function: Box<Fn(&Sender<InputEvent>, &Arc<AtomicBool>) + Send>) -> AsyncReader {
+impl AsyncWinConReader {
+    // Construct a new instance of the `AsyncReader`.
+    // The reading will immediately start when calling this function.
+    pub fn new(function: Box<Fn(
+        &Sender<InputEvent>, &Arc<AtomicBool>
+    ) + Send>) -> AsyncReader {
         let shutdown_handle = Arc::new(AtomicBool::new(false));
 
         let (event_tx, event_rx) = mpsc::channel();
@@ -123,56 +124,60 @@ impl AsyncReader {
             function(&event_tx, &thread_shutdown);
         });
 
-        AsyncReader {
+        AsyncWinConReader {
             event_rx,
             shutdown: shutdown_handle,
         }
     }
 
-    /// Stop the input event reading.
-    ///
-    /// You don't necessarily have to call this function because it will automatically be called when this reader goes out of scope.
-    ///
-    /// # Remarks
-    /// - Background thread will be closed.
-    /// - This will consume the handle you won't be able to restart the reading with this handle, create a new `AsyncReader` instead.
+    // Stop the input event reading.
+    //
+    // You don't necessarily have to call this function because it will
+    // automatically be called when this reader goes out of scope.
+    //
+    // - Background thread will be closed.
+    // - This will consume the handle you won't be able to restart the reading
+    //   with this handle, create a new `AsyncReader` instead.
     pub fn stop_reading(&mut self) {
         self.shutdown.store(true, Ordering::SeqCst);
     }
 }
 
-impl Drop for AsyncReader {
+impl Drop for AsyncWinConReader {
     fn drop(&mut self) {
         self.stop_reading();
     }
 }
 
-impl Iterator for AsyncReader {
+impl Iterator for AsyncWinConReader {
     type Item = InputEvent;
 
-    /// Check if there are input events to read.
-    ///
-    /// It will return `None` when nothing is there to read, `Some(InputEvent)` if there are events to read.
-    ///
-    /// # Remark
-    /// - This is **not** a blocking call.
-    /// - When calling this method to fast after each other the reader might not have read a full byte sequence of some pressed key.
-    /// Make sure that you have some delay of a few ms when calling this method.
+    // Check if there are input events to read.
+    //
+    // It will return `None` when nothing is there to read, `Some(InputEvent)`
+    // if there are events to read.
+    //
+    // - This is **not** a blocking call.
+    // - When calling this method rapidly after each other the reader might not
+    //   have read a full byte sequence of some pressed key.
+    //
+    // Make sure that you have some delay of a few ms when calling this method.
     fn next(&mut self) -> Option<Self::Item> {
         let mut iterator = self.event_rx.try_iter();
         iterator.next()
     }
 }
 
-pub struct SyncReader;
+pub struct SyncWinConReader;
 
-impl Iterator for SyncReader {
+impl Iterator for SyncWinConReader {
     type Item = InputEvent;
 
-    /// Read input from the user.
-    ///
-    /// If there are no keys pressed this will be a blocking call until there are.
-    /// This will return `None` in case of a failure and `Some(InputEvent) in case of an occurred input event.`
+    // Read input from the user.
+    //
+    // If there are no keys pressed this will be a blocking call until there are.
+    // This will return `None` in case of a failure and `Some(InputEvent) in
+    // case of an occurred input event.`
     fn next(&mut self) -> Option<Self::Item> {
         read_single_event().unwrap()
     }

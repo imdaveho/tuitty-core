@@ -1,16 +1,19 @@
-//! (imdaveho) TODO:
+// Functions to parse ANSI escape sequences and map them to the proper event.
+
 use std::str;
-use std::io::{Error, ErrorKind};
-use super::*;
+use super::{
+    Error, ErrorKind, InputEvent,KeyEvent,
+    MouseEvent, MouseButton, Result
+};
 
 
 // Reference: redox-os/termion/blob/master/src/event.rs
-pub fn parse_event<I>(item: u8, iter: &mut I) -> TtyResult<InputEvent>
+pub fn parse_event<I>(item: u8, iter: &mut I) -> Result<InputEvent>
 where I: Iterator<Item = u8> {
-    let error = TtyErrorKind::IoError(Error::new(
+    let error = Error::new(
         ErrorKind::Other,
         "Could not parse an input event",
-    ));
+    );
     let input_event = match item {
         // Match: ESC character
         b'\x1B' => {
@@ -267,12 +270,12 @@ where I: Iterator<Item = u8> {
     }
 }
 
-fn parse_utf8_char<I>(c: u8, iter: &mut I) -> TtyResult<char>
+fn parse_utf8_char<I>(c: u8, iter: &mut I) -> Result<char>
 where I: Iterator<Item = u8> {
-    let error = TtyErrorKind::IoError(Error::new(
+    let error = Error::new(
         ErrorKind::Other,
         "Input character is not valid UTF-8",
-    ));
+    );
 
     if c.is_ascii() {
         Ok(c as char)

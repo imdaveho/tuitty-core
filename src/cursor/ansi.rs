@@ -1,39 +1,40 @@
-//! Platform specific functions for the library.
-use std::io::{self, Write, BufRead, Result};
+// ANSI specific functions for controlling the terminal cursor.
+
+use std::io::{stdin, stdout, BufRead, Result, Write};
 use crate::{csi, write_cout};
-use super::{TtyResult};
 
 
-pub fn _goto(col: i16, row: i16) -> TtyResult<()> {
+
+pub fn goto(col: i16, row: i16) -> Result<()> {
     write_cout!(format!(csi!("{};{}H"), row + 1, col + 1))?;
     Ok(())
 }
 
-pub fn _move_up(n: i16) -> TtyResult<()> {
+pub fn move_up(n: i16) -> Result<()> {
     write_cout!(&format!(csi!("{}A"), n))?;
     Ok(())
 }
 
-pub fn _move_right(n: i16) -> TtyResult<()> {
+pub fn move_right(n: i16) -> Result<()> {
     write_cout!(&format!(csi!("{}C"), n))?;
     Ok(())
 }
 
-pub fn _move_down(n: i16) -> TtyResult<()> {
+pub fn move_down(n: i16) -> Result<()> {
     write_cout!(&format!(csi!("{}B"), n))?;
     Ok(())
 }
 
-pub fn _move_left(n: i16) -> TtyResult<()> {
+pub fn move_left(n: i16) -> Result<()> {
     write_cout!(&format!(csi!("{}D"), n))?;
     Ok(())
 }
 
-pub fn _pos_raw() -> Result<(i16, i16)> {
+pub fn pos_raw() -> Result<(i16, i16)> {
     // Where is the cursor?
     // Use `ESC [ 6 n`.
-    let mut stdout = io::stdout();
-    let stdin = io::stdin();
+    let mut stdout = stdout();
+    let stdin = stdin();
 
     // Write command
     stdout.write_all(b"\x1B[6n")?;
@@ -73,22 +74,22 @@ pub fn _pos_raw() -> Result<(i16, i16)> {
     Ok(((cols - 1) as i16, (rows - 1) as i16))
 }
 
-pub fn _save_pos() -> TtyResult<()> {
+pub fn save_pos() -> Result<()> {
     write_cout!(csi!("s"))?;
     Ok(())
 }
 
-pub fn _load_pos() -> TtyResult<()> {
+pub fn load_pos() -> Result<()> {
     write_cout!(csi!("u"))?;
     Ok(())
 }
 
-pub fn _hide() -> TtyResult<()> {
+pub fn hide() -> Result<()> {
     write_cout!(csi!("?25l"))?;
     Ok(())
 }
 
-pub fn _show() -> TtyResult<()> {
+pub fn show() -> Result<()> {
     write_cout!(csi!("?25h"))?;
     Ok(())
 }

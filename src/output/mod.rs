@@ -1,11 +1,22 @@
-//! Handles the printing to the visible part
-//! of the TTY. It also handles styling and
-//! enabling/disabling raw modes.
-use std::str::FromStr;
-use std::io::Result;
+//! # Output
+//!
+//! The `output` module contains the functions that will influence how and what
+//! gets displayed into the screen on both ANSI-supported terminals and Windows
+//! consoles. The module handles writing to the current output buffer, styling
+//! the foreground and background colors, setting text styles (eg. underline),
+//! and toggling raw mode.
+//!
+//! The main difference between the ANSI and WinCon for this module is that the
+//! `wincon` module does not export a set_mode function as it is moved to the
+//! root module as it takes advantage of the already specified Handle pointer 
+//! that is used at the root level.
 
-#[cfg(unix)]
-use crate::{Termios, TtyResult};
+use std::fmt::Display;
+use std::str::FromStr;
+use std::io::{Error, Result};
+use crate::{csi, write_cout, Termios};
+
+pub mod ansi;
 
 #[cfg(windows)]
 use crate::shared::{Handle, ConsoleInfo};
@@ -13,37 +24,8 @@ use crate::shared::{Handle, ConsoleInfo};
 #[cfg(windows)]
 use crate::Termios;
 
-#[cfg(unix)]
-mod linux;
-#[cfg(unix)]
-pub use linux::{
-    TextStyle,
-    _set_fg as fg,
-    _set_bg as bg,
-    _set_tx as txsty,
-    _set_all as set_style,
-    _reset as reset,
-    _enable_raw as enable_raw,
-    _get_terminal_attr as get_mode,
-    _write as writeout,
-    _set_terminal_attr as set_mode,
-};
-
 #[cfg(windows)]
-mod windows;
-#[cfg(windows)]
-pub use windows::{
-    TextStyle,
-    _set_fg as fg,
-    _set_bg as bg,
-    _set_tx as txsty,
-    _set_all as set_style,
-    _reset as reset,
-    _enable_raw as enable_raw,
-    _get_terminal_attr as get_mode,
-    _write as writeout,
-    _disable_raw as disable_raw,
-};
+pub mod wincon;
 
 
 enum Style {
@@ -120,6 +102,44 @@ impl FromStr for Color {
             "grey" => Ok(Color::Grey),
             "reset" => Ok(Color::Reset),
             _ => Ok(Color::Reset),
+        }
+    }
+}
+
+
+#[derive(Clone, Copy)]
+pub enum TextStyle {
+    Reset = 0,
+    Bold = 1,
+    Dim = 2,
+    Underline = 4,
+    Reverse = 7,
+    Hide = 8,
+}
+
+impl Display for TextStyle {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "{}", *self as u8)
+    }
+}
+
+impl From<&str> for TextStyle {
+    fn from(src: &str) -> Self {
+        src.parse().unwrap_or(TextStyle::Reset)
+    }
+}
+
+impl FromStr for TextStyle {
+    type Err = ();
+    fn from_str(src: &str) -> ::std::result::Result<Self, Self::Err> {
+        match src.as_ref() {
+            "bold" => Ok(TextStyle::Bold),
+            "dim" => Ok(TextStyle::Dim),
+            "underline" => Ok(TextStyle::Underline),
+            "reverse" => Ok(TextStyle::Reverse),
+            "hide" => Ok(TextStyle::Hide),
+            "reset" => Ok(TextStyle::Reset),
+            _ => Ok(TextStyle::Reset),
         }
     }
 }

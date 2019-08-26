@@ -8,19 +8,21 @@ mod shared;
 
 #[cfg(windows)]
 mod windows;
+
 #[cfg(windows)]
 pub use windows::*;
+
 #[cfg(windows)]
 pub use shared::{Handle, ConsoleInfo};
 
-#[cfg(unix)]
-mod linux;
-#[cfg(unix)]
-pub use linux::*;
-#[cfg(unix)]
-pub use shared::{TtyResult, TtyErrorKind};
+mod ansi;
+pub use ansi::*;
 
-use input::{AsyncReader, SyncReader};
+// use input::ansi::{AsyncAnsiReader, SyncAnsiReader};
+// TODO:
+// #[cfg(windows)]
+// use input::{AsyncAnsiReader, SyncAnsiReader};
+
 
 
 

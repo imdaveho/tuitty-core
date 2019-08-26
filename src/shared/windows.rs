@@ -5,10 +5,14 @@ use winapi::um::{
     handleapi::{INVALID_HANDLE_VALUE, CloseHandle},
     processenv::GetStdHandle,
     winbase::{STD_INPUT_HANDLE, STD_OUTPUT_HANDLE},
-    winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE, HANDLE},
+    winnt::{
+        FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ,
+        GENERIC_WRITE, HANDLE
+    },
     wincon::{
-        CreateConsoleScreenBuffer, GetConsoleScreenBufferInfo, SetConsoleActiveScreenBuffer,
-        CONSOLE_TEXTMODE_BUFFER, CONSOLE_SCREEN_BUFFER_INFO
+        CreateConsoleScreenBuffer, GetConsoleScreenBufferInfo,
+        SetConsoleActiveScreenBuffer,
+        CONSOLE_TEXTMODE_BUFFER, CONSOLE_SCREEN_BUFFER_INFO,
     },
     consoleapi::{GetConsoleMode, SetConsoleMode},
 };
@@ -61,7 +65,7 @@ impl Handle {
         }
         Ok(Handle(handle))
     }
-    
+
     pub fn stdin() -> Result<Handle> {
         unsafe {
             let handle = GetStdHandle(STD_INPUT_HANDLE);
@@ -72,7 +76,7 @@ impl Handle {
         Ok(Handle(handle))
         }
     }
-    
+
     // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-createfilew
     pub fn conin() -> Result<Handle> {
         let utf16: Vec<u16> = "CONIN$\0".encode_utf16().collect();
@@ -196,9 +200,9 @@ impl ConsoleInfo {
     pub fn window_pos(&self) -> (i16, i16, i16, i16) {
         let small_rect = self.0.srWindow;
         (
-            small_rect.Left, 
-            small_rect.Right, 
-            small_rect.Bottom, 
+            small_rect.Left,
+            small_rect.Right,
+            small_rect.Bottom,
             small_rect.Top
         )
     }
@@ -210,5 +214,46 @@ impl ConsoleInfo {
     pub fn cursor_pos(&self) -> (i16, i16) {
         let coord = self.0.dwCursorPosition;
         (coord.X, coord.Y)
+    }
+}
+
+
+pub fn is_ansi() -> bool {
+    const TERMS: [&'static str; 15] = [
+        "xterm",  // xterm, PuTTY, Mintty
+        "rxvt",   // RXVT
+        "eterm",  // Eterm
+        "screen", // GNU screen, tmux
+        "tmux",   // tmux
+        "vt100", "vt102", "vt220", "vt320",   // DEC VT series
+        "ansi",    // ANSI
+        "scoansi", // SCO ANSI
+        "cygwin",  // Cygwin, MinGW
+        "linux",   // Linux console
+        "konsole", // Konsole
+        "bvterm",  // Bitvise SSH Client
+    ];
+
+    let matched_terms = match std::env::var("TERM") {
+        Ok(val) => val != "dumb" || TERMS.contains(&val.as_str()),
+        Err(_) => false,
+    };
+
+    if matched_terms {
+        return true
+    } else {
+        let enable_vt = 0x0004;
+        let handle = match Handle::stdout() {
+            Ok(h) => h,
+            Err(_) => return false,
+        };
+        let mode = match handle.get_mode() {
+            Ok(m) => m,
+            Err(_) => return false,
+        }
+        match handle.set_mode(mode | enable_vt) {
+            Ok(_) => return true,
+            Err(_) => return false,
+        }
     }
 }

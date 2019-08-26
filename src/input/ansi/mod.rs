@@ -1,4 +1,5 @@
-//! This is a *NIX specific implementation for input handling.
+// ANSI specific functions for handling and parsing user input to the terminal.
+
 use std::fs;
 use std::io::{Result, Error, ErrorKind};
 use std::char;
@@ -14,36 +15,17 @@ use std::sync::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::os::unix::io::AsRawFd;
 use crate::{csi, write_cout};
-use super::*;
+use super::{InputEvent, MouseEvent, MouseButton, KeyEvent};
+
 
 mod parser;
 use parser::parse_event;
 
 
-fn _get_systty() -> Result<fs::File> {
-    fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("/dev/tty")
-}
-
-fn _get_systty_fd() -> Result<i32> {
-    let fd = unsafe {
-        if libc::isatty(libc::STDIN_FILENO) == 1 {
-            libc::STDIN_FILENO
-        } else {
-            let tty_f = fs::File::open("/dev/tty")?;
-            tty_f.as_raw_fd()
-        }
-    };
-    Ok(fd)
-}
-
-
-pub fn _read_char() -> Result<char> {
+pub fn read_char() -> Result<char> {
     let mut buf = [0u8; 20];
 
-    let fd = _get_systty_fd()?;
+    let fd = get_systty_fd()?;
 
     let rv = unsafe {
         let read = libc::read(fd, buf.as_mut_ptr() as *mut libc::c_void, 20);
@@ -70,9 +52,9 @@ pub fn _read_char() -> Result<char> {
     return rv;
 }
 
-pub fn _read_async() -> AsyncReader {
-    AsyncReader::new(Box::new(move |event_tx, kill_switch| {
-        for i in _get_systty().unwrap().bytes() {
+pub fn read_async() -> AsyncAnsiReader {
+    AsyncAnsiReader::new(Box::new(move |event_tx, kill_switch| {
+        for i in get_systty().unwrap().bytes() {
             if event_tx.send(i.unwrap()).is_err() {
                 return;
             }
@@ -83,9 +65,9 @@ pub fn _read_async() -> AsyncReader {
     }))
 }
 
-pub fn _read_until_async(delimiter: u8) -> AsyncReader {
-    AsyncReader::new(Box::new(move |event_tx, kill_switch| {
-        for byte in _get_systty().unwrap().bytes() {
+pub fn read_until_async(delimiter: u8) -> AsyncAnsiReader {
+    AsyncAnsiReader::new(Box::new(move |event_tx, kill_switch| {
+        for byte in get_systty().unwrap().bytes() {
             let b = byte.unwrap();
             let eos = b == delimiter;
             let send_err = event_tx.send(b).is_err();
@@ -97,14 +79,14 @@ pub fn _read_until_async(delimiter: u8) -> AsyncReader {
     }))
 }
 
-pub fn _read_sync() -> SyncReader {
-    SyncReader {
-        source: Box::from(_get_systty().unwrap()),
+pub fn read_sync() -> SyncAnsiReader {
+    SyncAnsiReader {
+        source: Box::from(get_systty().unwrap()),
         leftover: None,
     }
 }
 
-pub fn _enable_mouse_mode() -> TtyResult<()> {
+pub fn enable_mouse_mode() -> Result<()> {
     write_cout!(&format!(
         "{}h{}h{}h{}h",
         csi!("?1000"),
@@ -115,7 +97,7 @@ pub fn _enable_mouse_mode() -> TtyResult<()> {
     Ok(())
 }
 
-pub fn _disable_mouse_mode() -> TtyResult<()> {
+pub fn disable_mouse_mode() -> Result<()> {
     write_cout!(&format!(
         "{}l{}l{}l{}l",
         csi!("?1006"),
@@ -127,16 +109,36 @@ pub fn _disable_mouse_mode() -> TtyResult<()> {
 }
 
 
-pub struct AsyncReader {
+fn get_systty() -> Result<fs::File> {
+    fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/tty")
+}
+
+fn get_systty_fd() -> Result<i32> {
+    let fd = unsafe {
+        if libc::isatty(libc::STDIN_FILENO) == 1 {
+            libc::STDIN_FILENO
+        } else {
+            let tty_f = fs::File::open("/dev/tty")?;
+            tty_f.as_raw_fd()
+        }
+    };
+    Ok(fd)
+}
+
+
+pub struct AsyncAnsiReader {
     event_rx: Receiver<u8>,
     shutdown: Arc<AtomicBool>,
 }
 
-impl AsyncReader {
+impl AsyncAnsiReader {
     pub fn new(func: Box<Fn(
         &Sender<u8>,
         &Arc<AtomicBool>
-    ) + Send>) -> AsyncReader {
+    ) + Send>) -> AsyncAnsiReader {
         let shutdown_handle = Arc::new(AtomicBool::new(false));
 
         let (event_tx, event_rx) = channel();
@@ -146,7 +148,7 @@ impl AsyncReader {
             func(&event_tx, &thread_shutdown);
         });
 
-        AsyncReader {
+        AsyncAnsiReader {
             event_rx,
             shutdown: shutdown_handle,
         }
@@ -157,7 +159,7 @@ impl AsyncReader {
     }
 }
 
-impl Iterator for AsyncReader {
+impl Iterator for AsyncAnsiReader {
     type Item = InputEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -176,19 +178,19 @@ impl Iterator for AsyncReader {
     }
 }
 
-impl Drop for AsyncReader {
+impl Drop for AsyncAnsiReader {
     fn drop(&mut self) {
         self.stop_reading();
     }
 }
 
 
-pub struct SyncReader {
+pub struct SyncAnsiReader {
     source: Box<std::fs::File>,
     leftover: Option<u8>,
 }
 
-impl Iterator for SyncReader {
+impl Iterator for SyncAnsiReader {
     type Item = InputEvent;
     // Read input from the user.
     //

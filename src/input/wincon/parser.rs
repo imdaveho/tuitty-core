@@ -1,17 +1,19 @@
+// Functions to parse Windows Console inputs and map them to the proper event.
+
 use winapi::um::{
     wincon::{
         INPUT_RECORD, INPUT_RECORD_Event,
         KEY_EVENT_RECORD_uChar, KEY_EVENT, KEY_EVENT_RECORD,
         MENU_EVENT, FOCUS_EVENT, WINDOW_BUFFER_SIZE_EVENT,
-        MOUSE_EVENT, MOUSE_EVENT_RECORD, 
-        LEFT_ALT_PRESSED, LEFT_CTRL_PRESSED, RIGHT_ALT_PRESSED, 
+        MOUSE_EVENT, MOUSE_EVENT_RECORD,
+        LEFT_ALT_PRESSED, LEFT_CTRL_PRESSED, RIGHT_ALT_PRESSED,
         RIGHT_CTRL_PRESSED, SHIFT_PRESSED,
     },
     winuser::{
-        VK_BACK, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END, 
-        VK_ESCAPE, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, 
-        VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_HOME, 
-        VK_INSERT, VK_LEFT, VK_MENU, VK_NEXT, VK_PRIOR, 
+        VK_BACK, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END,
+        VK_ESCAPE, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6,
+        VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_HOME,
+        VK_INSERT, VK_LEFT, VK_MENU, VK_NEXT, VK_PRIOR,
         VK_RETURN, VK_RIGHT, VK_SHIFT, VK_UP,
     }
 };
@@ -20,16 +22,15 @@ use winapi::um::consoleapi::{
     GetNumberOfConsoleInputEvents, ReadConsoleInputW,
 };
 use std::borrow::ToOwned;
-use super::{Error, Result};
-use super::super::*;
+use super::{Error, Result, MouseEvent, MouseButton, KeyEvent};
 
 
 pub fn read_single_event() -> Result<Option<InputEvent>> {
     let conin = Handle::conin()?;
 
     let mut buf_len: DWORD = 0;
-    if !(unsafe { 
-        GetNumberOfConsoleInputEvents(conin.0, &mut buf_len) 
+    if !(unsafe {
+        GetNumberOfConsoleInputEvents(conin.0, &mut buf_len)
     } == 0) {
         return Err(Error::last_os_error());
     }
@@ -38,11 +39,11 @@ pub fn read_single_event() -> Result<Option<InputEvent>> {
      if buf_len == 0 {
         return Ok(None);
     }
-    
+
     let mut buf: Vec<INPUT_RECORD> = Vec::with_capacity(1);
     let mut size = 0;
-    
-    if !(unsafe { 
+
+    if !(unsafe {
         ReadConsoleInputW(conin.0, buf.as_mut_ptr(), 1, &mut size)
     } == 0) {
         return Err(Error::last_os_error());
@@ -86,8 +87,8 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
     let conin = Handle::conin()?;
 
     let mut buf_len: DWORD = 0;
-    if !(unsafe { 
-        GetNumberOfConsoleInputEvents(conin.0, &mut buf_len) 
+    if !(unsafe {
+        GetNumberOfConsoleInputEvents(conin.0, &mut buf_len)
     } == 0) {
         return Err(Error::last_os_error());
     }
@@ -99,7 +100,7 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
     let mut buf: Vec<INPUT_RECORD> = Vec::with_capacity(buf_len as usize);
     let mut size = 0;
 
-    if !(unsafe { 
+    if !(unsafe {
         ReadConsoleInputW(conin.0, buf.as_mut_ptr(), buf_len, &mut size)
     } == 0) {
         return Err(Error::last_os_error());
@@ -148,17 +149,17 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
 }
 
 
-/// Describes an input event in the console input buffer.
-/// These records can be read from the input buffer by using the `ReadConsoleInput` or `PeekConsoleInput` function, 
-/// or written to the input buffer by using the `WriteConsoleInput` function.
-///
-/// [Ms Docs](https://docs.microsoft.com/en-us/windows/console/input-record-str)
+// Describes an input event in the console input buffer.
+// These can be read by using the `ReadConsoleInput` or `PeekConsoleInput`,
+// or written to the input buffer by using the `WriteConsoleInput` function.
+//
+// https://docs.microsoft.com/en-us/windows/console/input-record-str
 #[derive(Clone)]
 struct InputRecord {
-    /// A handle to the type of input event and the event record stored in the Event member.
+    // A handle to the type of input event and the event record.
     pub event_type: InputEventType,
-    /// The event information. The format of this member depends on the event type specified by the EventType member.
-    /// Todo: wrap with rust type.
+    // The event information. The format of this member depends on
+    // the event type specified by the EventType member.
     pub event: INPUT_RECORD_Event,
 }
 
@@ -172,20 +173,24 @@ impl From<INPUT_RECORD> for InputRecord {
 }
 
 
-/// A handle to the type of input event and the event record stored in the Event member.
-///
-/// [Ms Docs](https://docs.microsoft.com/en-us/windows/console/input-record-str#members)
+// A handle to the type of input event and the event record in the Event member.
+//
+// https://docs.microsoft.com/en-us/windows/console/input-record-str#members
 #[derive(PartialEq, Debug, Copy, Clone)]
 enum InputEventType {
-    /// The Event member contains a `KEY_EVENT_RECORD` structure with information about a keyboard event.
+    // The `KEY_EVENT_RECORD` structure with information about a keyboard event.
     KeyEvent = KEY_EVENT as isize,
-    /// The Event member contains a `MOUSE_EVENT_RECORD` structure with information about a mouse movement or button press event.
+    // The `MOUSE_EVENT_RECORD` structure with information about a mouse
+    // movement or button press event.
     MouseEvent = MOUSE_EVENT as isize,
-    /// The Event member contains a `WINDOW_BUFFER_SIZE_RECORD` structure with information about the new size of the console screen buffer.
+    // The `WINDOW_BUFFER_SIZE_RECORD` structure with information about the new
+    // size of the console screen buffer.
     WindowBufferSizeEvent = WINDOW_BUFFER_SIZE_EVENT as isize,
-    /// The Event member contains a `FOCUS_EVENT_RECORD` structure. These events are used internally and should be ignored.
+    // The `FOCUS_EVENT_RECORD` structure. These events are used internally and
+    // should be ignored.
     FocusEvent = FOCUS_EVENT as isize,
-    /// The Event member contains a `MENU_EVENT_RECORD` structure. These events are used internally and should be ignored.
+    // The `MENU_EVENT_RECORD` structure. These events are used internally and
+    // should be ignored.
     MenuEvent = MENU_EVENT as isize,
 }
 
@@ -203,26 +208,29 @@ impl From<WORD> for InputEventType {
 }
 
 
-/// Describes a keyboard input event in a console INPUT_RECORD structure.
-/// link: [https://docs.microsoft.com/en-us/windows/console/key-event-record-str]
+// Describes a keyboard input event in a console INPUT_RECORD structure.
+// https://docs.microsoft.com/en-us/windows/console/key-event-record-str
 struct KeyEventRecord {
-    /// If the key is pressed, this member is TRUE. Otherwise, this member is FALSE (the key is released).
+    // If the key is pressed, this member is TRUE. Otherwise, this member is
+    // FALSE (the key is released).
     pub key_down: bool,
-    /// The repeat count, which indicates that a key is being held down.
-    /// For example, when a key is held down, you might get five events with this member equal to 1, one event with this member equal to 5, or multiple events with this member greater than or equal to 1.
+    // The repeat count, which indicates that a key is being held down.
+    // For example, when a key is held down, you might get five events with this
+    // member equal to 1, one event with this member equal to 5, or multiple
+    // events with this member greater than or equal to 1.
     pub repeat_count: u16,
-    /// A virtual-key code that identifies the given key in a device-independent manner.
+    // A virtual-key code that identifies the given key device-independently.
     pub virtual_key_code: WORD,
-    /// The virtual scan code of the given key that represents the device-dependent value generated by the keyboard hardware.
+    // The virtual scan code of the given key that represents the device-
+    // dependent value generated by the keyboard hardware.
     pub virtual_scan_code: u16,
-    /// A union of the following members.
-    ///
-    /// - UnicodeChar
-    ///   Translated Unicode character.
-    ///
-    /// - AsciiChar
-    ///  Translated ASCII character.
-    /// TODO, make this a rust type.
+    // A union of the following members.
+    //
+    // - UnicodeChar
+    //   Translated Unicode character.
+    //
+    // - AsciiChar
+    //  Translated ASCII character.
     pub u_char: KEY_EVENT_RECORD_uChar,
     /// The state of the control keys.
     pub control_key_state: ControlKeyState,
@@ -262,30 +270,32 @@ impl From<MOUSE_EVENT_RECORD> for MouseEventRecord {
 }
 
 
-/// The status of the mouse buttons.
-/// The least significant bit corresponds to the leftmost mouse button.
-/// The next least significant bit corresponds to the rightmost mouse button.
-/// The next bit indicates the next-to-leftmost mouse button.
-/// The bits then correspond left to right to the mouse buttons.
-/// A bit is 1 if the button was pressed.
-///
-/// [Ms Docs](https://docs.microsoft.com/en-us/windows/console/mouse-event-record-str#members)
+// The status of the mouse buttons.
+// The least significant bit corresponds to the leftmost mouse button.
+// The next least significant bit corresponds to the rightmost mouse button.
+// The next bit indicates the next-to-leftmost mouse button.
+// The bits then correspond left to right to the mouse buttons.
+// A bit is 1 if the button was pressed.
+//
+// https://docs.microsoft.com/en-us/windows/console/mouse-event-record-str
+// #members
 #[derive(PartialEq, Debug, Copy, Clone)]
 enum ButtonState {
     Release = 0x0000,
-    /// The leftmost mouse button.
+    // The leftmost mouse button.
     FromLeft1stButtonPressed = 0x0001,
-    /// The second button from the left. (Middle Button)
+    // The second button from the left. (Middle Button)
     FromLeft2ndButtonPressed = 0x0004,
-    /// The third button from the left.
+    // The third button from the left.
     FromLeft3rdButtonPressed = 0x0008,
-    /// The fourth button from the left.
+    // The fourth button from the left.
     FromLeft4thButtonPressed = 0x0010,
-    /// The rightmost mouse button.
+    // The rightmost mouse button.
     RightmostButtonPressed = 0x0002,
-    /// This button state is not recognized.
+    // This button state is not recognized.
     Unknown = 0x0021,
-    /// The wheel was rotated backward, toward the user; this will only be activated for `MOUSE_WHEELED ` from `dwEventFlags`
+    // The wheel was rotated backward, toward the user; this will only be
+    // activated for `MOUSE_WHEELED ` from `dwEventFlags`
     Negative = 0x0020,
 }
 
@@ -317,23 +327,28 @@ impl ControlKeyState {
 }
 
 
-/// The type of mouse event.
-/// If this value is zero, it indicates a mouse button being pressed or released.
-/// Otherwise, this member is one of the following values.
-///
-/// [Ms Docs](https://docs.microsoft.com/en-us/windows/console/mouse-event-record-str#members)
+// The type of mouse event.
+// If this value is zero, it indicates a mouse button being pressed or released.
+// Otherwise, this member is one of the following values.
+//
+// https://docs.microsoft.com/en-us/windows/console/mouse-event-record-str
+// #members
 #[derive(PartialEq, Debug, Copy, Clone)]
 enum EventFlags {
     PressOrRelease = 0x0000,
-    // The second click (button press) of a double-click occurred. The first click is returned as a regular button-press event.
+    // The second click (button press) of a double-click occurred. The first
+    // click is returned as a regular button-press event.
     DoubleClick = 0x0002,
     // The horizontal mouse wheel was moved.
     MouseHwheeled = 0x0008,
-    // If the high word of the dwButtonState member contains a positive value, the wheel was rotated to the right. Otherwise, the wheel was rotated to the left.
+    // If the high word of the dwButtonState member contains a positive value,
+    // the wheel was rotated to the right. Otherwise, the wheel was rotated to
+    // the left.
     MouseMoved = 0x0001,
     // A change in mouse position occurred.
-    // The vertical mouse wheel was moved, if the high word of the dwButtonState member contains a positive value, the wheel was rotated forward, away from the user.
-    // Otherwise, the wheel was rotated backward, toward the user.
+    // The vertical mouse wheel was moved, if the high word of the dwButtonState
+    // member contains a positive value, the wheel was rotated forward, away
+    // from the user. Otherwise, the wheel was rotated backward toward the user.
     MouseWheeled = 0x0004,
 }
 
@@ -354,7 +369,7 @@ impl From<DWORD> for EventFlags {
 fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
     let kcode = kevt.virtual_key_code as i32;
     match kcode {
-        // ignore SHIFT | CTRL | ALT or (0x10 | 0x11 | 0x12) 
+        // ignore SHIFT | CTRL | ALT or (0x10 | 0x11 | 0x12)
         // standalone presses
         VK_SHIFT | VK_CONTROL | VK_MENU => KeyEvent::Null,
         // (0x08) => vec![b'\x7F']
@@ -365,12 +380,12 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
         VK_RETURN => KeyEvent::Char('\n'),
         // For F1 - F12, match the key_codes with the byte value
         // format!("\x1BO{}", __)
-        // 0x70..=0x73 => b'P'..=b'S' (F1 - F4) 
+        // 0x70..=0x73 => b'P'..=b'S' (F1 - F4)
         // 0x74 => b'5' (F5)
         // 0x75..=0x77) => b'7'..=b'9' (F6 - F8)
         // 0x78..=0x79 => b'0'..=b'1' (F9 - F10)
         // 0x7A..=0x7B => b'3'..=b'4' (F11 - F12)
-        VK_F1 | VK_F2 | VK_F3 | VK_F4 
+        VK_F1 | VK_F2 | VK_F3 | VK_F4
         | VK_F5 | VK_F6 | VK_F7 | VK_F8
         | VK_F9 | VK_F10 | VK_F11 | VK_F12 => KeyEvent::F((kcode - 111) as u8),
         // 0x25 | 0x26 | 0x27 | 0x28
@@ -378,7 +393,7 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
         // first string variable is if CTRL or SHIFT is pressed:
         // if CTRL => 0x35 (53)
         // if SHIFT => 0x32 (50)
-        // second string variable is matching the char with 
+        // second string variable is matching the char with
         // left, up, right, down: [b'D', b'A', b'C', b'B']
         VK_LEFT | VK_UP | VK_RIGHT | VK_DOWN => {
             // Modifier Keys (Ctrl, Shift) Support
@@ -388,23 +403,23 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
 
             return match kcode {
                 VK_LEFT => {
-                    if ctrl { KeyEvent::CtrlLeft } 
-                    else if shift { KeyEvent::ShiftLeft } 
+                    if ctrl { KeyEvent::CtrlLeft }
+                    else if shift { KeyEvent::ShiftLeft }
                     else { KeyEvent::Left }
                 }
                 VK_UP => {
-                    if ctrl { KeyEvent::CtrlUp } 
-                    else if shift { KeyEvent::ShiftUp } 
+                    if ctrl { KeyEvent::CtrlUp }
+                    else if shift { KeyEvent::ShiftUp }
                     else { KeyEvent::Up }
                 }
                 VK_RIGHT => {
                     if ctrl { KeyEvent::CtrlRight }
-                    else if shift { KeyEvent::ShiftRight } 
+                    else if shift { KeyEvent::ShiftRight }
                     else { KeyEvent::Right }
                 }
                 VK_DOWN => {
-                    if ctrl { KeyEvent::CtrlDown } 
-                    else if shift { KeyEvent::ShiftDown } 
+                    if ctrl { KeyEvent::CtrlDown }
+                    else if shift { KeyEvent::ShiftDown }
                     else { KeyEvent::Down }
                 }
                 _ => KeyEvent::Null,
@@ -414,8 +429,8 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
         // format!("\x1B[{}~", __)
         // if PAGEUP (b'5') or PAGEDOWN (b'6')
         VK_PRIOR | VK_NEXT => {
-            if kcode == VK_PRIOR { KeyEvent::PageUp } 
-            else if kcode == VK_NEXT { KeyEvent::PageDown } 
+            if kcode == VK_PRIOR { KeyEvent::PageUp }
+            else if kcode == VK_NEXT { KeyEvent::PageDown }
             else { KeyEvent::Null }
         }
         // END 0x23 | HOME 0x24
@@ -437,7 +452,7 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
             let shift = SHIFT_PRESSED;
             // Modifier Keys (Ctrl, Alt, Shift) Support
             let chraw = { (unsafe { *kevt.u_char.UnicodeChar() } as u16) };
-            // (imdaveho) NOTE: should there be u16 support? 
+            // (imdaveho) NOTE: should there be u16 support?
             // ie. East Asian Characters?
             // if not, then we only consider u8, max: 255
             if chraw < 255 {
@@ -445,13 +460,14 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
                 let kstate = kevt.control_key_state;
                 if kstate.has_state(alt) {
                     // hex codes: 0x0002 | 0x0101 | 0x0001
-                    // If the ALT key is held down, pressing the A key produces ALT+A, 
-                    // which the system does not treat as a character at all, but 
-                    // rather as a system command. The pressed command is stored in 
-                    // `virtual_key_code`.
+                    // If the ALT key is held down, pressing the A key produces
+                    // ALT+A,
+                    // which the system does not treat as a character at all,
+                    // but rather as a system command. The pressed command is
+                    // stored in `virtual_key_code`.
                     let cmd = kevt.virtual_key_code as u8 as char;
                     // format!("\x1B{}", cmd)
-                    if (cmd).is_alphabetic() { KeyEvent::Alt(cmd) } 
+                    if (cmd).is_alphabetic() { KeyEvent::Alt(cmd) }
                     else { KeyEvent::Null }
                 } else if kstate.has_state(ctrl) {
                     // hex codes: 0x0008 | 0x0104 | 0x0004
@@ -498,10 +514,10 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
 }
 
 fn _parse_mouse_event(mevt: &MouseEventRecord) -> MouseEvent {
-    // NOTE (@imdaveho): xterm emulation takes the digits of the coords and passes them
-    // individually as bytes into a buffer; the below cxbs and cybs replicates that and
-    // mimicks the behavior; additionally, in xterm, mouse move is only handled when a
-    // mouse button is held down (ie. mouse drag)
+    // NOTE (@imdaveho): xterm emulation takes the digits of the coords and
+    // passes them individually as bytes into a buffer; the below cxbs and cybs
+    // replicates that and mimicks the behavior; additionally, in xterm, mouse
+    // move is only handled when a mouse button is held down (ie. mouse drag)
 
     let xpos = mevt.mouse_position.0 + 1;
     let ypos = mevt.mouse_position.1 + 1;
