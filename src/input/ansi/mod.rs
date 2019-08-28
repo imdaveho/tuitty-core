@@ -52,8 +52,8 @@ pub fn read_char() -> Result<char> {
     return rv;
 }
 
-pub fn read_async() -> AsyncAnsiReader {
-    AsyncAnsiReader::new(Box::new(move |event_tx, kill_switch| {
+pub fn read_async() -> AsyncReader {
+    AsyncReader::new(Box::new(move |event_tx, kill_switch| {
         for i in get_systty().unwrap().bytes() {
             if event_tx.send(i.unwrap()).is_err() {
                 return;
@@ -65,8 +65,8 @@ pub fn read_async() -> AsyncAnsiReader {
     }))
 }
 
-pub fn read_until_async(delimiter: u8) -> AsyncAnsiReader {
-    AsyncAnsiReader::new(Box::new(move |event_tx, kill_switch| {
+pub fn read_until_async(delimiter: u8) -> AsyncReader {
+    AsyncReader::new(Box::new(move |event_tx, kill_switch| {
         for byte in get_systty().unwrap().bytes() {
             let b = byte.unwrap();
             let eos = b == delimiter;
@@ -79,8 +79,8 @@ pub fn read_until_async(delimiter: u8) -> AsyncAnsiReader {
     }))
 }
 
-pub fn read_sync() -> SyncAnsiReader {
-    SyncAnsiReader {
+pub fn read_sync() -> SyncReader {
+    SyncReader {
         source: Box::from(get_systty().unwrap()),
         leftover: None,
     }
@@ -129,16 +129,16 @@ fn get_systty_fd() -> Result<i32> {
 }
 
 
-pub struct AsyncAnsiReader {
+pub struct AsyncReader {
     event_rx: Receiver<u8>,
     shutdown: Arc<AtomicBool>,
 }
 
-impl AsyncAnsiReader {
+impl AsyncReader {
     pub fn new(func: Box<Fn(
         &Sender<u8>,
         &Arc<AtomicBool>
-    ) + Send>) -> AsyncAnsiReader {
+    ) + Send>) -> AsyncReader {
         let shutdown_handle = Arc::new(AtomicBool::new(false));
 
         let (event_tx, event_rx) = channel();
@@ -148,7 +148,7 @@ impl AsyncAnsiReader {
             func(&event_tx, &thread_shutdown);
         });
 
-        AsyncAnsiReader {
+        AsyncReader {
             event_rx,
             shutdown: shutdown_handle,
         }
@@ -159,7 +159,7 @@ impl AsyncAnsiReader {
     }
 }
 
-impl Iterator for AsyncAnsiReader {
+impl Iterator for AsyncReader {
     type Item = InputEvent;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -178,19 +178,19 @@ impl Iterator for AsyncAnsiReader {
     }
 }
 
-impl Drop for AsyncAnsiReader {
+impl Drop for AsyncReader {
     fn drop(&mut self) {
         self.stop_reading();
     }
 }
 
 
-pub struct SyncAnsiReader {
+pub struct SyncReader {
     source: Box<std::fs::File>,
     leftover: Option<u8>,
 }
 
-impl Iterator for SyncAnsiReader {
+impl Iterator for SyncReader {
     type Item = InputEvent;
     // Read input from the user.
     //

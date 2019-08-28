@@ -5,6 +5,11 @@
 // For WinCon, we needed a way to wrap the methods to attain pointers to the
 // Handle object for terminal operations.
 
+#[cfg(unix)]
+mod ansi;
+
+#[cfg(unix)]
+pub use ansi::{get_mode, set_mode};
 
 #[cfg(windows)]
 mod windows;
@@ -26,6 +31,8 @@ macro_rules! csi {
 #[macro_export]
 macro_rules! write_cout {
     ($string:expr) => {{
+        use std::io::Write;
+        
         let stdout = ::std::io::stdout();
         let mut stdout = stdout.lock();
         let mut size = 0;

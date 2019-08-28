@@ -14,7 +14,9 @@
 
 use std::mem;
 use libc::c_int;
-use super::{Error, Result, Termios};
+use std::io::Error;
+use crate:Termios;
+use super::Result;
 
 
 pub fn get_mode() -> Result<Termios> {

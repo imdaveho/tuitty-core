@@ -8,33 +8,14 @@
 //! There are no notable differences between what is implemented in the ANSI and
 //! WinCon sub-modules.
 
+#[cfg(unix)]
 pub mod ansi;
-
-// #[cfg(unix)]
-// pub use linux::{
-//     _read_char as read_char,
-//     _read_sync as read_sync,
-//     _read_async as read_async,
-//     _read_until_async as read_until_async,
-//     _enable_mouse_mode as enable_mouse_input,
-//     _disable_mouse_mode as disable_mouse_input,
-//     AsyncReader,
-//     SyncReader,
-// };
 
 #[cfg(windows)]
 pub mod wincon;
 
-// #[cfg(windows)]
-// pub use windows::{
-//     _read_char as read_char,
-//     _read_sync as read_sync,
-//     _read_async as read_async,
-//     _read_until_async as read_until_async,
-//     _enable_mouse_mode as enable_mouse_input,
-//     AsyncReader,
-//     SyncReader,
-// };
+#[cfg(windows)]
+use crate::Handle;
 
 // (imdaveho) TODO: Check to see if it works in legacy cmd.exe.
 // use std::io::{Result, stdin};

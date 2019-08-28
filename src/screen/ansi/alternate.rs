@@ -10,7 +10,7 @@
 // to bash leaving the original buffer unchanged. This is the same behavior that
 // is implemented here.
 
-use super::{csi, write_cout, Result, Write};
+use super::{csi, write_cout, Result};
 
 
 pub fn enable_alt() -> Result<()> {

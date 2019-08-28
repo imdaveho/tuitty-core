@@ -2,12 +2,14 @@
 
 use std::io::Write;
 use super::{
-    csi, write_cout, Color, Display, Error,
-    Result, Termios, TextStyle, Style
+    csi, write_cout, Color, Display,
+    Result, TextStyle, Style,
 };
 
-
+#[cfg(unix)]
 mod raw;
+
+#[cfg(unix)]
 pub use raw::*;
 
 mod style;

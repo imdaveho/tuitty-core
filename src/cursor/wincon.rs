@@ -8,7 +8,7 @@ use winapi::um::wincon::{
 use crate::shared::{ConsoleInfo, Handle};
 
 
-pub fn _goto(col: i16, row: i16) -> Result<()> {
+pub fn goto(col: i16, row: i16) -> Result<()> {
     if col < 0 || col >= <i16>::max_value() {
         return Err(Error::new(
             ErrorKind::Other,
@@ -40,33 +40,33 @@ pub fn _goto(col: i16, row: i16) -> Result<()> {
     Ok(())
 }
 
-pub fn _move_up(n: i16) -> Result<()> {
-    let (col, row) = _pos().unwrap();
-    _goto(col, row - n)
+pub fn move_up(n: i16) -> Result<()> {
+    let (col, row) = pos().unwrap();
+    goto(col, row - n)
 }
 
-pub fn _move_right(n: i16) -> Result<()> {
-    let (col, row) = _pos().unwrap();
-    _goto(col + n, row)
+pub fn move_right(n: i16) -> Result<()> {
+    let (col, row) = pos().unwrap();
+    goto(col + n, row)
 }
 
-pub fn _move_down(n: i16) -> Result<()> {
-    let (col, row) = _pos().unwrap();
-    _goto(col, row + n)
+pub fn move_down(n: i16) -> Result<()> {
+    let (col, row) = pos().unwrap();
+    goto(col, row + n)
 }
 
-pub fn _move_left(n: i16) -> Result<()> {
-    let (col, row) = _pos().unwrap();
-    _goto(col - n, row)
+pub fn move_left(n: i16) -> Result<()> {
+    let (col, row) = pos().unwrap();
+    goto(col - n, row)
 }
 
-pub fn _pos() -> Result<(i16, i16)> {
+pub fn pos() -> Result<(i16, i16)> {
         let handle = Handle::conout()?;
         let info = ConsoleInfo::of(&handle)?;
         Ok(info.cursor_pos())
 }
 
-pub fn _hide() -> Result<()> {
+pub fn hide() -> Result<()> {
     let cursor_info = CONSOLE_CURSOR_INFO {
         dwSize: 100,
         bVisible: 0,
@@ -80,7 +80,7 @@ pub fn _hide() -> Result<()> {
     Ok(())
 }
 
-pub fn _show() -> Result<()> {
+pub fn show() -> Result<()> {
     let cursor_info = CONSOLE_CURSOR_INFO {
         dwSize: 100,
         bVisible: 1,

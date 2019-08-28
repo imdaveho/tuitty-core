@@ -6,36 +6,37 @@ mod input;
 mod shared;
 
 
-#[cfg(windows)]
-mod windows;
+#[cfg(unix)]
+use libc::termios as Termios;
 
 #[cfg(windows)]
-pub use windows::*;
+pub type Termios = u32;
+
+#[cfg(unix)]
+use input::ansi::{AsyncReader, SyncReader};
 
 #[cfg(windows)]
-pub use shared::{Handle, ConsoleInfo};
+use input::wincon::{AsyncReader, SyncReader};
 
-mod ansi;
-pub use ansi::*;
+#[cfg(windows)]
+use shared::{Handle, ConsoleInfo};
 
-// use input::ansi::{AsyncAnsiReader, SyncAnsiReader};
-// TODO:
-// #[cfg(windows)]
-// use input::{AsyncAnsiReader, SyncAnsiReader};
+mod tty;
 
 
 
 
-pub struct Tui(Tty);
+// pub struct Tui(Tty);
 
-#[no_mangle]
-pub extern fn tuitty() -> *mut Tui {
-    Box::into_raw(Box::new(Tui::init()))
-}
 
-// TODO: impl struct in system modules...
-impl Tui {
-    pub fn init() -> Tui {
-        Tui(Tty::init())
-    }
-}
+// #[no_mangle]
+// pub extern fn tuitty() -> *mut Tui {
+//     Box::into_raw(Box::new(Tui::init()))
+// }
+
+// // TODO: impl struct in system modules...
+// impl Tui {
+//     pub fn init() -> Tui {
+//         Tui(Tty::init())
+//     }
+// }

@@ -1,5 +1,6 @@
 // Windows Console API functions for terminal size and clearing the screen.
 
+use std::io::ErrorKind;
 use winapi::um::wincon::{
     GetLargestConsoleWindowSize, COORD, SMALL_RECT,
     SetConsoleScreenBufferSize, SetConsoleWindowInfo,
@@ -9,9 +10,8 @@ use winapi::um::wincon::{
     COMMON_LVB_GRID_RVERTICAL as RV, COMMON_LVB_REVERSE_VIDEO as REV,
     COMMON_LVB_UNDERSCORE as UN,
 };
-use std::io::{Error, Result};
 use crate::shared::{Handle, ConsoleInfo};
-use super::Clear;
+use super::{Clear, Error, Result};
 
 mod alternate;
 pub use alternate::*;
@@ -99,7 +99,7 @@ pub fn clear(clr: Clear) -> Result<()> {
     };
 }
 
-pub fn _size() -> (i16, i16) {
+pub fn size() -> (i16, i16) {
     if let Ok(handle) = Handle::conout() {
         if let Ok(info) = ConsoleInfo::of(&handle) {
             let size = info.terminal_size();
@@ -112,17 +112,17 @@ pub fn _size() -> (i16, i16) {
     }
 }
 
-pub fn _resize(w: i16, h: i16) -> Result<()> {
+pub fn resize(w: i16, h: i16) -> Result<()> {
     if w <= 0 {
-        return Err(Error(String::from(
-            "Cannot set the terminal width lower than 1",
-        )));
+        return Err(Error::new(
+            ErrorKind::Other,
+            "Cannot set the terminal width lower than 1"));
     }
 
     if h <= 0 {
-        return Err(Error(String::from(
-            "Cannot set the terminal height lower then 1",
-        )));
+        return Err(Error::new(
+            ErrorKind::Other,
+            "Cannot set the terminal height lower then 1"));
     }
 
     let handle = Handle::conout()?;
@@ -139,9 +139,9 @@ pub fn _resize(w: i16, h: i16) -> Result<()> {
 
     if buf_w < left + w {
         if left >= i16::max_value() - w {
-            return Err(Error(String::from(
-                "Argument out of range when setting terminal width.",
-            )));
+            return Err(Error::new(
+                ErrorKind::Other,
+                "Argument out of range when setting terminal width."));
         }
 
         new_w = left + w;
@@ -149,18 +149,18 @@ pub fn _resize(w: i16, h: i16) -> Result<()> {
     }
     if buf_h < top + h {
         if top >= i16::max_value() - h {
-            return Err(Error(String::from(
-                "Argument out of range when setting terminal height.",
-            )));
+            return Err(Error::new(
+                ErrorKind::Other,
+                "Argument out of range when setting terminal height."));
         }
 
         new_h = top + h;
         resize_buffer = true;
     }
 
-    let resize_error = Error(String::from(
-        "Something went wrong when setting screen buffer size.",
-    ));
+    let resize_error = Error::new(
+        ErrorKind::Other, 
+        "Something went wrong when setting screen buffer size.");
 
     if resize_buffer {
         if let Err(_) = _set_size(&handle, new_w, new_h) {
@@ -192,15 +192,15 @@ pub fn _resize(w: i16, h: i16) -> Result<()> {
     };
 
     if w > bound_w {
-        return Err(Error(format!(
-            "Argument width: {} out of range when setting terminal width.", w
-        )));
+        return Err(Error::new(
+            ErrorKind::Other, format!(
+                "Argument w: {} out of range setting terminal width.", w)));
     }
 
     if h > bound_h {
-        return Err(Error(format!(
-            "Argument height: {} out of range when setting terminal height.", h
-        )));
+        return Err(Error::new(
+            ErrorKind::Other, format!(
+                "Argument h: {} out of range setting terminal height.", h)));
     }
 
     Ok(())

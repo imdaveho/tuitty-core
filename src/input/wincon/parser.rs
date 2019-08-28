@@ -22,7 +22,10 @@ use winapi::um::consoleapi::{
     GetNumberOfConsoleInputEvents, ReadConsoleInputW,
 };
 use std::borrow::ToOwned;
-use super::{Error, Result, MouseEvent, MouseButton, KeyEvent};
+use super::{
+    Error, Result, Handle, InputEvent,
+    MouseEvent, MouseButton, KeyEvent
+};
 
 
 pub fn read_single_event() -> Result<Option<InputEvent>> {

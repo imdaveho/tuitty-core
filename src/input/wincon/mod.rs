@@ -45,8 +45,8 @@ pub fn read_char() -> Result<char> {
     }
 }
 
-pub fn read_async() -> AsyncWinConReader {
-    AsyncWinConReader::new(Box::new(move |event_tx, kill_switch| loop {
+pub fn read_async() -> AsyncReader {
+    AsyncReader::new(Box::new(move |event_tx, kill_switch| loop {
         for i in read_input_events().unwrap().1 {
             if event_tx.send(i).is_err() {
                 return;
@@ -61,8 +61,8 @@ pub fn read_async() -> AsyncWinConReader {
     }))
 }
 
-pub fn read_until_async(delimiter: u8) -> AsyncWinConReader {
-    AsyncWinConReader::new(Box::new(move |event_tx, kill_switch| loop {
+pub fn read_until_async(delimiter: u8) -> AsyncReader {
+    AsyncReader::new(Box::new(move |event_tx, kill_switch| loop {
         for event in read_input_events().unwrap().1 {
             if let InputEvent::Keyboard(KeyEvent::Char(key)) = event {
                 if (key as u8) == delimiter {
@@ -83,8 +83,8 @@ pub fn read_until_async(delimiter: u8) -> AsyncWinConReader {
     }))
 }
 
-pub fn read_sync() -> SyncWinConReader {
-    SyncWinConReader
+pub fn read_sync() -> SyncReader {
+    SyncReader
 }
 
 pub fn enable_mouse_mode() -> Result<()> {
@@ -95,21 +95,21 @@ pub fn enable_mouse_mode() -> Result<()> {
     Ok(())
 }
 
-// pub fn disable_mouse_mode() -> Result<()> {
-//     let handle = Handle::conin()?;
-//     let mode = handle.get_mode()?;
-//     let mouse_mode = mode & !MOUSE_MODE;
-//     handle.set_mode(&mouse_mode)?;
-//     Ok(())
-// }
+pub fn disable_mouse_mode() -> Result<()> {
+    let handle = Handle::conin()?;
+    let mode = handle.get_mode()?;
+    let mouse_mode = mode & !MOUSE_MODE;
+    handle.set_mode(&mouse_mode)?;
+    Ok(())
+}
 
 
-pub struct AsyncWinConReader {
+pub struct AsyncReader {
     event_rx: Receiver<InputEvent>,
     shutdown: Arc<AtomicBool>,
 }
 
-impl AsyncWinConReader {
+impl AsyncReader {
     // Construct a new instance of the `AsyncReader`.
     // The reading will immediately start when calling this function.
     pub fn new(function: Box<Fn(
@@ -124,7 +124,7 @@ impl AsyncWinConReader {
             function(&event_tx, &thread_shutdown);
         });
 
-        AsyncWinConReader {
+        AsyncReader {
             event_rx,
             shutdown: shutdown_handle,
         }
@@ -143,13 +143,13 @@ impl AsyncWinConReader {
     }
 }
 
-impl Drop for AsyncWinConReader {
+impl Drop for AsyncReader {
     fn drop(&mut self) {
         self.stop_reading();
     }
 }
 
-impl Iterator for AsyncWinConReader {
+impl Iterator for AsyncReader {
     type Item = InputEvent;
 
     // Check if there are input events to read.
@@ -168,9 +168,9 @@ impl Iterator for AsyncWinConReader {
     }
 }
 
-pub struct SyncWinConReader;
+pub struct SyncReader;
 
-impl Iterator for SyncWinConReader {
+impl Iterator for SyncReader {
     type Item = InputEvent;
 
     // Read input from the user.

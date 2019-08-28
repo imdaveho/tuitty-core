@@ -10,6 +10,8 @@
 //! to the top `wincon` module. This has to do with saving console settings to
 //! restore back to normal once the application exits and cleans up.
 
+use std::io::{Error, Result};
+
 pub mod ansi;
 
 #[cfg(windows)]

@@ -6,13 +6,13 @@
 // is created by associating a new `Handle` with some kind of `File` with Read /
 // Write traits.
 
-use super::Handle;
+use super::{Handle, Result};
 
 
-pub fn _disable_alt() -> Result<()> {
+pub fn disable_alt() -> Result<()> {
     let handle = Handle::stdout()?;
     handle.show()?;
     Ok(())
 }
 
-// pub fn _enable_alt(handle: &Handle) -> Result<()> { ... }
+// pub fn enable_alt(handle: &Handle) -> Result<()> { ... }

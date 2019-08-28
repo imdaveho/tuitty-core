@@ -1,9 +1,10 @@
 // ANSI functions for configuring the terminal size and clearing the screen.
 
-use std::io::{Result, Write};
-use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 use crate::{csi, write_cout};
-use super::Clear;
+use super::{Clear, Result};
+
+#[cfg(unix)]
+use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 
 mod alternate;
 pub use alternate::{
@@ -33,6 +34,7 @@ pub fn clear(clr: Clear) -> Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
 pub fn size() -> (i16, i16) {
     // Reference source:
     // http://rosettacode.org/wiki/Terminal_control/Dimensions#Library:_BSD_libc

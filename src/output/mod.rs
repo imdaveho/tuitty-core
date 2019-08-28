@@ -22,9 +22,6 @@ pub mod ansi;
 use crate::shared::{Handle, ConsoleInfo};
 
 #[cfg(windows)]
-use crate::Termios;
-
-#[cfg(windows)]
 pub mod wincon;
 
 

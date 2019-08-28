@@ -113,7 +113,7 @@ pub fn set_all(fg: &str, bg: &str, tx: &str, reset: u16) -> Result<()> {
             "bold" | "underline" | "reverse" | "hide" => {
                 attrs = _stylize(Style::Tx(TextStyle::from(*s)), attrs);
                 if dimmed {
-                    attrs &= !FOREGROUND_INTENSITY
+                    attrs &= !FG_INTENSITY
                 }
             }
             "dim" => {

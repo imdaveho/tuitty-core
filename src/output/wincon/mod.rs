@@ -4,10 +4,13 @@ use winapi::um::consoleapi::WriteConsoleW;
 use winapi::shared::ntdef::{NULL, VOID};
 use super::{
     Display, Error, Result, Color, Style,
-    FromStr, Handle, ConsoleInfo, Termios,
+    Handle, ConsoleInfo, Termios, TextStyle
 };
 
+#[cfg(windows)]
 mod raw;
+
+#[cfg(windows)]
 pub use raw::*;
 
 mod style;
