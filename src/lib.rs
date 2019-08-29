@@ -19,7 +19,7 @@ use input::ansi::{AsyncReader, SyncReader};
 use input::wincon::{AsyncReader, SyncReader};
 
 
-mod tty;
+pub mod tty;
 
 #[cfg(windows)]
 use tty::{Handle, ConsoleInfo};

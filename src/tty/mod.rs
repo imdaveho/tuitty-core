@@ -7,13 +7,9 @@ use crate::output;
 use crate::input;
 use crate::{AsyncReader, SyncReader, Termios};
 
-
-#[cfg(unix)]
-use libc::{c_int, ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
-
 // Shared code and abstractions that is leveraged by the other modules.
-// * For ANSI, a simple macro to help with writing escape sequences to stdout.
-// * For WinCon, wrappers for pointers to the Handle and ConsoleInfo objects.
+// * `ansi`, a simple macro to help with writing escape sequences to stdout.
+// * `wincon`, wrappers for pointers to the Handle and ConsoleInfo objects.
 
 mod ansi;
 
@@ -25,21 +21,21 @@ pub use wincon::{Handle, ConsoleInfo};
 
 
 pub struct Tty {
-    id: usize,
-    meta: Vec<Metadata>,
-    original_mode: Termios,
+    pub id: usize,
+    pub meta: Vec<Metadata>,
+    pub original_mode: Termios,
     ansi_supported: bool,
 
     #[cfg(windows)]
-    pub altscreen: Option<Handle>,
+    altscreen: Option<Handle>,
     
     #[cfg(windows)]
     reset_attrs: u16,
 }
 
-struct Metadata {
-    is_raw_enabled: bool,
-    is_mouse_enabled: bool,
+pub struct Metadata {
+    pub is_raw_enabled: bool,
+    pub is_mouse_enabled: bool,
     
     #[cfg(windows)]
     saved_position: Option<(i16, i16)>,
@@ -73,8 +69,15 @@ impl Tty {
                 is_mouse_enabled: false,
                 saved_position: None,
             }],
-            original_mode: output::wincon::get_mode().unwrap(),
-            ansi_supported: _ansi_enabled(),
+            original_mode: {
+                if !_is_wincon_supported() { 
+                    Handle::conout().unwrap()
+                    .get_mode().unwrap()
+                 } else { 
+                    output::wincon::get_mode().unwrap()
+                }
+            },
+            ansi_supported: _is_ansi_supported(),
 
             altscreen: None,
             reset_attrs: ConsoleInfo::of(
@@ -87,25 +90,33 @@ impl Tty {
     pub fn exit(&mut self) {
         self.main();
         output::ansi::set_mode(&self.original_mode).unwrap();
-        _write(cursor::ansi::show());
+        _write_ansi(cursor::ansi::show());
+        _write_ansi("\n\r".to_string());
         self.meta.clear();
     }
 
     #[cfg(windows)]
     pub fn exit(&mut self) {
-        let stdout = Handle::stdout().unwrap();
+        let handle = match _is_wincon_supported() {
+            true => Handle::stdout().unwrap(),
+            false => Handle::conout().unwrap(),
+        };
+
         if self.ansi_supported {
-            stdout.set_mode(&self.original_mode).unwrap();
-            _write(cursor::ansi::show());
+            handle.set_mode(&self.original_mode).unwrap();
+            _write_ansi(cursor::ansi::show());
+            _write_ansi("\n\r".to_string());
         } else {
-            stdout.set_mode(&self.original_mode).unwrap();
+            handle.set_mode(&self.original_mode).unwrap();
             if let Some(handle) = &self.altscreen {
                 handle.close().unwrap();
             }
             self.altscreen = None;
             cursor::wincon::show().unwrap();
+            self.write("\n\r");
         }
         self.meta.clear();
+
     }
 
     #[cfg(unix)]
@@ -157,7 +168,7 @@ impl Tty {
     #[cfg(unix)]
     pub fn enable_mouse(&mut self) {
         let mut m = &mut self.meta[self.id];
-        _write(input::ansi::enable_mouse_mode());
+        _write_ansi(input::ansi::enable_mouse_mode());
         m.is_mouse_enabled = true;
     }
 
@@ -171,7 +182,7 @@ impl Tty {
     #[cfg(unix)]
     pub fn disable_mouse(tty: &mut Tty) {
         let mut m = &mut self.meta[self.id];
-        _write(input::ansi::disable_mouse_mode());
+        _write_ansi(input::ansi::disable_mouse_mode());
         m.is_mouse_enabled = false;
     }
     
@@ -230,7 +241,7 @@ impl Tty {
         match method {
             "all" => {
                 if self.ansi_supported {
-                    _write(screen::ansi::clear(screen::Clear::All));
+                    _write_ansi(screen::ansi::clear(screen::Clear::All));
                     self.goto(0, 0);
                 } else {
                     screen::wincon::clear(screen::Clear::All).unwrap();
@@ -239,7 +250,7 @@ impl Tty {
             }
             "newln" => {
                 if self.ansi_supported {
-                    _write(screen::ansi::clear(screen::Clear::NewLn));
+                    _write_ansi(screen::ansi::clear(screen::Clear::NewLn));
                 } else {
                     let (col, row) = cursor::wincon::pos().unwrap();
                     screen::wincon::clear(screen::Clear::NewLn).unwrap();
@@ -248,7 +259,7 @@ impl Tty {
             }
             "currentln" => {
                 if self.ansi_supported {
-                    _write(screen::ansi::clear(screen::Clear::CurrentLn));
+                    _write_ansi(screen::ansi::clear(screen::Clear::CurrentLn));
                 } else {
                     let (_, row) = cursor::wincon::pos().unwrap();
                     screen::wincon::clear(screen::Clear::CurrentLn).unwrap();
@@ -257,14 +268,14 @@ impl Tty {
             }
              "cursorup" => {
                 if self.ansi_supported {
-                    _write(screen::ansi::clear(screen::Clear::CursorUp));
+                    _write_ansi(screen::ansi::clear(screen::Clear::CursorUp));
                 } else {
                     screen::wincon::clear(screen::Clear::CursorUp).unwrap();
                 }
             }
             "cursordn" => {
                 if self.ansi_supported {
-                    _write(screen::ansi::clear(screen::Clear::CursorDn));
+                    _write_ansi(screen::ansi::clear(screen::Clear::CursorDn));
                 } else {
                     screen::wincon::clear(screen::Clear::CursorDn).unwrap();
                 }
@@ -275,7 +286,7 @@ impl Tty {
 
     pub fn resize(&mut self, w: i16, h: i16) {
         if self.ansi_supported {
-            _write(screen::ansi::resize(w, h));
+            _write_ansi(screen::ansi::resize(w, h));
         } else {
             screen::wincon::resize(w, h).unwrap();
         }
@@ -289,7 +300,7 @@ impl Tty {
             if self.id == 0 {
                 // There is no point to switch if you're on another screen
                 // since ANSI terminals provide a single "alternate screen".
-                _write(screen::ansi::enable_alt());
+                _write_ansi(screen::ansi::enable_alt());
             }
             // Add new `Metadata` for the new screen. (OS-specific)
             self._add_metadata();
@@ -324,7 +335,7 @@ impl Tty {
                 let rstate = metas[0].is_raw_enabled;
                 let mstate = metas[0].is_mouse_enabled;
                 self.id = 0;
-                _write(screen::ansi::disable_alt());
+                _write_ansi(screen::ansi::disable_alt());
 
                 if rstate {
                     self.raw();
@@ -416,7 +427,7 @@ impl Tty {
 
     pub fn goto(&mut self, col: i16, row: i16) {
         if self.ansi_supported {
-            _write(cursor::ansi::goto(col, row));
+            _write_ansi(cursor::ansi::goto(col, row));
         } else {
             cursor::wincon::goto(col, row).unwrap();
         }
@@ -424,7 +435,7 @@ impl Tty {
 
     pub fn up(&mut self) {
         if self.ansi_supported {
-            _write(cursor::ansi::move_up(1));
+            _write_ansi(cursor::ansi::move_up(1));
         } else {
             cursor::wincon::move_up(1).unwrap();
         }
@@ -432,7 +443,7 @@ impl Tty {
 
     pub fn dn(&mut self) {
         if self.ansi_supported {
-            _write(cursor::ansi::move_down(1));
+            _write_ansi(cursor::ansi::move_down(1));
         } else {
             cursor::wincon::move_down(1).unwrap();
         }
@@ -440,7 +451,7 @@ impl Tty {
 
     pub fn left(&mut self) {
         if self.ansi_supported {
-            _write(cursor::ansi::move_left(1));
+            _write_ansi(cursor::ansi::move_left(1));
         } else {
             cursor::wincon::move_left(1).unwrap();
         }
@@ -448,7 +459,7 @@ impl Tty {
 
     pub fn right(&mut self) {
         if self.ansi_supported {
-            _write(cursor::ansi::move_right(1));
+            _write_ansi(cursor::ansi::move_right(1));
         } else {
             cursor::wincon::move_right(1).unwrap();
         }
@@ -461,28 +472,28 @@ impl Tty {
             match d.as_str() {
                 "up" => {
                     if self.ansi_supported {
-                        _write(cursor::ansi::move_up(n));
+                        _write_ansi(cursor::ansi::move_up(n));
                     } else {
                         cursor::wincon::move_up(n).unwrap();
                     }
                 },
                 "dn" => {
                     if self.ansi_supported {
-                        _write(cursor::ansi::move_down(n));
+                        _write_ansi(cursor::ansi::move_down(n));
                     } else {
                         cursor::wincon::move_down(n).unwrap();
                     }
                 },
                 "left" => {
                     if self.ansi_supported {
-                        _write(cursor::ansi::move_left(n));
+                        _write_ansi(cursor::ansi::move_left(n));
                     } else {
                         cursor::wincon::move_left(n).unwrap();
                     }
                 },
                 "right" => {
                     if self.ansi_supported {
-                        _write(cursor::ansi::move_right(n));
+                        _write_ansi(cursor::ansi::move_right(n));
                     } else {
                         cursor::wincon::move_right(n).unwrap();
                     }
@@ -509,7 +520,7 @@ impl Tty {
 
     pub fn mark(&mut self) {
         if self.ansi_supported {
-            _write(cursor::ansi::save_pos());
+            _write_ansi(cursor::ansi::save_pos());
         } else {
             self.meta[self.id].saved_position = Some(
                 cursor::wincon::pos().unwrap()
@@ -519,7 +530,7 @@ impl Tty {
 
     pub fn load(&mut self) {
         if self.ansi_supported {
-            _write(cursor::ansi::load_pos());
+            _write_ansi(cursor::ansi::load_pos());
         } else {
             match self.meta[self.id].saved_position {
                 Some(pos) => {
@@ -532,7 +543,7 @@ impl Tty {
 
     pub fn hide_cursor(&mut self) {
         if self.ansi_supported {
-            _write(cursor::ansi::hide());
+            _write_ansi(cursor::ansi::hide());
         } else {
             cursor::wincon::hide().unwrap();
         }
@@ -540,7 +551,7 @@ impl Tty {
 
     pub fn show_cursor(&mut self) {
         if self.ansi_supported {
-            _write(cursor::ansi::show());
+            _write_ansi(cursor::ansi::show());
         } else {
             cursor::wincon::show().unwrap();
         }
@@ -549,7 +560,7 @@ impl Tty {
     pub fn set_fg(&mut self, color: &str) {
         let fg_col = output::Color::from(color);
         if self.ansi_supported {
-            _write(output::ansi::set_fg(fg_col));
+            _write_ansi(output::ansi::set_fg(fg_col));
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
@@ -558,7 +569,7 @@ impl Tty {
     pub fn set_bg(&mut self, color: &str) {
         let bg_col = output::Color::from(color);
         if self.ansi_supported {
-            _write(output::ansi::set_bg(bg_col));
+            _write_ansi(output::ansi::set_bg(bg_col));
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
@@ -567,7 +578,7 @@ impl Tty {
     pub fn set_tx(&mut self, style: &str) {
         let tstyle = output::TextStyle::from(style);
         if self.ansi_supported {
-            _write(output::ansi::set_tx(tstyle));
+            _write_ansi(output::ansi::set_tx(tstyle));
         } else {
             output::wincon::set_tx(tstyle).unwrap();
         }
@@ -580,7 +591,7 @@ impl Tty {
             b: b,
         };
         if self.ansi_supported {
-            _write(output::ansi::set_fg(fg_col));
+            _write_ansi(output::ansi::set_fg(fg_col));
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
@@ -593,7 +604,7 @@ impl Tty {
             b: b,
         };
         if self.ansi_supported {
-            _write(output::ansi::set_bg(bg_col));
+            _write_ansi(output::ansi::set_bg(bg_col));
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
@@ -602,7 +613,7 @@ impl Tty {
     pub fn set_fg_ansi(&mut self, v: u8) {
         let fg_col = output::Color::AnsiValue(v);
         if self.ansi_supported {
-            _write(output::ansi::set_fg(fg_col));
+            _write_ansi(output::ansi::set_fg(fg_col));
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
@@ -611,7 +622,7 @@ impl Tty {
     pub fn set_bg_ansi(&mut self, v: u8) {
         let bg_col = output::Color::AnsiValue(v);
         if self.ansi_supported {
-            _write(output::ansi::set_bg(bg_col));
+            _write_ansi(output::ansi::set_bg(bg_col));
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
@@ -623,7 +634,7 @@ impl Tty {
         // match the various text styles that are supported: "bold", "dim",
         // "underline", "reverse", "hide", and "reset".
         if self.ansi_supported {
-            _write(output::ansi::set_all(fg, bg, style));
+            _write_ansi(output::ansi::set_all(fg, bg, style));
         } else {
             output::wincon::set_all(fg, bg, style, self.reset_attrs).unwrap();
         }
@@ -631,7 +642,7 @@ impl Tty {
 
     pub fn reset(&mut self) {
         if self.ansi_supported {
-            _write(output::ansi::reset());
+            _write_ansi(output::ansi::reset());
         } else {
             output::wincon::reset(self.reset_attrs).unwrap();
         }
@@ -639,13 +650,13 @@ impl Tty {
 
     pub fn write(&mut self, s: &str) {
         if self.ansi_supported {
-            _write(output::ansi::writeout(s));
+            _write_ansi(output::ansi::writeout(s));
         } else {
             output::wincon::writeout(s).unwrap();
         }
     }
 
-    pub fn flushout(&mut self) {
+    pub fn flush(&mut self) {
         // ANSI-only
         if self.ansi_supported {
             let cout = stdout();
@@ -698,7 +709,7 @@ impl Tty {
 }
 
 
-fn _write(s: String) {
+fn _write_ansi(s: String) {
     let cout = stdout();
     let lock = cout.lock();
     let mut writer = BufWriter::new(lock);
@@ -706,7 +717,7 @@ fn _write(s: String) {
 }
 
 #[cfg(windows)]
-fn _ansi_enabled() -> bool {
+fn _is_ansi_supported() -> bool {
     const TERMS: [&'static str; 15] = [
         "xterm",  // xterm, PuTTY, Mintty
         "rxvt",   // RXVT
@@ -743,5 +754,23 @@ fn _ansi_enabled() -> bool {
             Ok(_) => return true,
             Err(_) => return false,
         }
+    }
+}
+
+#[cfg(windows)]
+fn _is_wincon_supported() -> bool {
+    // MinTTY (and alledgedly ConPTY) do not have common support for the native
+    // Console API. The MinTTY instance used by `git-bash` emulates over MSYS2,
+    // which supports ANSI sequences, but throws an error when tryiing to fetch
+    // the default terminal mode from `Termios` (does not exist on Windows) or 
+    // from the `Handle` (Console API not supported).
+    //
+    // MSYSTEM environment variable: (stackoverflow)
+    // questions/37460073/msys-vs-mingw-internal-environment-variables
+    //
+    // MinTTY github issue: https://github.com/mintty/mintty/issues/56
+    match std::env::var("MSYSTEM") {
+        Ok(_) => false, // MSYS, MINGW64, MINGW32
+        Err(_) => true, // 
     }
 }

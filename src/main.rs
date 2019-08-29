@@ -13,15 +13,27 @@ extern crate tuitty;
 // use winapi::shared::ntdef::{NULL, VOID};
 
 fn main() {
-    let mut tty = tuitty::Tty::init();
+    // println!("{}", std::env::var("MSYSTEM").unwrap());
+    // let mut tty = tuitty::tty::Tty::trial();
+    // println!("{}", tty);
 
-    tuitty::set_fg(&tty, "green");
-    tuitty::writeout("Hello (g), ");
-    tuitty::reset(&tty);
-    tuitty::writeout("Hello (d), ");
-    tuitty::switch(&mut tty);
-    tuitty::clear("all");
-    
+
+    let mut tty = tuitty::tty::Tty::init();
+    tty.write(&format!("{}\n", tty.original_mode));
+
+    tty.write(&format!{"{}{}\n", tty.size().0, tty.size().1});
+
+    tty.set_fg("green");
+    tty.write("Hello (g), ");
+    tty.reset();
+    tty.write("Hello (d), ");
+    tty.flush();
+    tty.switch();
+    tty.clear("all");
+
+    tty.raw();
+    tty.enable_mouse();
+
     let words = "A good choice of font for your coding can make a huge difference and improve your productivity, \
     so take a look at the fonts in this post that can make your text editor or terminal emulator look little bit nicer. \
     Andale® Mono — is a monospaced sans-serif typeface designed by Steve Matteson for terminal emulation and software \
@@ -30,22 +42,32 @@ fn main() {
     trialled and tested through a number of design comissions taken on by The Entente through 2010. The conceit behind Aperçu \
     was to create a synopsis or amalgamation of classic realist typefaces: Johnston, Gill Sans, Neuzeit & Franklin Gothic.";
 
-    tuitty::set_fg(&tty, "red"); // this sets fg on altern screen
-    tuitty::writeout(words);
+    tty.set_fg("red"); // this sets fg on altern screen
+    tty.write(words);
+    
+    tty.write(&format!("\n\n\n{} ", tty.meta[tty.id].is_raw_enabled));
+    tty.write(&format!("\n{} ", tty.meta[tty.id].is_mouse_enabled));
+
+    tty.flush();
 
     use std::time::Duration;
     use std::thread;
     thread::sleep(Duration::from_secs(3));
 
-    tuitty::main(&mut tty);
-    tuitty::writeout("Hello (r), "); // since fg red was on the altern screen, the main screen is still white
-    tuitty::set_fg(&tty, "darkblue");
-    tuitty::writeout("Hello (db), ");
-    tuitty::reset(&tty);
-    tuitty::writeout("End\n");
+    tty.main();
+
+    tty.write(&format!("\n\n\n{} ", tty.meta[tty.id].is_raw_enabled));
+    tty.write(&format!("\n{} ", tty.meta[tty.id].is_mouse_enabled));
+
+    tty.write("Hello (r), "); // since fg red was on the altern screen, the main screen is still white
+    tty.set_fg("darkblue");
+    tty.write("Hello (db), ");
+    tty.reset();
+    tty.write("End\n");
+    tty.flush();
     thread::sleep(Duration::from_secs(2));
 
-    tty.altscreen.unwrap().close().unwrap();
+    tty.exit();
     thread::sleep(Duration::from_secs(2));
 
     // let handle = tuitty::Handle::stdout().unwrap();
