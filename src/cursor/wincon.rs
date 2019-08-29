@@ -5,7 +5,7 @@ use winapi::um::wincon::{
     SetConsoleCursorInfo, SetConsoleCursorPosition,
     COORD, CONSOLE_CURSOR_INFO,
 };
-use crate::shared::{ConsoleInfo, Handle};
+use crate::{ConsoleInfo, Handle};
 
 
 pub fn goto(col: i16, row: i16) -> Result<()> {

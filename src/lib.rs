@@ -3,7 +3,6 @@ mod screen;
 mod cursor;
 mod output;
 mod input;
-mod shared;
 
 
 #[cfg(unix)]
@@ -12,16 +11,18 @@ use libc::termios as Termios;
 #[cfg(windows)]
 pub type Termios = u32;
 
+
 #[cfg(unix)]
 use input::ansi::{AsyncReader, SyncReader};
 
 #[cfg(windows)]
 use input::wincon::{AsyncReader, SyncReader};
 
-#[cfg(windows)]
-use shared::{Handle, ConsoleInfo};
 
 mod tty;
+
+#[cfg(windows)]
+use tty::{Handle, ConsoleInfo};
 
 
 

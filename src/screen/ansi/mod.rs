@@ -1,7 +1,7 @@
 // ANSI functions for configuring the terminal size and clearing the screen.
 
-use crate::{csi, write_cout};
-use super::{Clear, Result};
+use crate::csi;
+use super::Clear;
 
 #[cfg(unix)]
 use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
@@ -13,25 +13,24 @@ pub use alternate::{
 };
 
 
-pub fn clear(clr: Clear) -> Result<()> {
+pub fn clear(clr: Clear) -> String {
     match clr {
         Clear::All => {
-            write_cout!(csi!("2J"))?;
+            return csi!("2J").to_string()
         }
         Clear::CursorDn => {
-            write_cout!(csi!("J"))?;
+            return csi!("J").to_string()
         }
         Clear::CursorUp => {
-            write_cout!(csi!("1J"))?;
+            return csi!("1J").to_string()
         }
         Clear::CurrentLn => {
-            write_cout!(csi!("2K"))?;
+            return csi!("2K").to_string()
         }
         Clear::NewLn => {
-            write_cout!(csi!("K"))?;
+            return csi!("K").to_string()
         }
-    };
-    Ok(())
+    }
 }
 
 #[cfg(unix)]
@@ -53,9 +52,8 @@ pub fn size() -> (i16, i16) {
     }
 }
 
-pub fn resize(w: i16, h: i16) -> Result<()> {
-    write_cout!(&format!(csi!("8;{};{}t"), h, w))?;
-    Ok(())
+pub fn resize(w: i16, h: i16) -> String {
+    format!(csi!("8;{};{}t"), h, w).to_string()
 }
 
 

@@ -86,26 +86,24 @@ pub fn read_sync() -> SyncReader {
     }
 }
 
-pub fn enable_mouse_mode() -> Result<()> {
-    write_cout!(&format!(
+pub fn enable_mouse_mode() -> String {
+    format!(
         "{}h{}h{}h{}h",
         csi!("?1000"),
         csi!("?1002"),
         csi!("?1015"),
         csi!("?1006")
-    ))?;
-    Ok(())
+    ).to_string()
 }
 
-pub fn disable_mouse_mode() -> Result<()> {
-    write_cout!(&format!(
+pub fn disable_mouse_mode() -> String {
+    format!(
         "{}l{}l{}l{}l",
         csi!("?1006"),
         csi!("?1015"),
         csi!("?1002"),
         csi!("?1000")
-    ))?;
-    Ok(())
+    ).to_string()
 }
 
 

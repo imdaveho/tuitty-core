@@ -1,32 +1,29 @@
 // ANSI specific functions to style text output to the terminal.
 
-use super::{csi, write_cout, Color, Result, Style, TextStyle, Write};
+use super::{csi, Color, Style, TextStyle};
 
-pub fn set_fg(fg_color: Color) -> Result<()> {
-    write_cout!(&format!(
+pub fn set_fg(fg_color: Color) -> String {
+    format!(
         csi!("{}m"),
         _stylize(Style::Fg(fg_color)),
-    ))?;
-    Ok(())
+    ).to_string()
 }
 
-pub fn set_bg(bg_color: Color) -> Result<()> {
-    write_cout!(&format!(
+pub fn set_bg(bg_color: Color) -> String {
+    format!(
         csi!("{}m"),
         _stylize(Style::Bg(bg_color)),
-    ))?;
-    Ok(())
+    ).to_string()
 }
 
-pub fn set_tx(text_style: TextStyle) -> Result<()> {
-    write_cout!(&format!(
+pub fn set_tx(text_style: TextStyle) -> String {
+    format!(
         csi!("{}m"),
         _stylize(Style::Tx(text_style)),
-    ))?;
-    Ok(())
+    ).to_string()
 }
 
-pub fn set_all(fg: &str, bg: &str, tx: &str) -> Result<()> {
+pub fn set_all(fg: &str, bg: &str, tx: &str) -> String {
     let fg_str = _stylize(Style::Fg(Color::from(fg)));
     let bg_str = _stylize(Style::Bg(Color::from(bg)));
 
@@ -72,16 +69,11 @@ pub fn set_all(fg: &str, bg: &str, tx: &str) -> Result<()> {
         }
     }
 
-    write_cout!(&format!(
-        csi!("{}{}{}"),
-        fg_str, bg_str, tx_str))?;
-
-    Ok(())
+    format!(csi!("{}{}{}"), fg_str, bg_str, tx_str).to_string()
 }
 
-pub fn reset() -> Result<()> {
-    write_cout!(csi!("0m"))?;
-    Ok(())
+pub fn reset() -> String {
+    csi!("0m").to_string()
 }
 
 

@@ -1,33 +1,27 @@
 // ANSI specific functions for controlling the terminal cursor.
 
 use std::io::{stdin, stdout, BufRead, Result, Write};
-use crate::{csi, write_cout};
+use crate::csi;
 
 
-
-pub fn goto(col: i16, row: i16) -> Result<()> {
-    write_cout!(format!(csi!("{};{}H"), row + 1, col + 1))?;
-    Ok(())
+pub fn goto(col: i16, row: i16) -> String {
+    format!(csi!("{};{}H"), row + 1, col + 1).to_string()
 }
 
-pub fn move_up(n: i16) -> Result<()> {
-    write_cout!(&format!(csi!("{}A"), n))?;
-    Ok(())
+pub fn move_up(n: i16) -> String {
+    format!(csi!("{}A"), n).to_string()
 }
 
-pub fn move_right(n: i16) -> Result<()> {
-    write_cout!(&format!(csi!("{}C"), n))?;
-    Ok(())
+pub fn move_right(n: i16) -> String {
+    format!(csi!("{}C"), n).to_string()
 }
 
-pub fn move_down(n: i16) -> Result<()> {
-    write_cout!(&format!(csi!("{}B"), n))?;
-    Ok(())
+pub fn move_down(n: i16) -> String {
+    format!(csi!("{}B"), n).to_string()
 }
 
-pub fn move_left(n: i16) -> Result<()> {
-    write_cout!(&format!(csi!("{}D"), n))?;
-    Ok(())
+pub fn move_left(n: i16) -> String {
+    format!(csi!("{}D"), n).to_string()
 }
 
 pub fn pos_raw() -> Result<(i16, i16)> {
@@ -74,22 +68,18 @@ pub fn pos_raw() -> Result<(i16, i16)> {
     Ok(((cols - 1) as i16, (rows - 1) as i16))
 }
 
-pub fn save_pos() -> Result<()> {
-    write_cout!(csi!("s"))?;
-    Ok(())
+pub fn save_pos() -> String {
+    csi!("s").to_string()
 }
 
-pub fn load_pos() -> Result<()> {
-    write_cout!(csi!("u"))?;
-    Ok(())
+pub fn load_pos() -> String {
+    csi!("u").to_string()
 }
 
-pub fn hide() -> Result<()> {
-    write_cout!(csi!("?25l"))?;
-    Ok(())
+pub fn hide() -> String {
+    csi!("?25l").to_string()
 }
 
-pub fn show() -> Result<()> {
-    write_cout!(csi!("?25h"))?;
-    Ok(())
+pub fn show() -> String {
+    csi!("?25h").to_string()
 }

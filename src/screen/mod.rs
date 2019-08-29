@@ -7,7 +7,7 @@
 //!
 //! Note that the difference between the ANSI vs the WinCon functionalities is
 //! that we moved the creation and activation of the alternate screen on Windows
-//! to the top `wincon` module. This has to do with saving console settings to
+//! to the top `tty` module. This has to do with saving console settings to
 //! restore back to normal once the application exits and cleans up.
 
 use std::io::{Error, Result};

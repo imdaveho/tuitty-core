@@ -1,15 +1,27 @@
+
+use std::io::{stdout, BufWriter, Write};
+
 use crate::screen;
 use crate::cursor;
 use crate::output;
 use crate::input;
-
 use crate::{AsyncReader, SyncReader, Termios};
+
 
 #[cfg(unix)]
 use libc::{c_int, ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 
+// Shared code and abstractions that is leveraged by the other modules.
+// * For ANSI, a simple macro to help with writing escape sequences to stdout.
+// * For WinCon, wrappers for pointers to the Handle and ConsoleInfo objects.
+
+mod ansi;
+
 #[cfg(windows)]
-use crate::{Handle, ConsoleInfo};
+mod wincon;
+
+#[cfg(windows)]
+pub use wincon::{Handle, ConsoleInfo};
 
 
 pub struct Tty {
@@ -19,11 +31,7 @@ pub struct Tty {
     ansi_supported: bool,
 
     #[cfg(windows)]
-    pub altscreen: Option<Handle>, 
-    // TODO: implement exit() where it cleans up before ending program
-    // * restore original mode
-    // * explicitly show cursor
-    // * close the altscreen buffer that's created
+    pub altscreen: Option<Handle>,
     
     #[cfg(windows)]
     reset_attrs: u16,
@@ -76,6 +84,31 @@ impl Tty {
     }
 
     #[cfg(unix)]
+    pub fn exit(&mut self) {
+        self.main();
+        output::ansi::set_mode(&self.original_mode).unwrap();
+        _write(cursor::ansi::show());
+        self.meta.clear();
+    }
+
+    #[cfg(windows)]
+    pub fn exit(&mut self) {
+        let stdout = Handle::stdout().unwrap();
+        if self.ansi_supported {
+            stdout.set_mode(&self.original_mode).unwrap();
+            _write(cursor::ansi::show());
+        } else {
+            stdout.set_mode(&self.original_mode).unwrap();
+            if let Some(handle) = &self.altscreen {
+                handle.close().unwrap();
+            }
+            self.altscreen = None;
+            cursor::wincon::show().unwrap();
+        }
+        self.meta.clear();
+    }
+
+    #[cfg(unix)]
     pub fn size(&self) -> (i16, i16) {
         screen::ansi::size()
     }
@@ -124,7 +157,7 @@ impl Tty {
     #[cfg(unix)]
     pub fn enable_mouse(&mut self) {
         let mut m = &mut self.meta[self.id];
-        input::ansi::enable_mouse_mode().unwrap();
+        _write(input::ansi::enable_mouse_mode());
         m.is_mouse_enabled = true;
     }
 
@@ -138,7 +171,7 @@ impl Tty {
     #[cfg(unix)]
     pub fn disable_mouse(tty: &mut Tty) {
         let mut m = &mut self.meta[self.id];
-        input::ansi::disable_mouse_mode().unwrap();
+        _write(input::ansi::disable_mouse_mode());
         m.is_mouse_enabled = false;
     }
     
@@ -193,11 +226,11 @@ impl Tty {
      * API-specific public methods *
      ******************************/
 
-    pub fn clear(&self, method: &str) {
+    pub fn clear(&mut self, method: &str) {
         match method {
             "all" => {
                 if self.ansi_supported {
-                    screen::ansi::clear(screen::Clear::All).unwrap();
+                    _write(screen::ansi::clear(screen::Clear::All));
                     self.goto(0, 0);
                 } else {
                     screen::wincon::clear(screen::Clear::All).unwrap();
@@ -206,7 +239,7 @@ impl Tty {
             }
             "newln" => {
                 if self.ansi_supported {
-                    screen::ansi::clear(screen::Clear::NewLn).unwrap();
+                    _write(screen::ansi::clear(screen::Clear::NewLn));
                 } else {
                     let (col, row) = cursor::wincon::pos().unwrap();
                     screen::wincon::clear(screen::Clear::NewLn).unwrap();
@@ -215,7 +248,7 @@ impl Tty {
             }
             "currentln" => {
                 if self.ansi_supported {
-                    screen::ansi::clear(screen::Clear::CurrentLn).unwrap();
+                    _write(screen::ansi::clear(screen::Clear::CurrentLn));
                 } else {
                     let (_, row) = cursor::wincon::pos().unwrap();
                     screen::wincon::clear(screen::Clear::CurrentLn).unwrap();
@@ -224,14 +257,14 @@ impl Tty {
             }
              "cursorup" => {
                 if self.ansi_supported {
-                    screen::ansi::clear(screen::Clear::CursorUp).unwrap();
+                    _write(screen::ansi::clear(screen::Clear::CursorUp));
                 } else {
                     screen::wincon::clear(screen::Clear::CursorUp).unwrap();
                 }
             }
             "cursordn" => {
                 if self.ansi_supported {
-                    screen::ansi::clear(screen::Clear::CursorDn).unwrap();
+                    _write(screen::ansi::clear(screen::Clear::CursorDn));
                 } else {
                     screen::wincon::clear(screen::Clear::CursorDn).unwrap();
                 }
@@ -240,9 +273,9 @@ impl Tty {
         }
     }
 
-    pub fn resize(&self, w: i16, h: i16) {
+    pub fn resize(&mut self, w: i16, h: i16) {
         if self.ansi_supported {
-            screen::ansi::resize(w, h).unwrap();
+            _write(screen::ansi::resize(w, h));
         } else {
             screen::wincon::resize(w, h).unwrap();
         }
@@ -256,7 +289,7 @@ impl Tty {
             if self.id == 0 {
                 // There is no point to switch if you're on another screen
                 // since ANSI terminals provide a single "alternate screen".
-                screen::ansi::enable_alt().unwrap();
+                _write(screen::ansi::enable_alt());
             }
             // Add new `Metadata` for the new screen. (OS-specific)
             self._add_metadata();
@@ -291,7 +324,7 @@ impl Tty {
                 let rstate = metas[0].is_raw_enabled;
                 let mstate = metas[0].is_mouse_enabled;
                 self.id = 0;
-                screen::ansi::disable_alt().unwrap();
+                _write(screen::ansi::disable_alt());
 
                 if rstate {
                     self.raw();
@@ -381,77 +414,77 @@ impl Tty {
         }
     }
 
-    pub fn goto(&self, col: i16, row: i16) {
+    pub fn goto(&mut self, col: i16, row: i16) {
         if self.ansi_supported {
-            cursor::ansi::goto(col, row).unwrap();
+            _write(cursor::ansi::goto(col, row));
         } else {
             cursor::wincon::goto(col, row).unwrap();
         }
     }
 
-    pub fn up(&self) {
+    pub fn up(&mut self) {
         if self.ansi_supported {
-            cursor::ansi::move_up(1).unwrap();
+            _write(cursor::ansi::move_up(1));
         } else {
             cursor::wincon::move_up(1).unwrap();
         }
     }
 
-    pub fn dn(&self) {
+    pub fn dn(&mut self) {
         if self.ansi_supported {
-            cursor::ansi::move_down(1).unwrap();
+            _write(cursor::ansi::move_down(1));
         } else {
             cursor::wincon::move_down(1).unwrap();
         }
     }
 
-    pub fn left(&self) {
+    pub fn left(&mut self) {
         if self.ansi_supported {
-            cursor::ansi::move_left(1).unwrap();
+            _write(cursor::ansi::move_left(1));
         } else {
             cursor::wincon::move_left(1).unwrap();
         }
     }
 
-    pub fn right(&self) {
+    pub fn right(&mut self) {
         if self.ansi_supported {
-            cursor::ansi::move_right(1).unwrap();
+            _write(cursor::ansi::move_right(1));
         } else {
             cursor::wincon::move_right(1).unwrap();
         }
     }
 
-    pub fn dpad(&self, dir: &str, n: i16) {
+    pub fn dpad(&mut self, dir: &str, n: i16) {
         // Case-insensitive.
         let d = dir.to_lowercase();
         if n > 0 {
             match d.as_str() {
                 "up" => {
                     if self.ansi_supported {
-                        cursor::ansi::move_up(n).unwrap()
+                        _write(cursor::ansi::move_up(n));
                     } else {
-                        cursor::wincon::move_up(n).unwrap()
+                        cursor::wincon::move_up(n).unwrap();
                     }
                 },
                 "dn" => {
                     if self.ansi_supported {
-                        cursor::ansi::move_down(n).unwrap()
+                        _write(cursor::ansi::move_down(n));
                     } else {
-                        cursor::wincon::move_down(n).unwrap()
+                        cursor::wincon::move_down(n).unwrap();
                     }
                 },
                 "left" => {
                     if self.ansi_supported {
-                        cursor::ansi::move_left(n).unwrap()
+                        _write(cursor::ansi::move_left(n));
                     } else {
-                        cursor::wincon::move_left(n).unwrap()
+                        cursor::wincon::move_left(n).unwrap();
                     }
                 },
                 "right" => {
                     if self.ansi_supported {
-                        cursor::ansi::move_right(n).unwrap()
+                        _write(cursor::ansi::move_right(n));
                     } else {
-                        cursor::wincon::move_right(n).unwrap()
+                        cursor::wincon::move_right(n).unwrap();
                     }
                 },
                 _ => ()
@@ -476,7 +509,7 @@ impl Tty {
 
     pub fn mark(&mut self) {
         if self.ansi_supported {
-            cursor::ansi::save_pos().unwrap()
+            _write(cursor::ansi::save_pos());
         } else {
             self.meta[self.id].saved_position = Some(
                 cursor::wincon::pos().unwrap()
@@ -484,9 +517,9 @@ impl Tty {
         }
     }
 
-    pub fn load(&self) {
+    pub fn load(&mut self) {
         if self.ansi_supported {
-            cursor::ansi::load_pos().unwrap()
+            _write(cursor::ansi::load_pos());
         } else {
             match self.meta[self.id].saved_position {
                 Some(pos) => {
@@ -497,120 +530,143 @@ impl Tty {
         }
     }
 
-    pub fn hide_cursor(&self) {
+    pub fn hide_cursor(&mut self) {
         if self.ansi_supported {
-            cursor::ansi::hide().unwrap();
+            _write(cursor::ansi::hide());
         } else {
             cursor::wincon::hide().unwrap();
         }
     }
 
-    pub fn show_cursor(&self) {
+    pub fn show_cursor(&mut self) {
         if self.ansi_supported {
-            cursor::ansi::show().unwrap();
+            _write(cursor::ansi::show());
         } else {
             cursor::wincon::show().unwrap();
         }
     }
 
-    pub fn set_fg(&self, color: &str) {
+    pub fn set_fg(&mut self, color: &str) {
         let fg_col = output::Color::from(color);
         if self.ansi_supported {
-            output::ansi::set_fg(fg_col).unwrap();
+            _write(output::ansi::set_fg(fg_col));
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
     }
 
-    pub fn set_bg(&self, color: &str) {
+    pub fn set_bg(&mut self, color: &str) {
         let bg_col = output::Color::from(color);
         if self.ansi_supported {
-            output::ansi::set_bg(bg_col).unwrap();
+            _write(output::ansi::set_bg(bg_col));
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
     }
 
-    pub fn set_tx(&self, style: &str) {
+    pub fn set_tx(&mut self, style: &str) {
         let tstyle = output::TextStyle::from(style);
         if self.ansi_supported {
-            output::ansi::set_tx(tstyle).unwrap();
+            _write(output::ansi::set_tx(tstyle));
         } else {
             output::wincon::set_tx(tstyle).unwrap();
         }
     }
 
-    pub fn set_fg_rgb(&self, r: u8, g:u8, b: u8) {
+    pub fn set_fg_rgb(&mut self, r: u8, g:u8, b: u8) {
         let fg_col = output::Color::Rgb{
             r: r,
             g: g,
             b: b,
         };
         if self.ansi_supported {
-            output::ansi::set_fg(fg_col).unwrap();
+            _write(output::ansi::set_fg(fg_col));
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
     }
 
-    pub fn set_bg_rgb(&self, r: u8, g:u8, b: u8) {
+    pub fn set_bg_rgb(&mut self, r: u8, g:u8, b: u8) {
         let bg_col = output::Color::Rgb{
             r: r,
             g: g,
             b: b,
         };
         if self.ansi_supported {
-            output::ansi::set_bg(bg_col).unwrap();
+            _write(output::ansi::set_bg(bg_col));
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
     }
 
-    pub fn set_fg_ansi(&self, v: u8) {
+    pub fn set_fg_ansi(&mut self, v: u8) {
         let fg_col = output::Color::AnsiValue(v);
         if self.ansi_supported {
-            output::ansi::set_fg(fg_col).unwrap();
+            _write(output::ansi::set_fg(fg_col));
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
     }
 
-    pub fn set_bg_ansi(&self, v: u8) {
+    pub fn set_bg_ansi(&mut self, v: u8) {
         let bg_col = output::Color::AnsiValue(v);
         if self.ansi_supported {
-            output::ansi::set_bg(bg_col).unwrap();
+            _write(output::ansi::set_bg(bg_col));
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
     }
 
-    pub fn set_style(&self, fg: &str, bg: &str, style: &str) {
+    pub fn set_style(&mut self, fg: &str, bg: &str, style: &str) {
         // The params fg is a single word, bg is also a single word, however
         // the tx param can be treated as a comma-separated list of words that
         // match the various text styles that are supported: "bold", "dim",
         // "underline", "reverse", "hide", and "reset".
         if self.ansi_supported {
-            output::ansi::set_all(fg, bg, style).unwrap();
+            _write(output::ansi::set_all(fg, bg, style));
         } else {
             output::wincon::set_all(fg, bg, style, self.reset_attrs).unwrap();
         }
     }
 
-    pub fn reset(&self) {
+    pub fn reset(&mut self) {
         if self.ansi_supported {
-            output::ansi::reset().unwrap();
+            _write(output::ansi::reset());
         } else {
             output::wincon::reset(self.reset_attrs).unwrap();
         }
     }
 
-    pub fn writeout(&self, s: &str) {
+    pub fn write(&mut self, s: &str) {
         if self.ansi_supported {
-            output::ansi::writeout(s).unwrap();
+            _write(output::ansi::writeout(s));
         } else {
             output::wincon::writeout(s).unwrap();
         }
     }
+
+    pub fn flushout(&mut self) {
+        // ANSI-only
+        if self.ansi_supported {
+            let cout = stdout();
+            let lock = cout.lock();
+            let mut writer = BufWriter::new(lock);
+            writer.flush().unwrap();
+        }
+    }
+
+    // pub fn paint() {
+    //     // write with colors and styles
+    // }
+
+    // pub fn render() {
+    //     // write from a template
+    // }
+
+    // pub fn intellisense() {
+    //     // write from a set of rules
+    //     // eg. syntax highlighting
+    // }
 
     /****************************************
      * OS-specific helper / private methods *
@@ -639,6 +695,14 @@ impl Tty {
             saved_position: None,
         });
     }
+}
+
+
+fn _write(s: String) {
+    let cout = stdout();
+    let lock = cout.lock();
+    let mut writer = BufWriter::new(lock);
+    writer.write(s.as_bytes()).unwrap();
 }
 
 #[cfg(windows)]

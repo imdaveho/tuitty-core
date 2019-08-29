@@ -7,19 +7,18 @@
 //! and toggling raw mode.
 //!
 //! The main difference between the ANSI and WinCon for this module is that the
-//! `wincon` module does not export a set_mode function as it is moved to the
-//! root module as it takes advantage of the already specified Handle pointer 
-//! that is used at the root level.
+//! `wincon` module does not export a set_mode function because this is already
+//! an existing method for the `Handle` wrapper at the top level.
 
 use std::fmt::Display;
 use std::str::FromStr;
 use std::io::{Error, Result};
-use crate::{csi, write_cout, Termios};
+use crate::{csi, Termios};
 
 pub mod ansi;
 
 #[cfg(windows)]
-use crate::shared::{Handle, ConsoleInfo};
+use crate::{Handle, ConsoleInfo};
 
 #[cfg(windows)]
 pub mod wincon;

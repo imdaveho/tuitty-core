@@ -10,16 +10,14 @@
 // to bash leaving the original buffer unchanged. This is the same behavior that
 // is implemented here.
 
-use super::{csi, write_cout, Result};
+use super::csi;
 
 
-pub fn enable_alt() -> Result<()> {
-    write_cout!(csi!("?1049h"))?;
-    Ok(())
+pub fn enable_alt() -> String {
+    csi!("?1049h").to_string()
 }
 
 
-pub fn disable_alt() -> Result<()> {
-    write_cout!(csi!("?1049l"))?;
-    Ok(())
+pub fn disable_alt() -> String {
+    csi!("?1049l").to_string()
 }
