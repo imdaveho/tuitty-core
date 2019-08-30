@@ -134,7 +134,7 @@ impl Tty {
         input::wincon::read_async()
     }
 
-    pub fn read_until_async(delimiter: u8) -> AsyncReader {
+    pub fn read_until_async(&self, delimiter: u8) -> AsyncReader {
         input::wincon::read_until_async(delimiter)
     }
 

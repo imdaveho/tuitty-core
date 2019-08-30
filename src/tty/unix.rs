@@ -95,7 +95,7 @@ impl Tty {
         input::ansi::read_async()
     }
 
-    pub fn read_until_async(delimiter: u8) -> AsyncReader {
+    pub fn read_until_async(&self, delimiter: u8) -> AsyncReader {
         input::ansi::read_until_async(delimiter)
     }
 
