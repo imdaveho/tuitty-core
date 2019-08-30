@@ -12,9 +12,7 @@
 // but will be in the same position as it was in the previous line. It is up to
 // the user or program to move it to where they would like the cursor to be.
 
-use winapi::um::wincon::{
-    ENABLE_LINE_INPUT, ENABLE_WRAP_AT_EOL_OUTPUT
-};
+use winapi::um::wincon::{ENABLE_LINE_INPUT, ENABLE_WRAP_AT_EOL_OUTPUT};
 use super::{Handle, Result, Termios};
 
 

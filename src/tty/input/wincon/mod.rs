@@ -1,11 +1,15 @@
 // Windows Console API specific functions for handling and parsing user input.
 
-use std::sync::mpsc;
-use std::time::Duration;
-use std::{char, thread};
-use std::io::{Error, ErrorKind, Result};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc::{Receiver, Sender}, Arc};
+use std::{
+    char, thread,
+    io::{Error, ErrorKind, Result},
+    sync::{
+        Arc,
+        mpsc::{self, Receiver, Sender},
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 use winapi::um::winnt::INT;
 use super::{Handle, InputEvent, MouseEvent, MouseButton, KeyEvent};
 

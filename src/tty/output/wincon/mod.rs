@@ -9,7 +9,6 @@ use super::{
 
 #[cfg(windows)]
 mod raw;
-
 #[cfg(windows)]
 pub use raw::*;
 

@@ -8,11 +8,7 @@ use winapi::um::wincon::{
     BACKGROUND_BLUE as BG_BLUE, BACKGROUND_INTENSITY as BG_INTENSITY,
     COMMON_LVB_UNDERSCORE, COMMON_LVB_REVERSE_VIDEO,
 };
-use super::{
-    Color, Error, Result, Style,
-    Handle, ConsoleInfo, TextStyle,
-};
-
+use super::{Color, Error, Result, Style, Handle, ConsoleInfo, TextStyle};
 
 type Fg = u16;
 type Bg = u16;

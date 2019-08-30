@@ -10,8 +10,8 @@ use winapi::um::wincon::{
     COMMON_LVB_GRID_RVERTICAL as RV, COMMON_LVB_REVERSE_VIDEO as REV,
     COMMON_LVB_UNDERSCORE as UN,
 };
-use crate::{Handle, ConsoleInfo};
 use super::{Clear, Error, Result};
+use crate::tty::{Handle, ConsoleInfo};
 
 mod alternate;
 pub use alternate::*;

@@ -42,7 +42,8 @@ impl Handle {
         }
     }
 
-    // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-createfilew
+    // https://docs.microsoft.com/en-us/windows/desktop/api/
+    // fileapi/nf-fileapi-createfilew
     pub fn conout() -> Result<Handle> {
         let utf16: Vec<u16> = "CONOUT$\0".encode_utf16().collect();
         let utf16_ptr: *const u16 = utf16.as_ptr();
@@ -76,7 +77,8 @@ impl Handle {
         }
     }
 
-    // https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-createfilew
+    // https://docs.microsoft.com/en-us/windows/desktop/api/
+    // fileapi/nf-fileapi-createfilew
     pub fn conin() -> Result<Handle> {
         let utf16: Vec<u16> = "CONIN$\0".encode_utf16().collect();
         let utf16_ptr: *const u16 = utf16.as_ptr();
@@ -99,7 +101,8 @@ impl Handle {
         Ok(Handle(handle))
     }
 
-    // https://docs.microsoft.com/en-us/windows/console/createconsolescreenbuffer
+    // https://docs.microsoft.com/en-us/windows/console/
+    // createconsolescreenbuffer
     pub fn buffer() -> Result<Handle> {
         let mut security_attr: SECURITY_ATTRIBUTES = SECURITY_ATTRIBUTES {
             nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
@@ -122,7 +125,8 @@ impl Handle {
         }
     }
 
-    // https://docs.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-closehandle
+    // https://docs.microsoft.com/en-us/windows/win32/api/
+    // handleapi/nf-handleapi-closehandle
     pub fn close(&self) -> Result<()> {
         let stdin = Handle::stdin()?;
         let stdout = Handle::stdout()?;

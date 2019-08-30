@@ -1,22 +1,13 @@
 // ANSI specific functions for handling and parsing user input to the terminal.
 
-use std::fs;
-use std::io::{Result, Error, ErrorKind};
-use std::char;
-use std::{
-    io::{Read, Write},
-    str::from_utf8
-};
 use std::thread;
-use std::sync::{
-    mpsc::{Receiver, Sender, channel},
-    Arc,
-};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::os::unix::io::AsRawFd;
-use crate::{csi, write_cout};
-use super::{InputEvent, MouseEvent, MouseButton, KeyEvent};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, mpsc::{Receiver, Sender, channel}};
+use std::{fs, char, str::from_utf8, io::{Read, Result, Error, ErrorKind}};
 
+use crate::csi;
+use super::{InputEvent, MouseEvent, MouseButton, KeyEvent};
 
 mod parser;
 use parser::parse_event;

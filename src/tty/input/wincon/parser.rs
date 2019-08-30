@@ -1,5 +1,7 @@
 // Functions to parse Windows Console inputs and map them to the proper event.
 
+use std::borrow::ToOwned;
+use winapi::shared::minwindef::{DWORD, WORD};
 use winapi::um::{
     wincon::{
         INPUT_RECORD, INPUT_RECORD_Event,
@@ -15,13 +17,11 @@ use winapi::um::{
         VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_HOME,
         VK_INSERT, VK_LEFT, VK_MENU, VK_NEXT, VK_PRIOR,
         VK_RETURN, VK_RIGHT, VK_SHIFT, VK_UP,
-    }
+    },
+    consoleapi::{
+        GetNumberOfConsoleInputEvents, ReadConsoleInputW,
+    },
 };
-use winapi::shared::minwindef::{DWORD, WORD};
-use winapi::um::consoleapi::{
-    GetNumberOfConsoleInputEvents, ReadConsoleInputW,
-};
-use std::borrow::ToOwned;
 use super::{
     Error, Result, Handle, InputEvent,
     MouseEvent, MouseButton, KeyEvent

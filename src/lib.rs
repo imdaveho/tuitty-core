@@ -1,30 +1,7 @@
-//! (imdaveho) TODO: ...
-mod screen;
-mod cursor;
-mod output;
-mod input;
+//! `tuitty` is a cross platform library that is meant for FFI.
 
-
-#[cfg(unix)]
-use libc::termios as Termios;
-
-#[cfg(windows)]
-pub type Termios = u32;
-
-
-#[cfg(unix)]
-use input::ansi::{AsyncReader, SyncReader};
-
-#[cfg(windows)]
-use input::wincon::{AsyncReader, SyncReader};
-
-
-pub mod tty;
-
-#[cfg(windows)]
-use tty::{Handle, ConsoleInfo};
-
-
+mod tty;
+pub use tty::Tty;
 
 
 // pub struct Tui(Tty);

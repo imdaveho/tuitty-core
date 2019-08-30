@@ -15,7 +15,7 @@ pub mod ansi;
 pub mod wincon;
 
 #[cfg(windows)]
-use crate::Handle;
+use crate::tty::Handle;
 
 // (imdaveho) TODO: Check to see if it works in legacy cmd.exe.
 // use std::io::{Result, stdin};

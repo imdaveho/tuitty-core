@@ -2,6 +2,7 @@
 
 use super::{csi, Color, Style, TextStyle};
 
+
 pub fn set_fg(fg_color: Color) -> String {
     format!(
         csi!("{}m"),

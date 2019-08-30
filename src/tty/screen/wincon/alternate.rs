@@ -14,5 +14,3 @@ pub fn disable_alt() -> Result<()> {
     handle.show()?;
     Ok(())
 }
-
-// pub fn enable_alt(handle: &Handle) -> Result<()> { ... }

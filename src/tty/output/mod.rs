@@ -13,12 +13,13 @@
 use std::fmt::Display;
 use std::str::FromStr;
 use std::io::{Error, Result};
-use crate::{csi, Termios};
+use crate::csi;
+use crate::tty::Termios;
 
 pub mod ansi;
 
 #[cfg(windows)]
-use crate::{Handle, ConsoleInfo};
+use crate::tty::{Handle, ConsoleInfo};
 
 #[cfg(windows)]
 pub mod wincon;

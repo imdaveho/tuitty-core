@@ -18,10 +18,8 @@ fn main() {
     // println!("{}", tty);
 
 
-    let mut tty = tuitty::tty::Tty::init();
-    tty.write(&format!("{}\n", tty.original_mode));
-
-    tty.write(&format!{"{}{}\n", tty.size().0, tty.size().1});
+    let mut tty = tuitty::Tty::init();
+    tty.write(&format!{"w: {}, h: {}\n", tty.size().0, tty.size().1});
 
     tty.set_fg("green");
     tty.write("Hello (g), ");
@@ -44,10 +42,6 @@ fn main() {
 
     tty.set_fg("red"); // this sets fg on altern screen
     tty.write(words);
-    
-    tty.write(&format!("\n\n\n{} ", tty.meta[tty.id].is_raw_enabled));
-    tty.write(&format!("\n{} ", tty.meta[tty.id].is_mouse_enabled));
-
     tty.flush();
 
     use std::time::Duration;
@@ -55,9 +49,6 @@ fn main() {
     thread::sleep(Duration::from_secs(3));
 
     tty.main();
-
-    tty.write(&format!("\n\n\n{} ", tty.meta[tty.id].is_raw_enabled));
-    tty.write(&format!("\n{} ", tty.meta[tty.id].is_mouse_enabled));
 
     tty.write("Hello (r), "); // since fg red was on the altern screen, the main screen is still white
     tty.set_fg("darkblue");
@@ -70,107 +61,36 @@ fn main() {
     tty.exit();
     thread::sleep(Duration::from_secs(2));
 
-    // let handle = tuitty::Handle::stdout().unwrap();
-    // let info = tuitty::ConsoleInfo::of(&handle).unwrap();
-    // let attrs = info.attributes();
-    
-    // // // println!("attributes: {}", attrs);
+    // https://docs.microsoft.com/en-us/windows/console/writeconsoleoutput
+    // https://docs.microsoft.com/en-us/windows/console/reading-and-writing-blocks-of-characters-and-attributes
+    // let words = "something after in altern; with widechar: 𝕊 🗻 ∈ 🌏".encode_utf16();
+    // let words = "something after in altern; with widechar: 𝕊 🗻∈🌏".as_bytes();
+    // let char_info_buffer = words
+    //     // .iter()
+    //     .map(|ch| unsafe {
+    //         let mut char_info: CHAR_INFO = zeroed();
+    //         char_info.Attributes = blue | intense;
+    //         // *char_info.Char.UnicodeChar_mut() = *ch as u16;
+    //         *char_info.Char.UnicodeChar_mut() = ch;
+    //         char_info
+    //     }).collect::<Vec<CHAR_INFO>>();
 
-    // // let blue = 0x0001;
-    // let green = 0x0002;
-    // let red = 0x0004;
-    // let intense = 0x0008;
+    // let length = char_info_buffer.len();
+    // let bsize = tuitty::size();
+    // let rows = length as i16 / bsize.0 + 1;
 
-    // // // let lead_byte = 0x0100;
-    // // // let tral_byte = 0x0200;
-    // // // let top_horiz = 0x0400;
-    // // // let left_vert = 0x0800;
-    // // // let right_vert = 0x1000;
-    // // // let reverse = 0x4000;
-    // // let underln = 0x8000;
+    // println!("{}", rows);
 
-    // // let white = red | green | blue;
+    // this informs how much of the pointer the function needs to traverse
+    // let buf_size = COORD {X: length as i16, Y: rows};
+    // let buf_cord = COORD {X: 0, Y: 0};
+    // let mut dest_rect = SMALL_RECT {
+    //     Top: 0,
+    //     Left: 0,
+    //     Bottom: bsize.1,
+    //     Right: bsize.0,
+    // };
 
-    // // let color = white;
-
-    // unsafe {
-    //     if SetConsoleTextAttribute(handle.0, green) == 0 {
-    //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
-    //         panic!("Something went wrong with setting the text attribute")
-    //     }
-    // }
-
-    // println!("Hello");
-
-    // // unsafe {
-    // //     if SetConsoleTextAttribute(handle.0, attrs & !intense) == 0 {
-    // //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
-    // //         panic!("Something went wrong with setting the text attribute")
-    // //     }
-    // // }
-
-    // // println!("Hello");
-
-
-
-    // // println!("something after");
-    // // println!("setting the attr");
-
-    // // RESET
-    // unsafe {
-    //     if SetConsoleTextAttribute(handle.0, attrs) == 0 {
-    //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
-    //         panic!("Something went wrong with setting the text attribute")
-    //     }
-    // }
-
-    // // println!("Hello");
-
-
-    // // // SWITCH TO ALT SCREEN
-    // let altern = tuitty::Handle::buffer().unwrap();
-    // tuitty::clear("newln");
-
-    // altern.show().unwrap();
-
-    // tuitty::clear("all");
-
-    // unsafe {
-    //     if SetConsoleTextAttribute(altern.0, red|intense) == 0 {
-    //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
-    //         panic!("Something went wrong with setting the text attribute")
-    //     }
-    // }
-    // // // https://docs.microsoft.com/en-us/windows/console/writeconsoleoutput
-    // // // https://docs.microsoft.com/en-us/windows/console/reading-and-writing-blocks-of-characters-and-attributes
-    // // let words = "something after in altern; with widechar: 𝕊 🗻 ∈ 🌏".encode_utf16();
-    // // // let words = "something after in altern; with widechar: 𝕊 🗻∈🌏".as_bytes();
-    // // let char_info_buffer = words
-    // //     // .iter()
-    // //     .map(|ch| unsafe {
-    // //         let mut char_info: CHAR_INFO = zeroed();
-    // //         char_info.Attributes = blue | intense;
-    // //         // *char_info.Char.UnicodeChar_mut() = *ch as u16;
-    // //         *char_info.Char.UnicodeChar_mut() = ch;
-    // //         char_info
-    // //     }).collect::<Vec<CHAR_INFO>>();
-    
-    // // let length = char_info_buffer.len();
-    // // let bsize = tuitty::size();
-    // // let rows = length as i16 / bsize.0 + 1;
-    
-    // // // // println!("{}", rows);
-
-    // // // // this informs how much of the pointer the function needs to traverse
-    // // let buf_size = COORD {X: length as i16, Y: rows}; 
-    // // let buf_cord = COORD {X: 0, Y: 0};
-    // // let mut dest_rect = SMALL_RECT {
-    // //     Top: 0,
-    // //     Left: 0,
-    // //     Bottom: bsize.1,
-    // //     Right: bsize.0,
-    // // };
-    
     // let words = "A good choice of font for your coding can make a huge difference and improve your productivity, \
     // so take a look at the fonts in this post that can make your text editor or terminal emulator look little bit nicer. \
     // Andale® Mono — is a monospaced sans-serif typeface designed by Steve Matteson for terminal emulation and software \
@@ -190,7 +110,7 @@ fn main() {
     //     if WriteConsoleW(
     //         currout.0,
     //         words_ptr.as_ptr() as *const VOID,
-    //         length, 
+    //         length,
     //         &mut size, NULL
     //     ) == 0 {
     //         panic!("Something went wrong writing in altern")
@@ -199,7 +119,7 @@ fn main() {
     //     // if WriteConsoleOutputW(
     //     //     altern.0,
     //     //     char_info_buffer.as_ptr(),
-    //     //     buf_size, buf_cord, 
+    //     //     buf_size, buf_cord,
     //     //     &mut dest_rect
     //     // ) == 0 {
     //     //     panic!("Something went wrong writing in altern")
@@ -210,59 +130,4 @@ fn main() {
     // // // if size == length {
     // // //     println!("write success!");
     // // // }
-
-    // //                 // unsafe {
-    // //                 //     if SetConsoleTextAttribute(handle.0, red) == 0 {
-    // //                 //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
-    // //                 //         panic!("Something went wrong with setting the text attribute")
-    // //                 //     }
-    // //                 // }
-
-    // //                 // use std::io::Write;
-
-    // //                 // let stdout = ::std::io::stdout();
-    // //                 // let mut stdout = stdout.lock();
-
-    // //                 // // stdout.flush().unwrap();
-    // //                 // stdout.write("\x1B[?1049h".as_bytes()).unwrap();
-    // //                 // // tuitty::clear("all");
-    // //                 // stdout.write("\x1B[2J".as_bytes()).unwrap();
-    // //                 // stdout.flush().unwrap();
-
-    // //                 // stdout.write("something after alt\0".as_bytes()).unwrap();
-    // //                 // stdout.write("setting the attr alt\n".as_bytes()).unwrap();
-
-    // //                 // stdout.flush().unwrap();
-
-    // //                 // println!("something after");
-    // //                 // println!("setting the attr");
-
-    // //                 // stdout.write("\x1B[?1049l".as_bytes()).unwrap();
-
-
-    // use std::time::Duration;
-    // use std::thread;
-
-    // thread::sleep(Duration::from_secs(3));
-    // handle.show().unwrap();
-    // altern.close().unwrap();
-
-
-    
-    // // RESET
-    // unsafe {
-    //     if SetConsoleTextAttribute(handle.0, attrs) == 0 {
-    //         // return Err(TtyErrorKind::IoError(Error::last_os_error()));
-    //         panic!("Something went wrong with setting the text attribute")
-    //     }
-    // }
-
-    // // use std::io::Write;
-
-    // // let stdout = ::std::io::stdout();
-    // // let mut stdout = stdout.lock();
-
-    // // stdout.write("\x1B[38;5;1m\x1B[39;mHello,\x1B[0m \x1B[38;5;10;1mHello, \x1B[38;5;10;2mHello, \x1B[38;5;10;4mHello \x1B[0m\n".as_bytes()).unwrap();
-    // // stdout.flush().unwrap();
-
 }

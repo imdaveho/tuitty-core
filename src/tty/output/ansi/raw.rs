@@ -14,9 +14,7 @@
 
 use std::mem;
 use libc::c_int;
-use std::io::Error;
-use crate:Termios;
-use super::Result;
+use super::{Error, Result, Termios};
 
 
 pub fn get_mode() -> Result<Termios> {
@@ -55,7 +53,7 @@ pub fn enable_raw() -> Result<()> {
 
 pub fn set_mode(termios: &Termios) -> Result<()> {
     extern "C" {
-        pub fn tcsetattr(fd: c_int, opt: c_int, termpt: *const Termios) -> c_int;
+        pub fn tcsetattr(fd: c_int, opt: c_int, termp: *const Termios) -> c_int;
     }
     if unsafe { tcsetattr(0, 0, termios) } == -1 {
         Err(Error::last_os_error())
