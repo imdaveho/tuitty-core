@@ -1,9 +1,9 @@
 // ANSI functions for writing and styling text to be outputted to the terminal.
 
-use super::{csi, Color, Display, Result, TextStyle, Style};
+use super::{csi, Color, Display, TextStyle, Style};
 
 #[cfg(unix)]
-use super::{Error, Termios};
+use super::{Error, Result, Termios};
 #[cfg(unix)]
 mod raw;
 #[cfg(unix)]

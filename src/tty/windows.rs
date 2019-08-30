@@ -66,8 +66,8 @@ impl Tty {
 
         if self.ansi_supported {
             handle.set_mode(&self.original_mode).unwrap();
-            _write_ansi(cursor::ansi::show());
-            _write_ansi("\n\r".to_string());
+            write_ansi(cursor::ansi::show());
+            write_ansi("\n\r".to_string());
         } else {
             handle.set_mode(&self.original_mode).unwrap();
             if let Some(handle) = &self.altscreen {
@@ -188,7 +188,7 @@ impl Tty {
 
     pub fn resize(&mut self, w: i16, h: i16) {
         if self.ansi_supported {
-            _write_ansi(screen::ansi::resize(w, h));
+            write_ansi(screen::ansi::resize(w, h));
         } else {
             screen::wincon::resize(w, h).unwrap();
         }
@@ -237,7 +237,7 @@ impl Tty {
                 let rstate = metas[0].is_raw_enabled;
                 let mstate = metas[0].is_mouse_enabled;
                 self.id = 0;
-                _write_ansi(screen::ansi::disable_alt());
+                write_ansi(screen::ansi::disable_alt());
 
                 if rstate {
                     self.raw();
