@@ -324,8 +324,8 @@ impl Tty {
         write_ansi(&output::ansi::reset());
     }
 
-    pub fn write(&mut self, s: &str) {
-        write_ansi(&output::ansi::writeout(s));
+    pub fn print(&mut self, s: &str) {
+        write_ansi(&output::ansi::print(s));
     }
 
     pub fn flush(&mut self) {

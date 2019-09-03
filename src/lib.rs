@@ -1,7 +1,7 @@
 //! `tuitty` is a cross platform library that is meant for FFI.
 
+use std::ffi::CStr;
 use std::os::raw::c_char;
-use std::ffi::{CStr, CString};
 
 mod tty;
 use tty::{
@@ -17,12 +17,6 @@ use ffi::{Coord, Size, SyncInput, AsyncInput};
 pub extern fn init() -> *mut Tty {
     Box::into_raw(Box::new(Tty::init()))
 }
-
-// #[no_mangle]
-// pub extern fn tty_free(ptr: *mut Tty) {
-//     if ptr.is_null() { return }
-//     unsafe { Box::from_raw(ptr); }
-// }
 
 #[no_mangle]
 pub extern fn exit(ptr: *mut Tty) {
@@ -75,24 +69,14 @@ pub extern fn disable_mouse(ptr: *mut Tty) {
 }
 
 #[no_mangle]
-pub extern fn read_char(ptr: *mut Tty) -> *mut c_char {
-    let c = unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).read_char()
-    };
+pub extern fn read_char(ptr: *mut Tty) -> u32 {
     // NOTE: Since Rust char and C char are different implementations from each
-    // other, instead we send a String over the FFI boundary. This allows for
-    // flexibility in the implemenation language to decode the String as the
-    // application expects.
-    let c_str = CString::new(c.to_string()).unwrap();
-    c_str.into_raw()
-}
-
-#[no_mangle]
-pub extern fn char_free(c_str: *mut c_char) {
+    // other, instead we send a u32 over the FFI boundary. This allows for
+    // flexibility in the implemenation language to transform the u32 as a
+    // byte array of [u8; 4] and decode as the application expects.
     unsafe {
-        if c_str.is_null() { return }
-        CString::from_raw(c_str);
+        assert!(!ptr.is_null());
+        (&mut *ptr).read_char() as u32
     }
 }
 
@@ -372,11 +356,11 @@ pub extern fn reset(ptr: *mut Tty) {
 }
 
 #[no_mangle]
-pub extern fn write(ptr: *mut Tty, c_str: *const c_char) {
+pub extern fn print(ptr: *mut Tty, c_str: *const c_char) {
     unsafe {
         assert!(!c_str.is_null());
         assert!(!ptr.is_null());
-        (&mut *ptr).write(
+        (&mut *ptr).print(
             CStr::from_ptr(c_str).to_str().unwrap());
     }
 }

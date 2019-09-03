@@ -13,6 +13,6 @@ mod style;
 pub use style::*;
 
 
-pub fn writeout<D: Display>(value: D) -> String {
+pub fn print<D: Display>(value: D) -> String {
     format!("{}", value)
 }

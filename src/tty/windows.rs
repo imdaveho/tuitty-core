@@ -552,11 +552,11 @@ impl Tty {
         }
     }
 
-    pub fn write(&mut self, s: &str) {
+    pub fn print(&mut self, s: &str) {
         if self.ansi_supported {
-            write_ansi(&output::ansi::writeout(s));
+            write_ansi(&output::ansi::print(s));
         } else {
-            output::wincon::writeout(s).unwrap();
+            output::wincon::print(s).unwrap();
         }
     }
 

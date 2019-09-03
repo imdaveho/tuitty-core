@@ -16,7 +16,7 @@ mod style;
 pub use style::*;
 
 
-pub fn writeout<D: Display>(value: D) -> Result<usize> {
+pub fn print<D: Display>(value: D) -> Result<usize> {
     let handle = Handle::conout()?;
     let text = format!("{}", value).as_str()
         .encode_utf16()
