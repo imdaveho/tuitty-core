@@ -4,10 +4,7 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 
 mod tty;
-use tty::{
-    Tty, SyncReader, AsyncReader,
-    InputEvent, KeyEvent, MouseEvent, MouseButton
-};
+use tty::Tty;
 
 mod ffi;
 use ffi::{Coord, Size, SyncInput, AsyncInput};

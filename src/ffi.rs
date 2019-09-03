@@ -1,6 +1,6 @@
 //! This module contains structs, functions, and traits that support CFFI.
 
-use super::{
+use super::tty::{
     AsyncReader, SyncReader,
     InputEvent, KeyEvent, MouseEvent, MouseButton
 };
