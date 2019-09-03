@@ -13,10 +13,30 @@ mod parser;
 use parser::parse_event;
 
 
+fn _get_systty() -> Result<fs::File> {
+    fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/tty")
+}
+
+fn _get_systty_fd() -> Result<i32> {
+    let fd = unsafe {
+        if libc::isatty(libc::STDIN_FILENO) == 1 {
+            libc::STDIN_FILENO
+        } else {
+            let tty_f = fs::File::open("/dev/tty")?;
+            tty_f.as_raw_fd()
+        }
+    };
+    Ok(fd)
+}
+
+
 pub fn read_char() -> Result<char> {
     let mut buf = [0u8; 20];
 
-    let fd = get_systty_fd()?;
+    let fd = _get_systty_fd()?;
 
     let rv = unsafe {
         let read = libc::read(fd, buf.as_mut_ptr() as *mut libc::c_void, 20);
@@ -45,7 +65,7 @@ pub fn read_char() -> Result<char> {
 
 pub fn read_async() -> AsyncReader {
     AsyncReader::new(Box::new(move |event_tx, kill_switch| {
-        for i in get_systty().unwrap().bytes() {
+        for i in _get_systty().unwrap().bytes() {
             if event_tx.send(i.unwrap()).is_err() {
                 return;
             }
@@ -58,7 +78,7 @@ pub fn read_async() -> AsyncReader {
 
 pub fn read_until_async(delimiter: u8) -> AsyncReader {
     AsyncReader::new(Box::new(move |event_tx, kill_switch| {
-        for byte in get_systty().unwrap().bytes() {
+        for byte in _get_systty().unwrap().bytes() {
             let b = byte.unwrap();
             let eos = b == delimiter;
             let send_err = event_tx.send(b).is_err();
@@ -72,7 +92,7 @@ pub fn read_until_async(delimiter: u8) -> AsyncReader {
 
 pub fn read_sync() -> SyncReader {
     SyncReader {
-        source: Box::from(get_systty().unwrap()),
+        source: Box::from(_get_systty().unwrap()),
         leftover: None,
     }
 }
@@ -84,7 +104,7 @@ pub fn enable_mouse_mode() -> String {
         csi!("?1002"),
         csi!("?1015"),
         csi!("?1006")
-    ).to_string()
+    )
 }
 
 pub fn disable_mouse_mode() -> String {
@@ -94,27 +114,7 @@ pub fn disable_mouse_mode() -> String {
         csi!("?1015"),
         csi!("?1002"),
         csi!("?1000")
-    ).to_string()
-}
-
-
-fn get_systty() -> Result<fs::File> {
-    fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("/dev/tty")
-}
-
-fn get_systty_fd() -> Result<i32> {
-    let fd = unsafe {
-        if libc::isatty(libc::STDIN_FILENO) == 1 {
-            libc::STDIN_FILENO
-        } else {
-            let tty_f = fs::File::open("/dev/tty")?;
-            tty_f.as_raw_fd()
-        }
-    };
-    Ok(fd)
+    )
 }
 
 
@@ -124,7 +124,7 @@ pub struct AsyncReader {
 }
 
 impl AsyncReader {
-    pub fn new(func: Box<Fn(
+    pub fn new(func: Box<dyn Fn(
         &Sender<u8>,
         &Arc<AtomicBool>
     ) + Send>) -> AsyncReader {

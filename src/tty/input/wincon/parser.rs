@@ -421,8 +421,8 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
                     else { KeyEvent::Right }
                 }
                 VK_DOWN => {
-                    if ctrl { KeyEvent::CtrlDown }
-                    else if shift { KeyEvent::ShiftDown }
+                    if ctrl { KeyEvent::CtrlDn }
+                    else if shift { KeyEvent::ShiftDn }
                     else { KeyEvent::Down }
                 }
                 _ => KeyEvent::Null,
@@ -531,31 +531,20 @@ fn _parse_mouse_event(mevt: &MouseEventRecord) -> MouseEvent {
             match mevt.button_state {
                 ButtonState::Release => {
                     // format!("\x1B[<3;{};{};M", xpos, ypos)
-                    MouseEvent::Release(xpos as u16, ypos as u16)
+                    MouseEvent::Release(xpos, ypos)
                 }
                 ButtonState::FromLeft1stButtonPressed => {
                     // format!("\x1B[<0;{};{};M", xpos, ypos)
-                    MouseEvent::Press(
-                        MouseButton::Left,
-                        xpos as u16,
-                        ypos as u16,
-                    )
+                    MouseEvent::Press(MouseButton::Left, xpos, ypos)
                 }
                 ButtonState::RightmostButtonPressed => {
                     // format!("\x1B[<2;{};{};M", xpos, ypos)
                     MouseEvent::Press(
-                        MouseButton::Right,
-                        xpos as u16,
-                        ypos as u16,
-                    )
+                        MouseButton::Right, xpos, ypos)
                 }
                 ButtonState::FromLeft2ndButtonPressed => {
                     // format!("\x1B[<1;{};{};M", xpos, ypos)
-                    MouseEvent::Press(
-                        MouseButton::Middle,
-                        xpos as u16,
-                        ypos as u16,
-                    )
+                    MouseEvent::Press(MouseButton::Middle, xpos, ypos)
                 }
                 _ => MouseEvent::Unknown
             }
@@ -564,24 +553,16 @@ fn _parse_mouse_event(mevt: &MouseEventRecord) -> MouseEvent {
             // Only register when the mouse is not released.
             if mevt.button_state != ButtonState::Release {
                 // format!("\x1B[<32;{};{};M", xpos, ypos)
-                MouseEvent::Hold(xpos as u16, ypos as u16)
+                MouseEvent::Hold(xpos, ypos)
             } else { MouseEvent::Unknown }
         }
         EventFlags::MouseWheeled => {
             if mevt.button_state != ButtonState::Negative {
                 // format!("\x1B[<64;{};{};M")
-                MouseEvent::Press(
-                    MouseButton::WheelUp,
-                    xpos as u16,
-                    ypos as u16,
-                )
+                MouseEvent::Press(MouseButton::WheelUp, xpos, ypos)
             } else {
                 // format!("\x1B[<65;{};{};M")
-                MouseEvent::Press(
-                    MouseButton::WheelDown,
-                    xpos as u16,
-                    ypos as u16,
-                )
+                MouseEvent::Press(MouseButton::WheelDn, xpos, ypos)
             }
         }
         EventFlags::DoubleClick => MouseEvent::Unknown,

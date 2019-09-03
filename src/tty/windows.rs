@@ -64,10 +64,12 @@ impl Tty {
             false => Handle::conout().unwrap(),
         };
 
+        self.to_main();
+
         if self.ansi_supported {
             handle.set_mode(&self.original_mode).unwrap();
-            write_ansi(cursor::ansi::show());
-            write_ansi("\n\r".to_string());
+            write_ansi(&cursor::ansi::show());
+            write_ansi("\n\r");
         } else {
             handle.set_mode(&self.original_mode).unwrap();
             if let Some(handle) = &self.altscreen {
@@ -143,7 +145,7 @@ impl Tty {
         match method {
             "all" => {
                 if self.ansi_supported {
-                    write_ansi(screen::ansi::clear(screen::Clear::All));
+                    write_ansi(&&screen::ansi::clear(screen::Clear::All));
                     self.goto(0, 0);
                 } else {
                     screen::wincon::clear(screen::Clear::All).unwrap();
@@ -152,7 +154,7 @@ impl Tty {
             }
             "newln" => {
                 if self.ansi_supported {
-                    write_ansi(screen::ansi::clear(screen::Clear::NewLn));
+                    write_ansi(&&screen::ansi::clear(screen::Clear::NewLn));
                 } else {
                     let (col, row) = cursor::wincon::pos().unwrap();
                     screen::wincon::clear(screen::Clear::NewLn).unwrap();
@@ -161,7 +163,7 @@ impl Tty {
             }
             "currentln" => {
                 if self.ansi_supported {
-                    write_ansi(screen::ansi::clear(screen::Clear::CurrentLn));
+                    write_ansi(&&screen::ansi::clear(screen::Clear::CurrentLn));
                 } else {
                     let (_, row) = cursor::wincon::pos().unwrap();
                     screen::wincon::clear(screen::Clear::CurrentLn).unwrap();
@@ -170,14 +172,14 @@ impl Tty {
             }
             "cursorup" => {
                 if self.ansi_supported {
-                    write_ansi(screen::ansi::clear(screen::Clear::CursorUp));
+                    write_ansi(&&screen::ansi::clear(screen::Clear::CursorUp));
                 } else {
                     screen::wincon::clear(screen::Clear::CursorUp).unwrap();
                 }
             }
             "cursordn" => {
                 if self.ansi_supported {
-                    write_ansi(screen::ansi::clear(screen::Clear::CursorDn));
+                    write_ansi(&&screen::ansi::clear(screen::Clear::CursorDn));
                 } else {
                     screen::wincon::clear(screen::Clear::CursorDn).unwrap();
                 }
@@ -188,7 +190,7 @@ impl Tty {
 
     pub fn resize(&mut self, w: i16, h: i16) {
         if self.ansi_supported {
-            write_ansi(screen::ansi::resize(w, h));
+            write_ansi(&screen::ansi::resize(w, h));
         } else {
             screen::wincon::resize(w, h).unwrap();
         }
@@ -202,7 +204,7 @@ impl Tty {
             if self.id == 0 {
                 // There is no point to switch if you're on another screen
                 // since ANSI terminals provide a single "alternate screen".
-                write_ansi(screen::ansi::enable_alt());
+                write_ansi(&screen::ansi::enable_alt());
             }
             // Add new `Metadata` for the new screen.
             self._add_metadata();
@@ -229,7 +231,7 @@ impl Tty {
         }
     }
 
-    pub fn main(&mut self) {
+    pub fn to_main(&mut self) {
         // Only execute if the User is not on the main screen buffer.
         if self.id != 0 {
             if self.ansi_supported {
@@ -237,7 +239,7 @@ impl Tty {
                 let rstate = metas[0].is_raw_enabled;
                 let mstate = metas[0].is_mouse_enabled;
                 self.id = 0;
-                write_ansi(screen::ansi::disable_alt());
+                write_ansi(&screen::ansi::disable_alt());
 
                 if rstate {
                     self.raw();
@@ -281,7 +283,7 @@ impl Tty {
         if id != self.id {
             if id == 0 {
                 // Switch to the main screen.
-                self.main();
+                self.to_main();
             } else {
                 if self.ansi_supported {
                     let metas = &self.meta;
@@ -329,7 +331,7 @@ impl Tty {
 
     pub fn goto(&mut self, col: i16, row: i16) {
         if self.ansi_supported {
-            write_ansi(cursor::ansi::goto(col, row));
+            write_ansi(&cursor::ansi::goto(col, row));
         } else {
             cursor::wincon::goto(col, row).unwrap();
         }
@@ -337,7 +339,7 @@ impl Tty {
 
     pub fn up(&mut self) {
         if self.ansi_supported {
-            write_ansi(cursor::ansi::move_up(1));
+            write_ansi(&cursor::ansi::move_up(1));
         } else {
             cursor::wincon::move_up(1).unwrap();
         }
@@ -345,7 +347,7 @@ impl Tty {
 
     pub fn dn(&mut self) {
         if self.ansi_supported {
-            write_ansi(cursor::ansi::move_down(1));
+            write_ansi(&cursor::ansi::move_down(1));
         } else {
             cursor::wincon::move_down(1).unwrap();
         }
@@ -353,7 +355,7 @@ impl Tty {
 
     pub fn left(&mut self) {
         if self.ansi_supported {
-            write_ansi(cursor::ansi::move_left(1));
+            write_ansi(&cursor::ansi::move_left(1));
         } else {
             cursor::wincon::move_left(1).unwrap();
         }
@@ -361,7 +363,7 @@ impl Tty {
 
     pub fn right(&mut self) {
         if self.ansi_supported {
-            write_ansi(cursor::ansi::move_right(1));
+            write_ansi(&cursor::ansi::move_right(1));
         } else {
             cursor::wincon::move_right(1).unwrap();
         }
@@ -374,28 +376,28 @@ impl Tty {
             match d.as_str() {
                 "up" => {
                     if self.ansi_supported {
-                        write_ansi(cursor::ansi::move_up(n));
+                        write_ansi(&cursor::ansi::move_up(n));
                     } else {
                         cursor::wincon::move_up(n).unwrap();
                     }
                 },
                 "dn" => {
                     if self.ansi_supported {
-                        write_ansi(cursor::ansi::move_down(n));
+                        write_ansi(&cursor::ansi::move_down(n));
                     } else {
                         cursor::wincon::move_down(n).unwrap();
                     }
                 },
                 "left" => {
                     if self.ansi_supported {
-                        write_ansi(cursor::ansi::move_left(n));
+                        write_ansi(&cursor::ansi::move_left(n));
                     } else {
                         cursor::wincon::move_left(n).unwrap();
                     }
                 },
                 "right" => {
                     if self.ansi_supported {
-                        write_ansi(cursor::ansi::move_right(n));
+                        write_ansi(&cursor::ansi::move_right(n));
                     } else {
                         cursor::wincon::move_right(n).unwrap();
                     }
@@ -422,7 +424,7 @@ impl Tty {
 
     pub fn mark(&mut self) {
         if self.ansi_supported {
-            write_ansi(cursor::ansi::save_pos());
+            write_ansi(&cursor::ansi::save_pos());
         } else {
             self.meta[self.id].saved_position = Some(
                 cursor::wincon::pos().unwrap()
@@ -432,7 +434,7 @@ impl Tty {
 
     pub fn load(&mut self) {
         if self.ansi_supported {
-            write_ansi(cursor::ansi::load_pos());
+            write_ansi(&cursor::ansi::load_pos());
         } else {
             match self.meta[self.id].saved_position {
                 Some(pos) => {
@@ -445,7 +447,7 @@ impl Tty {
 
     pub fn hide_cursor(&mut self) {
         if self.ansi_supported {
-            write_ansi(cursor::ansi::hide());
+            write_ansi(&cursor::ansi::hide());
         } else {
             cursor::wincon::hide().unwrap();
         }
@@ -453,7 +455,7 @@ impl Tty {
 
     pub fn show_cursor(&mut self) {
         if self.ansi_supported {
-            write_ansi(cursor::ansi::show());
+            write_ansi(&cursor::ansi::show());
         } else {
             cursor::wincon::show().unwrap();
         }
@@ -462,7 +464,7 @@ impl Tty {
     pub fn set_fg(&mut self, color: &str) {
         let fg_col = output::Color::from(color);
         if self.ansi_supported {
-            write_ansi(output::ansi::set_fg(fg_col));
+            write_ansi(&output::ansi::set_fg(fg_col));
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
@@ -471,7 +473,7 @@ impl Tty {
     pub fn set_bg(&mut self, color: &str) {
         let bg_col = output::Color::from(color);
         if self.ansi_supported {
-            write_ansi(output::ansi::set_bg(bg_col));
+            write_ansi(&output::ansi::set_bg(bg_col));
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
@@ -480,7 +482,7 @@ impl Tty {
     pub fn set_tx(&mut self, style: &str) {
         let tstyle = output::TextStyle::from(style);
         if self.ansi_supported {
-            write_ansi(output::ansi::set_tx(tstyle));
+            write_ansi(&output::ansi::set_tx(tstyle));
         } else {
             output::wincon::set_tx(tstyle).unwrap();
         }
@@ -493,7 +495,7 @@ impl Tty {
             b: b,
         };
         if self.ansi_supported {
-            write_ansi(output::ansi::set_fg(fg_col));
+            write_ansi(&output::ansi::set_fg(fg_col));
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
@@ -506,7 +508,7 @@ impl Tty {
             b: b,
         };
         if self.ansi_supported {
-            write_ansi(output::ansi::set_bg(bg_col));
+            write_ansi(&output::ansi::set_bg(bg_col));
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
@@ -515,7 +517,7 @@ impl Tty {
     pub fn set_fg_ansi(&mut self, v: u8) {
         let fg_col = output::Color::AnsiValue(v);
         if self.ansi_supported {
-            write_ansi(output::ansi::set_fg(fg_col));
+            write_ansi(&output::ansi::set_fg(fg_col));
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
@@ -524,7 +526,7 @@ impl Tty {
     pub fn set_bg_ansi(&mut self, v: u8) {
         let bg_col = output::Color::AnsiValue(v);
         if self.ansi_supported {
-            write_ansi(output::ansi::set_bg(bg_col));
+            write_ansi(&output::ansi::set_bg(bg_col));
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
@@ -536,7 +538,7 @@ impl Tty {
         // match the various text styles that are supported: "bold", "dim",
         // "underline", "reverse", "hide", and "reset".
         if self.ansi_supported {
-            write_ansi(output::ansi::set_all(fg, bg, style));
+            write_ansi(&output::ansi::set_all(fg, bg, style));
         } else {
             output::wincon::set_all(fg, bg, style, self.reset_attrs).unwrap();
         }
@@ -544,7 +546,7 @@ impl Tty {
 
     pub fn reset(&mut self) {
         if self.ansi_supported {
-            write_ansi(output::ansi::reset());
+            write_ansi(&output::ansi::reset());
         } else {
             output::wincon::reset(self.reset_attrs).unwrap();
         }
@@ -552,7 +554,7 @@ impl Tty {
 
     pub fn write(&mut self, s: &str) {
         if self.ansi_supported {
-            write_ansi(output::ansi::writeout(s));
+            write_ansi(&output::ansi::writeout(s));
         } else {
             output::wincon::writeout(s).unwrap();
         }

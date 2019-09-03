@@ -5,23 +5,23 @@ use crate::csi;
 
 
 pub fn goto(col: i16, row: i16) -> String {
-    format!(csi!("{};{}H"), row + 1, col + 1).to_string()
+    format!(csi!("{};{}H"), row + 1, col + 1)
 }
 
 pub fn move_up(n: i16) -> String {
-    format!(csi!("{}A"), n).to_string()
+    format!(csi!("{}A"), n)
 }
 
 pub fn move_right(n: i16) -> String {
-    format!(csi!("{}C"), n).to_string()
+    format!(csi!("{}C"), n)
 }
 
 pub fn move_down(n: i16) -> String {
-    format!(csi!("{}B"), n).to_string()
+    format!(csi!("{}B"), n)
 }
 
 pub fn move_left(n: i16) -> String {
-    format!(csi!("{}D"), n).to_string()
+    format!(csi!("{}D"), n)
 }
 
 pub fn pos_raw() -> Result<(i16, i16)> {

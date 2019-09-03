@@ -17,5 +17,5 @@ libc = "0.2.60"
 [target.'cfg(windows)'.dependencies]
 winapi = { version =  "0.3.7", features = ["wincon", "winbase", "winuser", "winnt", "consoleapi", "processenv", "handleapi"] }
 
-# [lib]
-# crate-type = ["cdylib"]
+[lib]
+crate-type = ["lib", "cdylib"]

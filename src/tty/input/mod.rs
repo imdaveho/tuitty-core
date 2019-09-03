@@ -38,9 +38,9 @@ pub enum InputEvent {
 
 // #[derive(Debug, PartialOrd, PartialEq, Hash, Clone, Copy)]
 pub enum MouseEvent {
-    Press(MouseButton, u16, u16),
-    Release(u16, u16),
-    Hold(u16, u16),
+    Press(MouseButton, i16, i16),
+    Release(i16, i16),
+    Hold(i16, i16),
     Unknown,
 }
 
@@ -50,7 +50,7 @@ pub enum MouseButton {
     Right,
     Middle,
     WheelUp,
-    WheelDown,
+    WheelDn,
 }
 
 // #[derive(Debug, PartialOrd, PartialEq, Eq, Hash, Clone)]
@@ -74,11 +74,11 @@ pub enum KeyEvent {
     Null,
     Esc,
     CtrlUp,
-    CtrlDown,
+    CtrlDn,
     CtrlRight,
     CtrlLeft,
     ShiftUp,
-    ShiftDown,
+    ShiftDn,
     ShiftRight,
     ShiftLeft,
 }

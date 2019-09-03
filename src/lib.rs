@@ -1,183 +1,390 @@
 //! `tuitty` is a cross platform library that is meant for FFI.
 
-use std::str;
-use std::ffi::CStr;
+use std::os::raw::c_char;
+use std::ffi::{CStr, CString};
 
 mod tty;
-pub use tty::{Tty, AsyncReader, SyncReader};
+use tty::{
+    Tty, SyncReader, AsyncReader,
+    InputEvent, KeyEvent, MouseEvent, MouseButton
+};
 
-
-// pub struct Tui(Tty);
-
-#[repr(C)]
-pub struct Tuple {
-    x: i16,
-    y: i16,
-}
-
-impl From<(i16, i16)> for Tuple {
-    fn from(tup: (i16, i16)) -> Tuple {
-        Tuple { x: tup.0, y: tup.1 }
-    }
-}
-
-impl From<Tuple> for (i16, i16) {
-    fn from(tup: Tuple) -> (i16, i16) {
-        (tup.x, tup.y)
-    }
-}
+mod ffi;
+use ffi::{Coord, Size, SyncInput, AsyncInput};
 
 
 #[no_mangle]
-pub extern fn tty() -> *mut Tty {
+pub extern fn init() -> *mut Tty {
     Box::into_raw(Box::new(Tty::init()))
 }
 
-#[no_mangle]
-pub extern fn tty_free(ptr: *mut Tty) {
-    if ptr.is_null() { return }
-    unsafe { Box::from_raw(ptr); }
-}
+// #[no_mangle]
+// pub extern fn tty_free(ptr: *mut Tty) {
+//     if ptr.is_null() { return }
+//     unsafe { Box::from_raw(ptr); }
+// }
 
 #[no_mangle]
 pub extern fn exit(ptr: *mut Tty) {
-    let tty = unsafe {
-        assert!(!ptr.is_null());
-        &mut *ptr
-    };
-    tty.exit();
+    unsafe {
+        // assert!(!ptr.is_null());
+        if ptr.is_null() { return }
+        (&mut *ptr).exit();
+        Box::from_raw(ptr);
+    }
 }
 
 #[no_mangle]
-pub extern fn size(ptr: *mut Tty) -> Tuple {
-    let tty = unsafe {
+pub extern fn size(ptr: *mut Tty) -> Size {
+    unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
-    };
-    tty.size().into()
+        (&mut *ptr).size().into()
+    }
 }
 
 #[no_mangle]
 pub extern fn raw(ptr: *mut Tty) {
-    let tty = unsafe {
+    unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
-    };
-    tty.raw();
+        (&mut *ptr).raw();
+    }
 }
 
 #[no_mangle]
 pub extern fn cook(ptr: *mut Tty) {
-    let tty = unsafe {
+    unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
-    };
-    tty.cook();
+        (&mut *ptr).cook();
+    }
 }
 
 #[no_mangle]
 pub extern fn enable_mouse(ptr: *mut Tty) {
-    let tty = unsafe {
+    unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
-    };
-    tty.enable_mouse();
+        (&mut *ptr).enable_mouse();
+    }
 }
 
 #[no_mangle]
 pub extern fn disable_mouse(ptr: *mut Tty) {
-    let tty = unsafe {
+    unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
-    };
-    tty.disable_mouse();
-}
-
-// TODO: confirm how to send char values through the FFI boundary
-#[no_mangle]
-pub extern fn read_char(ptr: *mut Tty) -> u32 {
-    let tty = unsafe {
-        assert!(!ptr.is_null());
-        &mut *ptr
-    };
-    tty.read_char() as u32
+        (&mut *ptr).disable_mouse();
+    }
 }
 
 #[no_mangle]
-pub extern fn read_sync(ptr: *mut Tty) -> *mut SyncReader {
-    let tty = unsafe {
+pub extern fn read_char(ptr: *mut Tty) -> *mut c_char {
+    let c = unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
+        (&mut *ptr).read_char()
     };
-    Box::into_raw(Box::new(tty.read_sync()))
+    // NOTE: Since Rust char and C char are different implementations from each
+    // other, instead we send a String over the FFI boundary. This allows for
+    // flexibility in the implemenation language to decode the String as the
+    // application expects.
+    let c_str = CString::new(c.to_string()).unwrap();
+    c_str.into_raw()
 }
 
 #[no_mangle]
-pub extern fn sync_free(ptr: *mut SyncReader) {
+pub extern fn char_free(c_str: *mut c_char) {
+    unsafe {
+        if c_str.is_null() { return }
+        CString::from_raw(c_str);
+    }
+}
+
+#[no_mangle]
+pub extern fn read_sync(ptr: *mut Tty) -> *mut SyncInput {
+    unsafe {
+        assert!(!ptr.is_null());
+        Box::into_raw(Box::new(SyncInput {
+            iter: (&mut *ptr).read_sync(),
+            event: Default::default(),
+        }))
+    }
+}
+
+#[no_mangle]
+pub extern fn sync_next(ptr: *mut SyncInput) {
+    let input = unsafe {
+        assert!(!ptr.is_null());
+        &mut *ptr
+    };
+
+    if let Some(ev) = input.iter.next() {
+        ffi::match_event(ev, &mut input.event);
+    }
+}
+
+#[no_mangle]
+pub extern fn sync_free(ptr: *mut SyncInput) {
     if ptr.is_null() { return }
     unsafe { Box::from_raw(ptr); }
 }
 
 #[no_mangle]
-pub extern fn read_async(ptr: *mut Tty) -> *mut AsyncReader {
-    let tty = unsafe {
+pub extern fn read_async(ptr: *mut Tty) -> *mut AsyncInput {
+    unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
-    };
-    Box::into_raw(Box::new(tty.read_async()))
-}
-
-// TODO: confirm if u8's need to have special considerations when going through
-// the FFI boundary
-#[no_mangle]
-pub extern fn read_until_async(ptr: *mut Tty, d: u8) -> *mut AsyncReader {
-    let tty = unsafe {
-        assert!(!ptr.is_null());
-        &mut *ptr
-    };
-    Box::into_raw(Box::new(tty.read_until_async(d)))
+        Box::into_raw(Box::new(AsyncInput {
+            iter: (&mut *ptr).read_async(),
+            event: Default::default(),
+        }))
+    }
 }
 
 #[no_mangle]
-pub extern fn async_free(ptr: *mut AsyncReader) {
+pub extern fn read_until_async(ptr: *mut Tty, d: u8) -> *mut AsyncInput {
+    unsafe {
+        assert!(!ptr.is_null());
+        Box::into_raw(Box::new(AsyncInput {
+            iter: (&mut *ptr).read_until_async(d),
+            event: Default::default(),
+        }))
+    }
+}
+
+#[no_mangle]
+pub extern fn async_next(ptr: *mut AsyncInput) {
+    let input = unsafe {
+        assert!(!ptr.is_null());
+        &mut *ptr
+    };
+
+    if let Some(ev) = input.iter.next() {
+        ffi::match_event(ev, &mut input.event);
+    }
+}
+
+#[no_mangle]
+pub extern fn async_free(ptr: *mut AsyncInput) {
     if ptr.is_null() { return }
     unsafe { Box::from_raw(ptr); }
 }
 
-// TODO: confirm if strings passed through FFI boundary are i8 or u8
 #[no_mangle]
-pub extern fn clear(ptr: *mut Tty, s: *const i8) {
-    let c_str = unsafe {
-        assert!(!s.is_null());
-        CStr::from_ptr(s)
-    };
-
-    let method = c_str.to_str().unwrap();
-
-    let tty = unsafe {
+pub extern fn clear(ptr: *mut Tty, m: u8) {
+    let method = ffi::match_method(m);
+    unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
-    };
-
-    tty.clear(method);
+        (&mut *ptr).clear(method);
+    }
 }
 
 #[no_mangle]
 pub extern fn resize(ptr: *mut Tty, w: i16, h: i16) {
-    let tty = unsafe {
+    unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
-    };
-
-    tty.resize(w, h);
+        (&mut *ptr).resize(w, h);
+    }
 }
 
 #[no_mangle]
 pub extern fn switch(ptr: *mut Tty) {
-    let tty = unsafe {
+    unsafe {
         assert!(!ptr.is_null());
-        &mut *ptr
-    };
+        (&mut *ptr).switch();
+    }
+}
 
-    tty.switch();
+#[no_mangle]
+pub extern fn to_main(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).to_main();
+    };
+}
+
+#[no_mangle]
+pub extern fn switch_to(ptr: *mut Tty, id: usize) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).switch_to(id);
+    }
+}
+
+
+#[no_mangle]
+pub extern fn goto(ptr: *mut Tty, col: i16, row: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).goto(col, row);
+    }
+}
+
+#[no_mangle]
+pub extern fn up(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).up();
+    }
+}
+
+#[no_mangle]
+pub extern fn dn(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).dn();
+    }
+}
+
+#[no_mangle]
+pub extern fn left(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).left();
+    }
+}
+
+#[no_mangle]
+pub extern fn right(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).right();
+    }
+}
+
+#[no_mangle]
+pub extern fn dpad(ptr: *mut Tty, d: u8, n: i16) {
+    let dir = ffi::match_direction(d);
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).dpad(dir, n);
+    }
+}
+
+#[no_mangle]
+pub extern fn pos(ptr: *mut Tty) -> Coord {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).pos().into()
+    }
+}
+
+#[no_mangle]
+pub extern fn mark(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).mark();
+    }
+}
+
+#[no_mangle]
+pub extern fn load(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).load();
+    }
+}
+
+#[no_mangle]
+pub extern fn hide_cursor(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).hide_cursor();
+    }
+}
+
+#[no_mangle]
+pub extern fn show_cursor(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).show_cursor();
+    }
+}
+
+#[no_mangle]
+pub extern fn set_fg(ptr: *mut Tty, fc: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).set_fg(ffi::match_color(fc));
+    }
+}
+
+#[no_mangle]
+pub extern fn set_bg(ptr: *mut Tty, bc: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).set_bg(ffi::match_color(bc));
+    };
+}
+
+#[no_mangle]
+pub extern fn set_tx(ptr: *mut Tty, ts: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).set_tx(ffi::match_style(ts));
+    }
+}
+
+#[no_mangle]
+pub extern fn set_fg_rgb(ptr: *mut Tty, r: u8, g: u8, b: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).set_fg_rgb(r, g, b);
+    }
+}
+
+#[no_mangle]
+pub extern fn set_bg_rgb(ptr: *mut Tty, r: u8, g: u8, b: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).set_bg_rgb(r, g, b);
+    }
+}
+
+#[no_mangle]
+pub extern fn set_fg_ansi(ptr: *mut Tty, v: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).set_fg_ansi(v);
+    }
+}
+
+#[no_mangle]
+pub extern fn set_bg_ansi(ptr: *mut Tty, v: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).set_bg_ansi(v);
+    }
+}
+
+#[no_mangle]
+pub extern fn set_style(ptr: *mut Tty, fc: u8, bc: u8, ts: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).set_style(
+            ffi::match_color(fc),
+            ffi::match_color(bc),
+            ffi::match_style(ts));
+    }
+}
+
+#[no_mangle]
+pub extern fn reset(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).reset();
+    }
+}
+
+#[no_mangle]
+pub extern fn write(ptr: *mut Tty, c_str: *const c_char) {
+    unsafe {
+        assert!(!c_str.is_null());
+        assert!(!ptr.is_null());
+        (&mut *ptr).write(
+            CStr::from_ptr(c_str).to_str().unwrap());
+    }
+}
+
+#[no_mangle]
+pub extern fn flush(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).flush();
+    }
 }

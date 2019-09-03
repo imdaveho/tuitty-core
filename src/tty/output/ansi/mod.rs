@@ -14,5 +14,5 @@ pub use style::*;
 
 
 pub fn writeout<D: Display>(value: D) -> String {
-    format!("{}", value).to_string()
+    format!("{}", value)
 }

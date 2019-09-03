@@ -7,21 +7,21 @@ pub fn set_fg(fg_color: Color) -> String {
     format!(
         csi!("{}m"),
         _stylize(Style::Fg(fg_color)),
-    ).to_string()
+    )
 }
 
 pub fn set_bg(bg_color: Color) -> String {
     format!(
         csi!("{}m"),
         _stylize(Style::Bg(bg_color)),
-    ).to_string()
+    )
 }
 
 pub fn set_tx(text_style: TextStyle) -> String {
     format!(
         csi!("{}m"),
         _stylize(Style::Tx(text_style)),
-    ).to_string()
+    )
 }
 
 pub fn set_all(fg: &str, bg: &str, tx: &str) -> String {
@@ -70,7 +70,7 @@ pub fn set_all(fg: &str, bg: &str, tx: &str) -> String {
         }
     }
 
-    format!(csi!("{}{}{}"), fg_str, bg_str, tx_str).to_string()
+    format!(csi!("{}{}{}"), fg_str, bg_str, tx_str)
 }
 
 pub fn reset() -> String {
@@ -103,7 +103,7 @@ fn _stylize(style: Style) -> String {
             }
         }
         Style::Tx(t) => {
-            ansi_value.push_str(t.to_string().as_str());
+            ansi_value.push_str(&t.to_string());
             return ansi_value;
         }
     }

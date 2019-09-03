@@ -79,7 +79,7 @@ where I: Iterator<Item = u8> {
         Some(b'[') => match iter.next() {
             // NOTE (@imdaveho): cannot find when this occurs;
             // having another '[' after ESC[ not a likely scenario
-            Some(val @ b'A'...b'E') => {
+            Some(val @ b'A'..=b'E') => {
                 InputEvent::Keyboard(KeyEvent::F(1 + val - b'A'))
             }
             _ => InputEvent::Unknown,
@@ -100,8 +100,8 @@ where I: Iterator<Item = u8> {
 
             let cb = next() as i8 - 32;
             // (1, 1) are the coords for upper left.
-            let cx = next().saturating_sub(32) as u16;
-            let cy = next().saturating_sub(32) as u16;
+            let cx = next().saturating_sub(32) as i16;
+            let cy = next().saturating_sub(32) as i16;
 
             InputEvent::Mouse(match cb & 0b11 {
                 0 => {
@@ -113,7 +113,7 @@ where I: Iterator<Item = u8> {
                 }
                 1 => {
                     if cb & 0x40 != 0 {
-                        MouseEvent::Press(MouseButton::WheelDown, cx, cy)
+                        MouseEvent::Press(MouseButton::WheelDn, cx, cy)
                     } else {
                         MouseEvent::Press(MouseButton::Middle, cx, cy)
                     }
@@ -138,18 +138,18 @@ where I: Iterator<Item = u8> {
             let str_buf = String::from_utf8(buf).unwrap();
             let nums = &mut str_buf.split(';');
 
-            let cb = nums.next().unwrap().parse::<u16>().unwrap();
-            let cx = nums.next().unwrap().parse::<u16>().unwrap();
-            let cy = nums.next().unwrap().parse::<u16>().unwrap();
+            let cb = nums.next().unwrap().parse::<i16>().unwrap();
+            let cx = nums.next().unwrap().parse::<i16>().unwrap();
+            let cy = nums.next().unwrap().parse::<i16>().unwrap();
 
             let event = match cb {
-                0...2 | 64...65 => {
+                0..=2 | 64..=65 => {
                     let btn = match cb {
                         0 => MouseButton::Left,
                         1 => MouseButton::Middle,
                         2 => MouseButton::Right,
                         64 => MouseButton::WheelUp,
-                        65 => MouseButton::WheelDown,
+                        65 => MouseButton::WheelDn,
                         _ => unreachable!(),
                     };
                     match c {
@@ -168,7 +168,7 @@ where I: Iterator<Item = u8> {
             }
         } // End xterm mouse handling
         // Match: Numbered escape code.
-        Some(c @ b'0'...b'9') => {
+        Some(c @ b'0'..=b'9') => {
             let mut buf = Vec::new();
             buf.push(c);
             let mut character = iter.next().unwrap();
@@ -186,7 +186,7 @@ where I: Iterator<Item = u8> {
                 b'M' => {
                     let str_buf = String::from_utf8(buf).unwrap();
 
-                    let nums: Vec<u16> = str_buf
+                    let nums: Vec<i16> = str_buf
                         .split(';')
                         .map(|n| n.parse().unwrap())
                         .collect();
@@ -237,13 +237,13 @@ where I: Iterator<Item = u8> {
                         4 | 8 => InputEvent::Keyboard(KeyEvent::End),
                         5 => InputEvent::Keyboard(KeyEvent::PageUp),
                         6 => InputEvent::Keyboard(KeyEvent::PageDown),
-                        v @ 11...15 => {
+                        v @ 11..=15 => {
                             InputEvent::Keyboard(KeyEvent::F(v - 10))
                         }
-                        v @ 17...21 => {
+                        v @ 17..=21 => {
                             InputEvent::Keyboard(KeyEvent::F(v - 11))
                         }
-                        v @ 23...24 => {
+                        v @ 23..=24 => {
                             InputEvent::Keyboard(KeyEvent::F(v - 12))
                         }
                         _ => InputEvent::Unknown,
@@ -255,11 +255,11 @@ where I: Iterator<Item = u8> {
                 // _ = InputEvent::Unknown,
                 e => match (buf.last().unwrap(), e) {
                     (53, 65) => InputEvent::Keyboard(KeyEvent::CtrlUp),
-                    (53, 66) => InputEvent::Keyboard(KeyEvent::CtrlDown),
+                    (53, 66) => InputEvent::Keyboard(KeyEvent::CtrlDn),
                     (53, 67) => InputEvent::Keyboard(KeyEvent::CtrlRight),
                     (53, 68) => InputEvent::Keyboard(KeyEvent::CtrlLeft),
                     (50, 65) => InputEvent::Keyboard(KeyEvent::ShiftUp),
-                    (50, 66) => InputEvent::Keyboard(KeyEvent::ShiftDown),
+                    (50, 66) => InputEvent::Keyboard(KeyEvent::ShiftDn),
                     (50, 67) => InputEvent::Keyboard(KeyEvent::ShiftRight),
                     (50, 68) => InputEvent::Keyboard(KeyEvent::ShiftLeft),
                     _ => InputEvent::Unknown,

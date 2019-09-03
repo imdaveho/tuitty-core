@@ -34,10 +34,10 @@ impl Tty {
     }
 
     pub fn exit(&mut self) {
-        self.main();
+        self.to_main();
         output::ansi::set_mode(&self.original_mode).unwrap();
-        write_ansi(cursor::ansi::show());
-        write_ansi("\n\r".to_string());
+        write_ansi(&cursor::ansi::show());
+        write_ansi("\n\r");
         self.meta.clear();
     }
 
@@ -73,13 +73,13 @@ impl Tty {
 
     pub fn enable_mouse(&mut self) {
         let mut m = &mut self.meta[self.id];
-        write_ansi(input::ansi::enable_mouse_mode());
+        write_ansi(&input::ansi::enable_mouse_mode());
         m.is_mouse_enabled = true;
     }
 
     pub fn disable_mouse(&mut self) {
         let mut m = &mut self.meta[self.id];
-        write_ansi(input::ansi::disable_mouse_mode());
+        write_ansi(&input::ansi::disable_mouse_mode());
         m.is_mouse_enabled = false;
     }
 
@@ -103,27 +103,27 @@ impl Tty {
     pub fn clear(&mut self, method: &str) {
         match method {
             "all" => {
-                write_ansi(screen::ansi::clear(screen::Clear::All));
+                write_ansi(&screen::ansi::clear(screen::Clear::All));
                 self.goto(0, 0);
             }
             "newln" => {
-                write_ansi(screen::ansi::clear(screen::Clear::NewLn));
+                write_ansi(&screen::ansi::clear(screen::Clear::NewLn));
             }
             "currentln" => {
-                write_ansi(screen::ansi::clear(screen::Clear::CurrentLn));
+                write_ansi(&screen::ansi::clear(screen::Clear::CurrentLn));
             }
             "cursorup" => {
-                write_ansi(screen::ansi::clear(screen::Clear::CursorUp));
+                write_ansi(&screen::ansi::clear(screen::Clear::CursorUp));
             }
             "cursordn" => {
-                write_ansi(screen::ansi::clear(screen::Clear::CursorDn));
+                write_ansi(&screen::ansi::clear(screen::Clear::CursorDn));
             }
             _ => ()
         }
     }
 
     pub fn resize(&mut self, w: i16, h: i16) {
-        write_ansi(screen::ansi::resize(w, h));
+        write_ansi(&screen::ansi::resize(w, h));
     }
 
 
@@ -134,7 +134,7 @@ impl Tty {
         if self.id == 0 {
             // There is no point to switch if you're on another screen
             // since ANSI terminals provide a single "alternate screen".
-            write_ansi(screen::ansi::enable_alt());
+            write_ansi(&screen::ansi::enable_alt());
         }
         // Add new `Metadata` for the new screen.
         self._add_metadata();
@@ -145,14 +145,14 @@ impl Tty {
     }
 
 
-    pub fn main(&mut self) {
+    pub fn to_main(&mut self) {
         // Only execute if the User is not on the main screen buffer.
         if self.id != 0 {
             let metas = &self.meta;
             let rstate = metas[0].is_raw_enabled;
             let mstate = metas[0].is_mouse_enabled;
             self.id = 0;
-            write_ansi(screen::ansi::disable_alt());
+            write_ansi(&screen::ansi::disable_alt());
 
             if rstate {
                 self.raw();
@@ -179,7 +179,7 @@ impl Tty {
         if id != self.id {
             if id == 0 {
                 // Switch to the main screen.
-                self.main();
+                self.to_main();
             } else {
                 let metas = &self.meta;
                 let rstate = metas[id].is_raw_enabled;
@@ -201,23 +201,23 @@ impl Tty {
     }
 
     pub fn goto(&mut self, col: i16, row: i16) {
-        write_ansi(cursor::ansi::goto(col, row));
+        write_ansi(&cursor::ansi::goto(col, row));
     }
 
     pub fn up(&mut self) {
-        write_ansi(cursor::ansi::move_up(1));
+        write_ansi(&cursor::ansi::move_up(1));
     }
 
     pub fn dn(&mut self) {
-        write_ansi(cursor::ansi::move_down(1));
+        write_ansi(&cursor::ansi::move_down(1));
     }
 
     pub fn left(&mut self) {
-        write_ansi(cursor::ansi::move_left(1));
+        write_ansi(&cursor::ansi::move_left(1));
     }
 
     pub fn right(&mut self) {
-        write_ansi(cursor::ansi::move_right(1));
+        write_ansi(&cursor::ansi::move_right(1));
     }
 
     pub fn dpad(&mut self, dir: &str, n: i16) {
@@ -226,16 +226,16 @@ impl Tty {
         if n > 0 {
             match d.as_str() {
                 "up" => {
-                    write_ansi(cursor::ansi::move_up(n));
+                    write_ansi(&cursor::ansi::move_up(n));
                 },
                 "dn" => {
-                    write_ansi(cursor::ansi::move_down(n));
+                    write_ansi(&cursor::ansi::move_down(n));
                 },
                 "left" => {
-                    write_ansi(cursor::ansi::move_left(n));
+                    write_ansi(&cursor::ansi::move_left(n));
                 },
                 "right" => {
-                    write_ansi(cursor::ansi::move_right(n));
+                    write_ansi(&cursor::ansi::move_right(n));
                 },
                 _ => ()
             };
@@ -254,34 +254,34 @@ impl Tty {
     }
 
     pub fn mark(&mut self) {
-        write_ansi(cursor::ansi::save_pos());
+        write_ansi(&cursor::ansi::save_pos());
     }
 
     pub fn load(&mut self) {
-        write_ansi(cursor::ansi::load_pos());
+        write_ansi(&cursor::ansi::load_pos());
     }
 
     pub fn hide_cursor(&mut self) {
-        write_ansi(cursor::ansi::hide());
+        write_ansi(&cursor::ansi::hide());
     }
 
     pub fn show_cursor(&mut self) {
-        write_ansi(cursor::ansi::show());
+        write_ansi(&cursor::ansi::show());
     }
 
     pub fn set_fg(&mut self, color: &str) {
         let fg_col = output::Color::from(color);
-        write_ansi(output::ansi::set_fg(fg_col));
+        write_ansi(&output::ansi::set_fg(fg_col));
     }
 
     pub fn set_bg(&mut self, color: &str) {
         let bg_col = output::Color::from(color);
-        write_ansi(output::ansi::set_bg(bg_col));
+        write_ansi(&output::ansi::set_bg(bg_col));
     }
 
     pub fn set_tx(&mut self, style: &str) {
         let tstyle = output::TextStyle::from(style);
-        write_ansi(output::ansi::set_tx(tstyle));
+        write_ansi(&output::ansi::set_tx(tstyle));
     }
 
     pub fn set_fg_rgb(&mut self, r: u8, g:u8, b: u8) {
@@ -290,7 +290,7 @@ impl Tty {
             g: g,
             b: b,
         };
-        write_ansi(output::ansi::set_fg(fg_col));
+        write_ansi(&output::ansi::set_fg(fg_col));
     }
 
     pub fn set_bg_rgb(&mut self, r: u8, g:u8, b: u8) {
@@ -299,17 +299,17 @@ impl Tty {
             g: g,
             b: b,
         };
-        write_ansi(output::ansi::set_bg(bg_col));
+        write_ansi(&output::ansi::set_bg(bg_col));
     }
 
     pub fn set_fg_ansi(&mut self, v: u8) {
         let fg_col = output::Color::AnsiValue(v);
-        write_ansi(output::ansi::set_fg(fg_col));
+        write_ansi(&output::ansi::set_fg(fg_col));
     }
 
     pub fn set_bg_ansi(&mut self, v: u8) {
         let bg_col = output::Color::AnsiValue(v);
-        write_ansi(output::ansi::set_bg(bg_col));
+        write_ansi(&output::ansi::set_bg(bg_col));
     }
 
     pub fn set_style(&mut self, fg: &str, bg: &str, style: &str) {
@@ -317,15 +317,15 @@ impl Tty {
         // the tx param can be treated as a comma-separated list of words that
         // match the various text styles that are supported: "bold", "dim",
         // "underline", "reverse", "hide", and "reset".
-        write_ansi(output::ansi::set_all(fg, bg, style));
+        write_ansi(&output::ansi::set_all(fg, bg, style));
     }
 
     pub fn reset(&mut self) {
-        write_ansi(output::ansi::reset());
+        write_ansi(&output::ansi::reset());
     }
 
     pub fn write(&mut self, s: &str) {
-        write_ansi(output::ansi::writeout(s));
+        write_ansi(&output::ansi::writeout(s));
     }
 
     pub fn flush(&mut self) {

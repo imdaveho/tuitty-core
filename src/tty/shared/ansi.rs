@@ -3,7 +3,7 @@
 use std::io::{stdout, BufWriter, Write};
 
 
-pub fn write_ansi(s: String) {
+pub fn write_ansi(s: &str) {
     let cout = stdout();
     let lock = cout.lock();
     let mut writer = BufWriter::new(lock);
@@ -22,5 +22,3 @@ pub fn flush_ansi() {
 macro_rules! csi {
     ($( $l:expr ),*) => { concat!("\x1B[", $( $l ),*) };
 }
-
-

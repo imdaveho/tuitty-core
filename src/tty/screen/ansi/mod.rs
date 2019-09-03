@@ -16,19 +16,19 @@ pub use alternate::{
 pub fn clear(clr: Clear) -> String {
     match clr {
         Clear::All => {
-            return csi!("2J").to_string()
+            csi!("2J").to_string()
         }
         Clear::CursorDn => {
-            return csi!("J").to_string()
+            csi!("J").to_string()
         }
         Clear::CursorUp => {
-            return csi!("1J").to_string()
+            csi!("1J").to_string()
         }
         Clear::CurrentLn => {
-            return csi!("2K").to_string()
+            csi!("2K").to_string()
         }
         Clear::NewLn => {
-            return csi!("K").to_string()
+            csi!("K").to_string()
         }
     }
 }
@@ -53,7 +53,7 @@ pub fn size() -> (i16, i16) {
 }
 
 pub fn resize(w: i16, h: i16) -> String {
-    format!(csi!("8;{};{}t"), h, w).to_string()
+    format!(csi!("8;{};{}t"), h, w)
 }
 
 

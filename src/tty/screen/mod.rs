@@ -10,9 +10,10 @@
 //! to the top `tty` module. This has to do with saving console settings to
 //! restore back to normal once the application exits and cleans up.
 
-use std::io::{Error, Result};
-
 pub mod ansi;
+
+#[cfg(windows)]
+use std::io::{Error, Result};
 
 #[cfg(windows)]
 pub mod wincon;
