@@ -1,11 +1,26 @@
+import os
 import sys
+import platform
 from ctypes import c_bool, c_char_p, c_int, c_uint8, c_int16, c_uint32, cdll, \
     Structure, POINTER
 
 
 prefix = {'win32': ''}.get(sys.platform, 'lib')
 extension = {'darwin': '.dylib', 'win32': '.dll'}.get(sys.platform, '.so')
-lib = cdll.LoadLibrary(prefix + "tuitty" + extension)
+root = os.path.dirname(os.path.dirname(__file__))
+system = {"darwin": "macos", "win32": "windows"}.get(sys.platform, "linux")
+bits = "64" if platform.architecture()[0] == "64bit" else "32"
+cpu = {
+    "aarch64": "arm",
+    "x86_64": "intel",
+    "i686": "intel",
+    "AMD64": "amd"
+}.get(platform.machine(), "arm")
+
+path = os.path.join(
+    os.path.abspath(root), "lib", system, cpu + bits,
+    prefix + "tuitty" + extension)
+lib = cdll.LoadLibrary(path)
 
 
 class CTty(Structure):
@@ -219,7 +234,7 @@ class Tty:
         lib.terminate(self.tty)
 
     def size(self) -> (int, int):
-        size = lib.termsize(self.tty)
+        size = lib.size(self.tty)
         return (size.w, size.h)
 
     def raw(self):
@@ -306,30 +321,32 @@ class Tty:
         lib.show_cursor(self.tty)
 
     def _color_match(self, color: str) -> c_uint8:
-        {"reset": 0,
-         "black": 1,
-         "red": 2,
-         "green": 3,
-         "yellow": 4,
-         "blue": 5,
-         "magenta": 6,
-         "cyan": 7,
-         "white": 8,
-         "dark_grey": 9,
-         "darkgrey": 9,
-         "dark_red": 10,
-         "darkred": 10,
-         "dark_green": 11,
-         "darkgreen": 11,
-         "dark_yellow": 12,
-         "darkyellow": 12,
-         "dark_blue": 13,
-         "darkblue": 13,
-         "dark_magenta": 14,
-         "darkmagenta": 14,
-         "dark_cyan": 15,
-         "darkcyan": 15,
-         "grey": 16}.get(color, 17)
+        return {
+            "reset": 0,
+            "black": 1,
+            "red": 2,
+            "green": 3,
+            "yellow": 4,
+            "blue": 5,
+            "magenta": 6,
+            "cyan": 7,
+            "white": 8,
+            "dark_grey": 9,
+            "darkgrey": 9,
+            "dark_red": 10,
+            "darkred": 10,
+            "dark_green": 11,
+            "darkgreen": 11,
+            "dark_yellow": 12,
+            "darkyellow": 12,
+            "dark_blue": 13,
+            "darkblue": 13,
+            "dark_magenta": 14,
+            "darkmagenta": 14,
+            "dark_cyan": 15,
+            "darkcyan": 15,
+            "grey": 16
+        }.get(color, 17)
 
     def set_fg(self, color: str):
         lib.set_fg(self.tty, self._color_match(color))
@@ -339,34 +356,36 @@ class Tty:
 
     def _style_match(self, style: str) -> c_uint8:
         lookup = ','.join(map(lambda x: x.strip(), style.split(',')))
-        {"reset": 0,
-         "bold": 1,
-         "dim": 2,
-         "underline": 4,
-         "reverse": 7,
-         "hide": 8,
+        return {
+            "reset": 0,
+            "bold": 1,
+            "dim": 2,
+            "underline": 4,
+            "reverse": 7,
+            "hide": 8,
 
-         "bold,underline": 14,
-         "bold,reverse": 17,
-         "bold,hide": 18,
+            "bold,underline": 14,
+            "bold,reverse": 17,
+            "bold,hide": 18,
 
-         "dim,underline": 24,
-         "dim,reverse": 27,
-         "dim,hide": 28,
+            "dim,underline": 24,
+            "dim,reverse": 27,
+            "dim,hide": 28,
 
-         "underline,reverse": 47,
-         "underline,hide": 48,
+            "underline,reverse": 47,
+            "underline,hide": 48,
 
-         "reverse,hide": 49,
+            "reverse,hide": 49,
 
-         "bold,underline,reverse": 147,
-         "dim,underline,reverse": 247,
+            "bold,underline,reverse": 147,
+            "dim,underline,reverse": 247,
 
-         "bold,reverse,hide": 148,
-         "dim,reverse,hide": 248,
+            "bold,reverse,hide": 148,
+            "dim,reverse,hide": 248,
 
-         "bold,underline,reverse,hide": 254,
-         "dim,underline,reverse,hide": 255}.get(lookup, 9)
+            "bold,underline,reverse,hide": 254,
+            "dim,underline,reverse,hide": 255
+        }.get(lookup, 9)
 
     def set_tx(self, style: str):
         lib.set_tx(self.tty, self._style_match(style))
