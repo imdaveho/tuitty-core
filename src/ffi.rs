@@ -58,6 +58,29 @@ pub fn match_style(s: u8) -> &'static str {
         4 => "underline",
         7 => "reverse",
         8 => "hide",
+
+        14 => "bold, underline",
+        17 => "bold, reverse",
+        18 => "bold, hide",
+
+        24 => "dim, underline",
+        27 => "dim, reverse",
+        28 => "dim, hide",
+
+        47 => "underline, reverse",
+        48 => "underline, hide",
+
+        78 => "reverse, hide",
+
+        147 => "bold, underline, reverse",
+        247 => "dim, underline, reverse",
+
+        148 => "bold, reverse, hide",
+        248 => "dim, reverse, hide",
+
+        254 => "bold, underline, reverse, hide",
+        255 => "dim, underline, reverse, hide",
+
         _ => "reset",
     }
 }
@@ -112,24 +135,24 @@ pub struct AsyncInput {
 
 pub struct Event {
     // 0=Keyboard, 1=Mouse, 2=Null
-    kind: u8,
-    // 0..n for types of Keyboard or Mouse events.
-    input: u8,
+    pub kind: u8,
+    // 0..n for label of Keyboard or Mouse events.
+    pub label: u8,
     // 0=MouseLeft, 1=MouseRight, 2=MouseMiddle, 3=MouseWheelUp, 4=MouseWheelDn
-    btn: u8,
+    pub btn: u8,
     // (row: i16, col: i16); default (-1, -1)
-    coord: Coord,
+    pub coord: (i16, i16),
     // char or u8 for Char(char), Ctrl(char), Alt(char), and F(u8 as u32)
-    ch: u32,
+    pub ch: u32,
 }
 
 impl Default for Event {
     fn default() -> Self {
         Event {
             kind: 2,
-            input: 0,
+            label: 0,
             btn: 0,
-            coord: (-1, -1).into(),
+            coord: (0, 0),
             ch: 0,
         }
     }
@@ -140,52 +163,52 @@ pub fn match_event(input: InputEvent, evt: &mut Event) {
         InputEvent::Keyboard(ke) => {
             evt.kind = 0;
             match ke {
-                KeyEvent::Backspace  => evt.input = 0,
-                KeyEvent::Left       => evt.input = 1,
-                KeyEvent::Right      => evt.input = 2,
-                KeyEvent::Up         => evt.input = 3,
-                KeyEvent::Down       => evt.input = 4,
-                KeyEvent::Home       => evt.input = 5,
-                KeyEvent::End        => evt.input = 6,
-                KeyEvent::PageUp     => evt.input = 7,
-                KeyEvent::PageDown   => evt.input = 8,
-                KeyEvent::BackTab    => evt.input = 9,
-                KeyEvent::Delete     => evt.input = 10,
-                KeyEvent::Insert     => evt.input = 11,
+                KeyEvent::Backspace  => evt.label = 0,
+                KeyEvent::Left       => evt.label = 1,
+                KeyEvent::Right      => evt.label = 2,
+                KeyEvent::Up         => evt.label = 3,
+                KeyEvent::Dn         => evt.label = 4,
+                KeyEvent::Home       => evt.label = 5,
+                KeyEvent::End        => evt.label = 6,
+                KeyEvent::PageUp     => evt.label = 7,
+                KeyEvent::PageDn     => evt.label = 8,
+                KeyEvent::BackTab    => evt.label = 9,
+                KeyEvent::Delete     => evt.label = 10,
+                KeyEvent::Insert     => evt.label = 11,
                 KeyEvent::F(n) => {
-                    evt.input = 12;
+                    evt.label = 12;
                     evt.ch = n as u32;
                 },
                 KeyEvent::Char(c) => {
-                    evt.input = 13;
+                    evt.label = 13;
                     evt.ch = c as u32;
                 },
                 KeyEvent::Alt(c) => {
-                    evt.input = 14;
+                    evt.label = 14;
                     evt.ch = c as u32;
                 },
                 KeyEvent::Ctrl(c) => {
-                    evt.input = 15;
+                    evt.label = 15;
                     evt.ch = c as u32;
                 },
                 KeyEvent::Null       => evt.kind = 2,
-                KeyEvent::Esc        => evt.input = 16,
-                KeyEvent::CtrlUp     => evt.input = 17,
-                KeyEvent::CtrlDn     => evt.input = 18,
-                KeyEvent::CtrlRight  => evt.input = 19,
-                KeyEvent::CtrlLeft   => evt.input = 20,
-                KeyEvent::ShiftUp    => evt.input = 21,
-                KeyEvent::ShiftDn    => evt.input = 22,
-                KeyEvent::ShiftRight => evt.input = 23,
-                KeyEvent::ShiftLeft  => evt.input = 24,
+                KeyEvent::Esc        => evt.label = 16,
+                KeyEvent::CtrlUp     => evt.label = 17,
+                KeyEvent::CtrlDn     => evt.label = 18,
+                KeyEvent::CtrlRight  => evt.label = 19,
+                KeyEvent::CtrlLeft   => evt.label = 20,
+                KeyEvent::ShiftUp    => evt.label = 21,
+                KeyEvent::ShiftDn    => evt.label = 22,
+                KeyEvent::ShiftRight => evt.label = 23,
+                KeyEvent::ShiftLeft  => evt.label = 24,
             }
         },
         InputEvent::Mouse(me) => {
             evt.kind = 1;
             match me {
                 MouseEvent::Press(b, r, c) => {
-                    evt.input = 0;
-                    evt.coord = (r, c).into();
+                    evt.label = 0;
+                    evt.coord = (r, c);
                     match b {
                         MouseButton::Left    => evt.btn = 0,
                         MouseButton::Right   => evt.btn = 1,
@@ -195,14 +218,14 @@ pub fn match_event(input: InputEvent, evt: &mut Event) {
                     }
                 },
                 MouseEvent::Release(r, c) => {
-                    evt.input = 1;
-                    evt.coord = (r, c).into();
+                    evt.label = 1;
+                    evt.coord = (r, c);
                 }
                 MouseEvent::Hold(r, c) => {
-                    evt.input = 2;
-                    evt.coord = (r, c).into();
+                    evt.label = 2;
+                    evt.coord = (r, c);
                 },
-                MouseEvent::Unknown => evt.kind = 3,
+                MouseEvent::Unknown => evt.kind = 2,
             }
         },
         InputEvent::Unknown => evt.kind = 2,

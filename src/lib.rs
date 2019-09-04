@@ -101,6 +101,46 @@ pub extern fn sync_next(ptr: *mut SyncInput) {
 }
 
 #[no_mangle]
+pub extern fn get_sync_kind(ptr: *mut SyncInput) -> u8 {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.kind
+    }
+}
+
+#[no_mangle]
+pub extern fn get_sync_label(ptr: *mut SyncInput) -> u8 {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.label
+    }
+}
+
+#[no_mangle]
+pub extern fn get_sync_btn(ptr: *mut SyncInput) -> u8 {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.btn
+    }
+}
+
+#[no_mangle]
+pub extern fn get_sync_coord(ptr: *mut SyncInput) -> Coord {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.coord.into()
+    }
+}
+
+#[no_mangle]
+pub extern fn get_sync_ch(ptr: *mut SyncInput) -> u32 {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.ch
+    }
+}
+
+#[no_mangle]
 pub extern fn sync_free(ptr: *mut SyncInput) {
     if ptr.is_null() { return }
     unsafe { Box::from_raw(ptr); }
@@ -129,7 +169,7 @@ pub extern fn read_until_async(ptr: *mut Tty, d: u8) -> *mut AsyncInput {
 }
 
 #[no_mangle]
-pub extern fn async_next(ptr: *mut AsyncInput) {
+pub extern fn async_next(ptr: *mut AsyncInput) -> bool {
     let input = unsafe {
         assert!(!ptr.is_null());
         &mut *ptr
@@ -137,6 +177,49 @@ pub extern fn async_next(ptr: *mut AsyncInput) {
 
     if let Some(ev) = input.iter.next() {
         ffi::match_event(ev, &mut input.event);
+        true
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+pub extern fn get_async_kind(ptr: *mut AsyncInput) -> u8 {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.kind
+    }
+}
+
+#[no_mangle]
+pub extern fn get_async_label(ptr: *mut AsyncInput) -> u8 {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.label
+    }
+}
+
+#[no_mangle]
+pub extern fn get_async_btn(ptr: *mut AsyncInput) -> u8 {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.btn
+    }
+}
+
+#[no_mangle]
+pub extern fn get_async_coord(ptr: *mut AsyncInput) -> Coord {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.coord.into()
+    }
+}
+
+#[no_mangle]
+pub extern fn get_async_ch(ptr: *mut AsyncInput) -> u32 {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).event.ch
     }
 }
 
@@ -180,10 +263,10 @@ pub extern fn to_main(ptr: *mut Tty) {
 }
 
 #[no_mangle]
-pub extern fn switch_to(ptr: *mut Tty, id: usize) {
+pub extern fn switch_to(ptr: *mut Tty, index: usize) {
     unsafe {
         assert!(!ptr.is_null());
-        (&mut *ptr).switch_to(id);
+        (&mut *ptr).switch_to(index);
     }
 }
 
@@ -278,26 +361,26 @@ pub extern fn show_cursor(ptr: *mut Tty) {
 }
 
 #[no_mangle]
-pub extern fn set_fg(ptr: *mut Tty, fc: u8) {
+pub extern fn set_fg(ptr: *mut Tty, f: u8) {
     unsafe {
         assert!(!ptr.is_null());
-        (&mut *ptr).set_fg(ffi::match_color(fc));
+        (&mut *ptr).set_fg(ffi::match_color(f));
     }
 }
 
 #[no_mangle]
-pub extern fn set_bg(ptr: *mut Tty, bc: u8) {
+pub extern fn set_bg(ptr: *mut Tty, b: u8) {
     unsafe {
         assert!(!ptr.is_null());
-        (&mut *ptr).set_bg(ffi::match_color(bc));
+        (&mut *ptr).set_bg(ffi::match_color(b));
     };
 }
 
 #[no_mangle]
-pub extern fn set_tx(ptr: *mut Tty, ts: u8) {
+pub extern fn set_tx(ptr: *mut Tty, s: u8) {
     unsafe {
         assert!(!ptr.is_null());
-        (&mut *ptr).set_tx(ffi::match_style(ts));
+        (&mut *ptr).set_tx(ffi::match_style(s));
     }
 }
 
@@ -334,13 +417,13 @@ pub extern fn set_bg_ansi(ptr: *mut Tty, v: u8) {
 }
 
 #[no_mangle]
-pub extern fn set_style(ptr: *mut Tty, fc: u8, bc: u8, ts: u8) {
+pub extern fn set_style(ptr: *mut Tty, f: u8, b: u8, s: u8) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).set_style(
-            ffi::match_color(fc),
-            ffi::match_color(bc),
-            ffi::match_style(ts));
+            ffi::match_color(f),
+            ffi::match_color(b),
+            ffi::match_style(s));
     }
 }
 

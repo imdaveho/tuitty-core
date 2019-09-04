@@ -17,8 +17,8 @@ use super::{Handle, ConsoleInfo};
 
 
 pub struct Tty {
-    id: usize,
-    meta: Vec<Metadata>,
+    index: usize,
+    metas: Vec<Metadata>,
     original_mode: Termios,
     ansi_supported: bool,
     altscreen: Option<Handle>,
@@ -35,8 +35,8 @@ impl Tty {
 
     pub fn init() -> Tty {
         Tty {
-            id: 0,
-            meta: vec![Metadata {
+            index: 0,
+            metas: vec![Metadata {
                 is_raw_enabled: false,
                 is_mouse_enabled: false,
                 saved_position: None,
@@ -79,7 +79,7 @@ impl Tty {
             cursor::wincon::show().unwrap();
             self.write("\n\r");
         }
-        self.meta.clear();
+        self.metas.clear();
     }
 
     pub fn size(&self) -> (i16, i16) {
@@ -96,14 +96,14 @@ impl Tty {
     // data as-is to the program without interpreting any special characters.
     pub fn raw(&mut self) {
         // Windows Console API only (no ANSI equivalent).
-        let mut m = &mut self.meta[self.id];
+        let mut m = &mut self.metas[self.index];
         output::wincon::enable_raw().unwrap();
         m.is_raw_enabled = true;
     }
 
     pub fn cook(&mut self) {
         // Windows Console API only (no ANSI equivalent).
-        let mut m = &mut self.meta[self.id];
+        let mut m = &mut self.metas[self.index];
         output::wincon::disable_raw().unwrap();
         m.is_raw_enabled = false;
     }
@@ -113,13 +113,13 @@ impl Tty {
     // * read_char/sync/async/until_async
 
     pub fn enable_mouse(&mut self) {
-        let mut m = &mut self.meta[self.id];
+        let mut m = &mut self.metas[self.index];
         input::wincon::enable_mouse_mode().unwrap();
         m.is_mouse_enabled = true;
     }
 
     pub fn disable_mouse(&mut self) {
-        let mut m = &mut self.meta[self.id];
+        let mut m = &mut self.metas[self.index];
         input::wincon::disable_mouse_mode().unwrap();
         m.is_mouse_enabled = false;
     }
@@ -201,14 +201,14 @@ impl Tty {
         // Metadata entry which stores any screen specific changes that a User
         // might want to be restored when switching between screens.
         if self.ansi_supported {
-            if self.id == 0 {
+            if self.index == 0 {
                 // There is no point to switch if you're on another screen
                 // since ANSI terminals provide a single "alternate screen".
                 write_ansi(&screen::ansi::enable_alt());
             }
             // Add new `Metadata` for the new screen.
             self._add_metadata();
-            self.id = self.meta.len() - 1;
+            self.index = self.metas.len() - 1;
             // Explicitly set default screen settings. (ANSI-only)
             self.cook();
             self.disable_mouse();
@@ -226,16 +226,16 @@ impl Tty {
                 }
                 // Add new `Metadata` for the new screen.
                 self._add_metadata();
-                self.id = self.meta.len() - 1;
+                self.index = self.metas.len() - 1;
             }
         }
     }
 
     pub fn to_main(&mut self) {
         // Only execute if the User is not on the main screen buffer.
-        if self.id != 0 {
+        if self.index != 0 {
             if self.ansi_supported {
-                let metas = &self.meta;
+                let metas = &self.metas;
                 let rstate = metas[0].is_raw_enabled;
                 let mstate = metas[0].is_mouse_enabled;
                 self.id = 0;
@@ -253,7 +253,7 @@ impl Tty {
                     self.disable_mouse();
                 }
             } else {
-                let metas = &self.meta;
+                let metas = &self.metas;
                 let rstate = metas[0].is_raw_enabled;
                 let mstate = metas[0].is_mouse_enabled;
                 let mode = &self.original_mode;
@@ -273,23 +273,23 @@ impl Tty {
         }
     }
 
-    pub fn switch_to(&mut self, id: usize) {
+    pub fn switch_to(&mut self, index: usize) {
         // This only switches the screen buffer and updates the settings.
         // Updating the content that will be passed in and rendered, that is
         // up to the implementation.
 
         // If the id and the current id are the same, well, there is nothing to
         // do, you're already on the active screen buffer.
-        if id != self.id {
-            if id == 0 {
+        if index != self.index {
+            if index == 0 {
                 // Switch to the main screen.
                 self.to_main();
             } else {
                 if self.ansi_supported {
-                    let metas = &self.meta;
-                    let rstate = metas[id].is_raw_enabled;
-                    let mstate = metas[id].is_mouse_enabled;
-                    self.id = id;
+                    let metas = &self.metas;
+                    let rstate = metas[index].is_raw_enabled;
+                    let mstate = metas[index].is_mouse_enabled;
+                    self.index = index;
                     if rstate {
                         self.raw();
                     } else {
@@ -302,9 +302,9 @@ impl Tty {
                         self.disable_mouse();
                     }
                 } else {
-                    let metas = &self.meta;
-                    let rstate = metas[id].is_raw_enabled;
-                    let mstate = metas[id].is_mouse_enabled;
+                    let metas = &self.metas;
+                    let rstate = metas[index].is_raw_enabled;
+                    let mstate = metas[index].is_mouse_enabled;
                     let mode = &self.original_mode;
                     if let Some(handle) = &self.altscreen {
                         handle.set_mode(mode).unwrap();
@@ -314,7 +314,7 @@ impl Tty {
                         if self.id == 0 {
                             handle.show().unwrap();
                         }
-                        self.id = id;
+                        self.index = index;
 
                         if rstate {
                             self.raw();
@@ -409,7 +409,7 @@ impl Tty {
 
     pub fn pos(&mut self) -> (i16, i16) {
         if self.ansi_supported {
-            if self.meta[self.id].is_raw_enabled {
+            if self.metas[self.index].is_raw_enabled {
                 cursor::ansi::pos_raw().unwrap()
             } else {
                 self.raw();
@@ -426,7 +426,7 @@ impl Tty {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::save_pos());
         } else {
-            self.meta[self.id].saved_position = Some(
+            self.metas[self.index].saved_position = Some(
                 cursor::wincon::pos().unwrap()
             );
         }
@@ -436,7 +436,7 @@ impl Tty {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::load_pos());
         } else {
-            match self.meta[self.id].saved_position {
+            match self.metas[self.index].saved_position {
                 Some(pos) => {
                     self.goto(pos.0, pos.1);
                 }
@@ -480,11 +480,13 @@ impl Tty {
     }
 
     pub fn set_tx(&mut self, style: &str) {
-        let tstyle = output::TextStyle::from(style);
+        // NOTE: `style` will be `reset` if the passed in
+        // `&str` contains multiple values (eg. "bold, underline").
+        let style = output::TextStyle::from(style);
         if self.ansi_supported {
-            write_ansi(&output::ansi::set_tx(tstyle));
+            write_ansi(&output::ansi::set_tx(style));
         } else {
-            output::wincon::set_tx(tstyle).unwrap();
+            output::wincon::set_tx(style).unwrap();
         }
     }
 
@@ -583,9 +585,9 @@ impl Tty {
 
 
     fn _add_metadata(&mut self) {
-        let metas = &mut self.meta;
-        let rstate = metas[self.id].is_raw_enabled;
-        let mstate = metas[self.id].is_mouse_enabled;
+        let metas = &mut self.metas;
+        let rstate = metas[self.index].is_raw_enabled;
+        let mstate = metas[self.index].is_mouse_enabled;
         metas.push(Metadata{
             is_raw_enabled: rstate,
             is_mouse_enabled: mstate,

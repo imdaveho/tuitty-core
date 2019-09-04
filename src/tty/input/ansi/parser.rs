@@ -87,7 +87,7 @@ where I: Iterator<Item = u8> {
         Some(b'D') => InputEvent::Keyboard(KeyEvent::Left),
         Some(b'C') => InputEvent::Keyboard(KeyEvent::Right),
         Some(b'A') => InputEvent::Keyboard(KeyEvent::Up),
-        Some(b'B') => InputEvent::Keyboard(KeyEvent::Down),
+        Some(b'B') => InputEvent::Keyboard(KeyEvent::Dn),
         Some(b'H') => InputEvent::Keyboard(KeyEvent::Home),
         Some(b'F') => InputEvent::Keyboard(KeyEvent::End),
         Some(b'Z') => InputEvent::Keyboard(KeyEvent::BackTab),
@@ -236,7 +236,7 @@ where I: Iterator<Item = u8> {
                         3 => InputEvent::Keyboard(KeyEvent::Delete),
                         4 | 8 => InputEvent::Keyboard(KeyEvent::End),
                         5 => InputEvent::Keyboard(KeyEvent::PageUp),
-                        6 => InputEvent::Keyboard(KeyEvent::PageDown),
+                        6 => InputEvent::Keyboard(KeyEvent::PageDn),
                         v @ 11..=15 => {
                             InputEvent::Keyboard(KeyEvent::F(v - 10))
                         }

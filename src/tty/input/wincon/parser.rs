@@ -423,7 +423,7 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
                 VK_DOWN => {
                     if ctrl { KeyEvent::CtrlDn }
                     else if shift { KeyEvent::ShiftDn }
-                    else { KeyEvent::Down }
+                    else { KeyEvent::Dn }
                 }
                 _ => KeyEvent::Null,
             }
@@ -433,7 +433,7 @@ fn _parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
         // if PAGEUP (b'5') or PAGEDOWN (b'6')
         VK_PRIOR | VK_NEXT => {
             if kcode == VK_PRIOR { KeyEvent::PageUp }
-            else if kcode == VK_NEXT { KeyEvent::PageDown }
+            else if kcode == VK_NEXT { KeyEvent::PageDn }
             else { KeyEvent::Null }
         }
         // END 0x23 | HOME 0x24

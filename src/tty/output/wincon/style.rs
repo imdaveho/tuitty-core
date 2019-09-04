@@ -53,11 +53,11 @@ pub fn set_bg(color: Color, reset: u16) -> Result<()> {
     Ok(())
 }
 
-pub fn set_tx(text_style: TextStyle) -> Result<()> {
+pub fn set_tx(style: TextStyle) -> Result<()> {
     let handle = Handle::conout()?;
     let info = ConsoleInfo::of(&handle)?;
     let curr_at = info.attributes();
-    let attr: Attrs = _stylize(Style::Tx(text_style), curr_at);
+    let attr: Attrs = _stylize(Style::Tx(style), curr_at);
     unsafe {
         if SetConsoleTextAttribute(handle.0, attr) == 0 {
             return Err(Error::last_os_error());
@@ -123,7 +123,7 @@ pub fn set_all(fg: &str, bg: &str, tx: &str, reset: u16) -> Result<()> {
             }
         }
     }
-    // Finally apply the cobined styles.
+    // Finally apply the combined styles.
     unsafe {
         if SetConsoleTextAttribute(handle.0, attrs) == 0 {
             return Err(Error::last_os_error());
@@ -144,8 +144,8 @@ pub fn reset(reset: u16) -> Result<()> {
 }
 
 
-fn _stylize(style: Style, at: u16) -> Attrs {
-    let attr: u16;
+fn _stylize(style: Style, attr: u16) -> Attrs {
+    let attrs: u16;
     let (mask_fg, mask_bg, mask_tx) = (0x000f, 0x00f0, 0xdf00);
     match style {
         Style::Fg(c) => {
@@ -153,28 +153,28 @@ fn _stylize(style: Style, at: u16) -> Attrs {
             if fg == <u16>::max_value() {
                 return <u16>::max_value();
             }
-            let bg = at & mask_bg;
-            let tx = at & mask_tx;
-            attr = fg | bg | tx;
+            let bg = attr & mask_bg;
+            let tx = attr & mask_tx;
+            attrs = fg | bg | tx;
         }
         Style::Bg(c) => {
             let bg = _match_bg(c);
             if bg == <u16>::max_value() {
                 return <u16>::max_value();
             }
-            let fg = at & mask_fg;
-            let tx = at & mask_tx;
-            attr = fg | bg | tx;
+            let fg = attr & mask_fg;
+            let tx = attr & mask_tx;
+            attrs = fg | bg | tx;
         }
         Style::Tx(t) => {
             let tx = _match_tx(t, at);
-            let fg = at & mask_fg;
-            let bg = at & mask_bg;
-            attr = fg | bg | tx;
+            let fg = attr & mask_fg;
+            let bg = attr & mask_bg;
+            attrs = fg | bg | tx;
         }
     }
 
-    attr
+    attrs
 }
 
 fn _match_fg(color: Color) -> Fg {
@@ -233,19 +233,19 @@ fn _match_bg(color: Color) -> Bg {
     }
 }
 
-fn _match_tx(text_style: TextStyle, at: u16) -> Attrs {
+fn _match_tx(style: TextStyle, attr: u16) -> Attrs {
     // Returns Fg, Bg, and Tx attributes. Since
     // text styling is additive we will apply and
     // return the existing attributes as a whole.
-    match text_style {
-        TextStyle::Bold => at | FG_INTENSITY,
-        TextStyle::Dim => at & !FG_INTENSITY,
-        TextStyle::Underline => at | COMMON_LVB_UNDERSCORE,
-        TextStyle::Reverse => at | COMMON_LVB_REVERSE_VIDEO,
+    match style {
+        TextStyle::Bold => attr | FG_INTENSITY,
+        TextStyle::Dim => attr & !FG_INTENSITY,
+        TextStyle::Underline => attr | COMMON_LVB_UNDERSCORE,
+        TextStyle::Reverse => attr | COMMON_LVB_REVERSE_VIDEO,
         TextStyle::Hide => {
             // Get the BG color.
             let (mask_fg, mask_bg) = (0x000f, 0x00f0);
-            let bg = at & mask_bg;
+            let bg = attr & mask_bg;
             // FOREGROUND and BACKGROUND color differ by 4 bits;
             // to convert from 0x0020 (BG Green) to 0x0002 (FG Green),
             // shift right 4 bits. By making the FOREGROUND color the
@@ -255,13 +255,13 @@ fn _match_tx(text_style: TextStyle, at: u16) -> Attrs {
             // Since we identified the new FOREGROUND, we include it
             // and remove it from the current attributes. The BACK-
             // GROUND should remain the same within the current attrs.
-            fg | (at & !mask_fg)
+            fg | (attr & !mask_fg)
         },
         TextStyle::Reset => {
             let mask_tx = 0xdf00;
             // Since Windows Attributes are "additive", we can simply
             // unmask all of them if Attribute::Reset.
-            (at & !mask_tx)
+            (attr & !mask_tx)
         },
     }
 }

@@ -3,24 +3,24 @@
 use super::{csi, Color, Style, TextStyle};
 
 
-pub fn set_fg(fg_color: Color) -> String {
+pub fn set_fg(color: Color) -> String {
     format!(
         csi!("{}m"),
-        _stylize(Style::Fg(fg_color)),
+        _stylize(Style::Fg(color)),
     )
 }
 
-pub fn set_bg(bg_color: Color) -> String {
+pub fn set_bg(color: Color) -> String {
     format!(
         csi!("{}m"),
-        _stylize(Style::Bg(bg_color)),
+        _stylize(Style::Bg(color)),
     )
 }
 
-pub fn set_tx(text_style: TextStyle) -> String {
+pub fn set_tx(style: TextStyle) -> String {
     format!(
         csi!("{}m"),
-        _stylize(Style::Tx(text_style)),
+        _stylize(Style::Tx(style)),
     )
 }
 
