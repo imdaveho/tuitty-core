@@ -436,7 +436,7 @@ class SyncInput:
         self.evt.label = lib.get_sync_label(self.obj)
         self.evt.btn = lib.get_sync_btn(self.obj)
         self.evt.coord = lib.get_sync_coord(self.obj)
-        self.evt.ch = lib.get_sync_chr(self.obj)
+        self.evt.ch = lib.get_sync_ch(self.obj)
 
     def close(self):
         lib.sync_free(self.obj)
@@ -462,7 +462,7 @@ class AsyncInput:
             self.evt.label = lib.get_async_label(self.obj)
             self.evt.btn = lib.get_async_btn(self.obj)
             self.evt.coord = lib.get_async_coord(self.obj)
-            self.evt.ch = lib.get_async_chr(self.obj)
+            self.evt.ch = lib.get_async_ch(self.obj)
             return True
         else:
             return False  # skip if there was no update to evt
@@ -477,52 +477,3 @@ class Event:
     btn: int = None
     coord: CCoord = None
     ch: int = None
-
-
-# class InputEvent(Enum):
-#     Keyboard = 0
-#     Mouse = 1
-#     Unknown = 2
-
-
-# class KeyEvent(Enum):
-#     Backspace = 0
-#     Left = 1
-#     Right = 2
-#     Up = 3
-#     Dn = 4
-#     Home = 5
-#     End = 6
-#     PageUp = 7
-#     PageDn = 8
-#     BackTab = 9
-#     Delete = 10
-#     Insert = 11
-#     F = 12
-#     Char = 13
-#     Alt = 14
-#     Ctrl = 15
-#     # Null
-#     Esc = 16
-#     CtrlUp = 17
-#     CtrlDn = 18
-#     CtrlRight = 19
-#     CtrlLeft = 20
-#     ShiftUp = 21
-#     ShiftDn = 22
-#     ShiftRight = 23
-#     ShiftLeft = 24
-
-
-# class MouseEvent(Enum):
-#     Press = 0
-#     Hold = 1
-#     Release = 2
-
-
-# class MouseButton(Enum):
-#     Left = 0
-#     Right = 1
-#     Middle = 2
-#     WheelUp = 3
-#     WheelDn = 4

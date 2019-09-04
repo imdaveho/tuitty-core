@@ -1,3 +1,10 @@
-use super::Tty;
+use super::{
+    Tty,
+    InputEvent,
+    KeyEvent,
+    MouseEvent,
+    MouseButton,
+};
 
-mod example;
+mod test_example;
+mod test_inputs;
