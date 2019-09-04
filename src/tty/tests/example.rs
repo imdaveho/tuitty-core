@@ -2,12 +2,12 @@
 fn example() {
     let mut tty = super::Tty::init();
 
-    tty.print(&format!{"w: {}, h: {}\n", tty.size().0, tty.size().1});
+    tty.prints(&format!{"w: {}, h: {}\n", tty.size().0, tty.size().1});
 
     tty.set_fg("green");
-    tty.print("Hello (g), ");
+    tty.prints("Hello (g), ");
     tty.reset();
-    tty.print("Hello (d), ");
+    tty.prints("Hello (d), ");
     tty.flush();
     tty.switch();
     tty.clear("all");
@@ -24,7 +24,7 @@ fn example() {
     was to create a synopsis or amalgamation of classic realist typefaces: Johnston, Gill Sans, Neuzeit & Franklin Gothic.";
 
     tty.set_fg("red"); // this sets fg on altern screen
-    tty.print(words);
+    tty.prints(words);
     tty.flush();
 
     use std::time::Duration;
@@ -33,14 +33,14 @@ fn example() {
 
     tty.to_main();
 
-    tty.print("Hello (r), "); // since fg red was on the altern screen, the main screen is still white
+    tty.prints("Hello (r), "); // since fg red was on the altern screen, the main screen is still white
     tty.set_fg("darkblue");
-    tty.print("Hello (db), ");
+    tty.prints("Hello (db), ");
     tty.reset();
-    tty.print("End\n");
+    tty.prints("End\n");
     tty.flush();
     thread::sleep(Duration::from_secs(2));
 
-    tty.exit();
+    tty.terminate();
     thread::sleep(Duration::from_secs(2));
 }

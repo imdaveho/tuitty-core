@@ -16,7 +16,7 @@ mod style;
 pub use style::*;
 
 
-pub fn print<D: Display>(value: D) -> Result<usize> {
+pub fn prints<D: Display>(value: D) -> Result<usize> {
     let handle = Handle::conout()?;
     let text = format!("{}", value).as_str()
         .encode_utf16()
@@ -29,7 +29,7 @@ pub fn print<D: Display>(value: D) -> Result<usize> {
         if WriteConsoleW(
             handle.0,
             text.as_ptr() as *const VOID,
-            length, 
+            length,
             &mut size, NULL
         ) == 0 {
             return Err(Error::last_os_error());

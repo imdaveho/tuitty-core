@@ -16,11 +16,11 @@ pub extern fn init() -> *mut Tty {
 }
 
 #[no_mangle]
-pub extern fn exit(ptr: *mut Tty) {
+pub extern fn terminate(ptr: *mut Tty) {
     unsafe {
-        // assert!(!ptr.is_null());
+        assert!(!ptr.is_null());
         if ptr.is_null() { return }
-        (&mut *ptr).exit();
+        (&mut *ptr).terminate();
         Box::from_raw(ptr);
     }
 }
@@ -353,11 +353,11 @@ pub extern fn reset(ptr: *mut Tty) {
 }
 
 #[no_mangle]
-pub extern fn print(ptr: *mut Tty, c_str: *const c_char) {
+pub extern fn prints(ptr: *mut Tty, c_str: *const c_char) {
     unsafe {
         assert!(!c_str.is_null());
         assert!(!ptr.is_null());
-        (&mut *ptr).print(
+        (&mut *ptr).prints(
             CStr::from_ptr(c_str).to_str().unwrap());
     }
 }

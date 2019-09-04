@@ -33,7 +33,7 @@ impl Tty {
         }
     }
 
-    pub fn exit(&mut self) {
+    pub fn terminate(&mut self) {
         self.to_main();
         output::ansi::set_mode(&self.original_mode).unwrap();
         write_ansi(&cursor::ansi::show());
@@ -324,8 +324,8 @@ impl Tty {
         write_ansi(&output::ansi::reset());
     }
 
-    pub fn print(&mut self, s: &str) {
-        write_ansi(&output::ansi::print(s));
+    pub fn prints(&mut self, s: &str) {
+        write_ansi(&output::ansi::prints(s));
     }
 
     pub fn flush(&mut self) {

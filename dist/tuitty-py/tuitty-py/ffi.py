@@ -38,7 +38,7 @@ class CAsyncInput(Structure):
 
 lib.init.restype = POINTER(CTty)
 
-lib.exit.argtypes = (POINTER(CTty), )
+lib.terminate.argtypes = (POINTER(CTty), )
 
 lib.size.argtypes = (POINTER(CTty), )
 lib.size.restype = CSize
@@ -122,7 +122,7 @@ lib.set_style.argtypes = (POINTER(CTty), c_uint8, c_uint8, c_uint8)
 
 lib.reset.argtypes = (POINTER(CTty), )
 
-lib.print.argtypes = (POINTER(CTty), c_char_p)
+lib.prints.argtypes = (POINTER(CTty), c_char_p)
 
 lib.flush.argtypes = (POINTER(CTty), )
 
@@ -135,7 +135,7 @@ class Tty:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        lib.exit(self.obj)
+        lib.terminate(self.obj)
 
     def size(self):
         lib.size(self.obj)

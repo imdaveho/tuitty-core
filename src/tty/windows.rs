@@ -58,7 +58,7 @@ impl Tty {
         }
     }
 
-    pub fn exit(&mut self) {
+    pub fn terminate(&mut self) {
         let handle = match _is_wincon_supported() {
             true => Handle::stdout().unwrap(),
             false => Handle::conout().unwrap(),
@@ -552,11 +552,11 @@ impl Tty {
         }
     }
 
-    pub fn print(&mut self, s: &str) {
+    pub fn prints(&mut self, s: &str) {
         if self.ansi_supported {
-            write_ansi(&output::ansi::print(s));
+            write_ansi(&output::ansi::prints(s));
         } else {
-            output::wincon::print(s).unwrap();
+            output::wincon::prints(s).unwrap();
         }
     }
 
