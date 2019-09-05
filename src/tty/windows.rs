@@ -28,6 +28,7 @@ pub struct Tty {
 pub struct Metadata {
     is_raw_enabled: bool,
     is_mouse_enabled: bool,
+    is_cursor_visible: bool,
     saved_position: Option<(i16, i16)>,
 }
 
@@ -39,6 +40,7 @@ impl Tty {
             metas: vec![Metadata {
                 is_raw_enabled: false,
                 is_mouse_enabled: false,
+                is_cursor_visible: true,
                 saved_position: None,
             }],
             original_mode: {
@@ -212,6 +214,7 @@ impl Tty {
             // Explicitly set default screen settings. (ANSI-only)
             self.cook();
             self.disable_mouse();
+            self.show_cursor();
         } else {
             if self.altscreen.is_none() {
                 self.altscreen = Some(Handle::buffer().unwrap());
@@ -224,6 +227,7 @@ impl Tty {
                     // need to enable the alternate.
                     handle.show().unwrap();
                 }
+                self.show_cursor();
                 // Add new `Metadata` for the new screen.
                 self._add_metadata();
                 self.index = self.metas.len() - 1;
@@ -238,6 +242,7 @@ impl Tty {
                 let metas = &self.metas;
                 let rstate = metas[0].is_raw_enabled;
                 let mstate = metas[0].is_mouse_enabled;
+                let cstate = metas[0].is_cursor_visible;
                 self.id = 0;
                 write_ansi(&screen::ansi::disable_alt());
 
@@ -252,10 +257,17 @@ impl Tty {
                 } else {
                     self.disable_mouse();
                 }
+
+                if cstate {
+                    self.show_cursor();
+                } else {
+                    self.hide_cursor();
+                }
             } else {
                 let metas = &self.metas;
                 let rstate = metas[0].is_raw_enabled;
                 let mstate = metas[0].is_mouse_enabled;
+                let cstate = metas[0].is_cursor_visible;
                 let mode = &self.original_mode;
                 let stdout = Handle::stdout().unwrap();
                 stdout.set_mode(mode).unwrap();
@@ -268,6 +280,12 @@ impl Tty {
 
                 if mstate {
                     self.enable_mouse();
+                }
+
+                if cstate {
+                    self.show_cursor();
+                } else {
+                    self.hide_cursor();
                 }
             }
         }
@@ -289,6 +307,7 @@ impl Tty {
                     let metas = &self.metas;
                     let rstate = metas[index].is_raw_enabled;
                     let mstate = metas[index].is_mouse_enabled;
+                    let cstate = metas[index].is_cursor_visible;
                     self.index = index;
                     if rstate {
                         self.raw();
@@ -301,10 +320,17 @@ impl Tty {
                     } else {
                         self.disable_mouse();
                     }
+
+                    if cstate {
+                        self.show_cursor();
+                    } else {
+                        self.hide_cursor();
+                    }
                 } else {
                     let metas = &self.metas;
                     let rstate = metas[index].is_raw_enabled;
                     let mstate = metas[index].is_mouse_enabled;
+                    let cstate = metas[index].is_cursor_visible;
                     let mode = &self.original_mode;
                     if let Some(handle) = &self.altscreen {
                         handle.set_mode(mode).unwrap();
@@ -322,6 +348,12 @@ impl Tty {
 
                         if mstate {
                             self.enable_mouse();
+                        }
+
+                        if cstate {
+                            self.show_cursor();
+                        } else {
+                            self.hide_cursor();
                         }
                     }
                 }
@@ -451,6 +483,8 @@ impl Tty {
         } else {
             cursor::wincon::hide().unwrap();
         }
+        let mut m = &mut self.metas[self.index];
+        m.is_cursor_visible = false;
     }
 
     pub fn show_cursor(&mut self) {
@@ -459,6 +493,8 @@ impl Tty {
         } else {
             cursor::wincon::show().unwrap();
         }
+        let mut m = &mut self.metas[self.index];
+        m.is_cursor_visible = true;
     }
 
     pub fn set_fg(&mut self, color: &str) {
@@ -588,9 +624,11 @@ impl Tty {
         let metas = &mut self.metas;
         let rstate = metas[self.index].is_raw_enabled;
         let mstate = metas[self.index].is_mouse_enabled;
+        let cstate = metas[self.index].is_cursor_visible;
         metas.push(Metadata{
             is_raw_enabled: rstate,
             is_mouse_enabled: mstate,
+            is_cursor_visible: cstate,
             saved_position: None,
         });
     }

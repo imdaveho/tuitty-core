@@ -1,8 +1,9 @@
 import os
 import sys
 import platform
+from enum import Enum
 from ctypes import c_bool, c_char_p, c_int, c_uint8, c_int16, c_uint32, cdll, \
-    Structure, POINTER
+    Structure, POINTER, byref
 
 
 prefix = {'win32': ''}.get(sys.platform, 'lib')
@@ -27,26 +28,85 @@ class CTty(Structure):
     pass
 
 
-class CSize(Structure):
-    _fields_ = [("w", c_int16), ("h", c_int16)]
-
-    def __str__(self):
-        return "({}, {})".format(self.w, self.h)
-
-
-class CCoord(Structure):
-    _fields_ = [("col", c_int16), ("row", c_int16)]
-
-    def __str__(self):
-        return "({}, {})".format(self.col, self.row)
-
-
-class CSyncInput(Structure):
+class CSyncReader(Structure):
     pass
 
 
-class CAsyncInput(Structure):
+class CAsyncReader(Structure):
     pass
+
+
+class Event(Structure):
+    _fields_ = [("_kind", c_int16), ("_data", c_uint32)]
+
+    def kind(self) -> 'InputEvent':
+        return InputEvent(self._kind)
+
+    def data(self):
+        if self._kind in (14, 15, 16):
+            return chr(self._data)
+
+        elif self._kind in (26, 27, 28, 29, 30, 31, 32):
+            return ((self._data >> 16), (self._data & 0xffff))
+
+        else:
+            return self._data
+
+    def __str__(self):
+        if self._kind not in (13, 14, 15, 16, 26, 27, 28, 29, 30, 31, 32):
+            return "Key: {}".format(InputEvent(self._kind).name)
+
+        elif self._kind in (13, 14, 15, 16):
+            return "Key: {}({})".format(
+                InputEvent(self._kind).name, self.data())
+
+        elif self._kind in (26, 27, 28, 29, 30, 31, 32):
+            s = {
+                26: "Button-Left",
+                27: "Button-Right",
+                28: "Button-Middle",
+                29: "Button-WheelUp",
+                30: "Button-WheelDn",
+                31: "Hold",
+                32: "Release",
+            }.get(self._kind)
+            return "Mouse: {} @ ({}, {})".format(s, *self.data())
+
+
+class InputEvent(Enum):
+    Null = 0
+    Backspace = 1
+    Left = 2
+    Right = 3
+    Up = 4
+    Dn = 5
+    Home = 6
+    End = 7
+    PageUp = 8
+    PageDn = 9
+    BackTab = 10
+    Delete = 11
+    Insert = 12
+    F = 13
+    Char = 14
+    Alt = 15
+    Ctrl = 16
+    Esc = 17
+    CtrlUp = 18
+    CtrlDn = 19
+    CtrlRight = 20
+    CtrlLeft = 21
+    ShiftUp = 22
+    ShiftDn = 23
+    ShiftRight = 24
+    ShiftLeft = 25
+    MousePressLeft = 26
+    MousePressRight = 27
+    MousePressMiddle = 28
+    MousePressWheelUp = 29
+    MousePressWheelDn = 30
+    MouseHold = 31
+    MouseRelease = 32
 
 
 # Tty.init()
@@ -57,7 +117,7 @@ lib.terminate.argtypes = (POINTER(CTty), )
 
 # Tty.size()
 lib.size.argtypes = (POINTER(CTty), )
-lib.size.restype = CSize
+lib.size.restype = c_uint32
 
 # Tty.raw()
 lib.raw.argtypes = (POINTER(CTty), )
@@ -77,71 +137,31 @@ lib.read_char.restype = c_uint32
 
 # Tty.read_sync()
 lib.read_sync.argtypes = (POINTER(CTty), )
-lib.read_sync.restype = POINTER(CSyncInput)
+lib.read_sync.restype = POINTER(CSyncReader)
 
-# SyncInput.SyncReader.next()
-lib.sync_next.argtypes = (POINTER(CSyncInput), )
+# SyncReader.next()
+lib.sync_next.argtypes = (POINTER(CSyncReader), POINTER(Event))
 
-# SyncInput.Event.kind
-lib.get_sync_kind.argtypes = (POINTER(CSyncInput), )
-lib.get_sync_kind.restype = c_uint8
-
-# SyncInput.Event.label
-lib.get_sync_label.argtypes = (POINTER(CSyncInput), )
-lib.get_sync_label.restype = c_uint8
-
-# SyncInput.Event.btn
-lib.get_sync_btn.argtypes = (POINTER(CSyncInput), )
-lib.get_sync_btn.restype = c_uint8
-
-# SyncInput.Event.coord
-lib.get_sync_coord.argtypes = (POINTER(CSyncInput), )
-lib.get_sync_coord.restype = CCoord
-
-# SyncInput.Event.ch
-lib.get_sync_ch.argtypes = (POINTER(CSyncInput), )
-lib.get_sync_ch.restype = c_uint32
-
-# drop(SyncInput)
-lib.sync_free.argtypes = (POINTER(CSyncInput), )
+# drop(SyncReader)
+lib.sync_free.argtypes = (POINTER(CSyncReader), )
 
 # Tty.read_async()
 lib.read_async.argtypes = (POINTER(CTty), )
-lib.read_async.restype = POINTER(CAsyncInput)
+lib.read_async.restype = POINTER(CAsyncReader)
 
 # Tty.read_until_async()
 lib.read_until_async.argtypes = (POINTER(CTty), c_int)
-lib.read_until_async.restype = POINTER(CAsyncInput)
+lib.read_until_async.restype = POINTER(CAsyncReader)
 
-# AsyncInput.AsyncReader.next()
-lib.async_next.argtypes = (POINTER(CAsyncInput), )
+# AsyncReader.next()
+lib.async_next.argtypes = (POINTER(CAsyncReader), POINTER(Event))
 lib.async_next.restype = c_bool
 
-# AsyncInput.Event.kind
-lib.get_async_kind.argtypes = (POINTER(CAsyncInput), )
-lib.get_async_kind.restype = c_uint8
-
-# AsyncInput.Event.label
-lib.get_async_label.argtypes = (POINTER(CAsyncInput), )
-lib.get_async_label.restype = c_uint8
-
-# AsyncInput.Event.btn
-lib.get_async_btn.argtypes = (POINTER(CAsyncInput), )
-lib.get_async_btn.restype = c_uint8
-
-# AsyncInput.Event.coord
-lib.get_async_coord.argtypes = (POINTER(CAsyncInput), )
-lib.get_async_coord.restype = CCoord
-
-# AsyncInput.Event.ch
-lib.get_async_ch.argtypes = (POINTER(CAsyncInput), )
-lib.get_async_ch.restype = c_uint32
-
-# drop(AsyncInput)
-lib.async_free.argtypes = (POINTER(CAsyncInput), )
+# drop(AsyncReader)
+lib.async_free.argtypes = (POINTER(CAsyncReader), )
 
 # Tty.clear()
-lib.clear.argtypes = (POINTER(CTty), c_uint8)
+lib.clear.argtypes = (POINTER(CTty), c_char_p)
 
 # Tty.resize()
 lib.resize.argtypes = (POINTER(CTty), c_int16, c_int16)
@@ -171,11 +191,11 @@ lib.left.argtypes = (POINTER(CTty), )
 lib.right.argtypes = (POINTER(CTty), )
 
 # Tty.dpad()
-lib.dpad.argtypes = (POINTER(CTty), c_uint8, c_int16)
+lib.dpad.argtypes = (POINTER(CTty), c_char_p, c_int16)
 
 # Tty.pos()
 lib.pos.argtypes = (POINTER(CTty), )
-lib.pos.restype = CCoord
+lib.pos.restype = c_uint32
 
 # Tty.mark()
 lib.mark.argtypes = (POINTER(CTty), )
@@ -190,13 +210,13 @@ lib.hide_cursor.argtypes = (POINTER(CTty), )
 lib.show_cursor.argtypes = (POINTER(CTty), )
 
 # Tty.set_fg()
-lib.set_fg.argtypes = (POINTER(CTty), c_uint8)
+lib.set_fg.argtypes = (POINTER(CTty), c_char_p)
 
 # Tty.set_bg()
-lib.set_bg.argtypes = (POINTER(CTty), c_uint8)
+lib.set_bg.argtypes = (POINTER(CTty), c_char_p)
 
 # Tty.aset_tx()
-lib.set_tx.argtypes = (POINTER(CTty), c_uint8)
+lib.set_tx.argtypes = (POINTER(CTty), c_char_p)
 
 # Tty.set_fg_rgb()
 lib.set_fg_rgb.argtypes = (POINTER(CTty), c_uint8, c_uint8, c_uint8)
@@ -211,7 +231,7 @@ lib.set_fg_ansi.argtypes = (POINTER(CTty), c_uint8)
 lib.set_bg_ansi.argtypes = (POINTER(CTty), c_uint8)
 
 # Tty.set_style()
-lib.set_style.argtypes = (POINTER(CTty), c_uint8, c_uint8, c_uint8)
+lib.set_style.argtypes = (POINTER(CTty), c_char_p, c_char_p, c_char_p)
 
 # Tty.reset()
 lib.reset.argtypes = (POINTER(CTty), )
@@ -238,7 +258,7 @@ class Tty:
 
     def size(self) -> (int, int):
         size = lib.size(self.tty)
-        return (size.w, size.h)
+        return ((size >> 16), (size & 0xffff))
 
     def raw(self):
         lib.raw(self.tty)
@@ -262,14 +282,7 @@ class Tty:
         return AsyncInput(self.tty)
 
     def clear(self, method: str):
-        m = {
-            "all": 0,
-            "newln": 1,
-            "currentln": 2,
-            "cursorup": 3,
-            "cursordn": 4,
-        }.get(method, 5)
-        lib.clear(self.tty, m)
+        lib.clear(self.tty, method.encode('utf-8'))
 
     def resize(self, w: int, h: int):
         lib.resize(self.tty, w, h)
@@ -298,18 +311,12 @@ class Tty:
     def right(self):
         lib.right(self.tty)
 
-    def dpad(self, direct: str, n: int):
-        d = {
-            "up": 0,
-            "dn": 1,
-            "left": 2,
-            "right": 3,
-        }.get(direct, 4)
-        lib.dpad(self.tty, d, n)
+    def dpad(self, direction: str, n: int):
+        lib.dpad(self.tty, direction.encode('utf-8'), n)
 
     def pos(self) -> (int, int):
         coord = lib.pos(self.tty)
-        return (coord.col, coord.row)
+        return ((coord >> 16), (coord & 0xffff))
 
     def mark(self):
         lib.mark(self.tty)
@@ -323,75 +330,14 @@ class Tty:
     def show_cursor(self):
         lib.show_cursor(self.tty)
 
-    def _color_match(self, color: str) -> c_uint8:
-        return {
-            "reset": 0,
-            "black": 1,
-            "red": 2,
-            "green": 3,
-            "yellow": 4,
-            "blue": 5,
-            "magenta": 6,
-            "cyan": 7,
-            "white": 8,
-            "dark_grey": 9,
-            "darkgrey": 9,
-            "dark_red": 10,
-            "darkred": 10,
-            "dark_green": 11,
-            "darkgreen": 11,
-            "dark_yellow": 12,
-            "darkyellow": 12,
-            "dark_blue": 13,
-            "darkblue": 13,
-            "dark_magenta": 14,
-            "darkmagenta": 14,
-            "dark_cyan": 15,
-            "darkcyan": 15,
-            "grey": 16
-        }.get(color, 17)
-
     def set_fg(self, color: str):
-        lib.set_fg(self.tty, self._color_match(color))
+        lib.set_fg(self.tty, color.encode('utf-8'))
 
     def set_bg(self, color: str):
-        lib.set_fg(self.tty, self._color_match(color))
-
-    def _style_match(self, style: str) -> c_uint8:
-        lookup = ','.join(map(lambda x: x.strip(), style.split(',')))
-        return {
-            "reset": 0,
-            "bold": 1,
-            "dim": 2,
-            "underline": 4,
-            "reverse": 7,
-            "hide": 8,
-
-            "bold,underline": 14,
-            "bold,reverse": 17,
-            "bold,hide": 18,
-
-            "dim,underline": 24,
-            "dim,reverse": 27,
-            "dim,hide": 28,
-
-            "underline,reverse": 47,
-            "underline,hide": 48,
-
-            "reverse,hide": 49,
-
-            "bold,underline,reverse": 147,
-            "dim,underline,reverse": 247,
-
-            "bold,reverse,hide": 148,
-            "dim,reverse,hide": 248,
-
-            "bold,underline,reverse,hide": 254,
-            "dim,underline,reverse,hide": 255
-        }.get(lookup, 9)
+        lib.set_bg(self.tty, color.encode('utf-8'))
 
     def set_tx(self, style: str):
-        lib.set_tx(self.tty, self._style_match(style))
+        lib.set_tx(self.tty, style.encode('utf-8'))
 
     def set_fg_rgb(self, r: int, g: int, b: int):
         lib.set_fg_rgb(self.tty, r, g, b)
@@ -406,11 +352,10 @@ class Tty:
         lib.set_bg_ansi(self.tty, v)
 
     def set_style(self, fg: str, bg: str, style: str):
-        lib.set_style(
-            self.tty,
-            self._color_match(fg),
-            self._color_match(bg),
-            self._style_match(style))
+        lib.set_style(self.tty,
+                      fg.encode('utf-8'),
+                      bg.encode('utf-8'),
+                      style.encode('utf-8'))
 
     def reset(self):
         lib.reset(self.tty)
@@ -424,8 +369,8 @@ class Tty:
 
 class SyncInput:
     def __init__(self, tty: 'Tty'):
-        self.obj: POINTER('CSyncInput') = lib.read_sync(tty)
-        self.evt: 'Event' = Event()
+        self.obj: POINTER('CSyncReader') = lib.read_sync(tty)
+        self.event: 'Event' = Event()
 
     def __enter__(self):
         return self
@@ -434,12 +379,7 @@ class SyncInput:
         return self
 
     def __next__(self):
-        lib.sync_next(self.obj)  # blocking call
-        self.evt.kind = lib.get_sync_kind(self.obj)
-        self.evt.label = lib.get_sync_label(self.obj)
-        self.evt.btn = lib.get_sync_btn(self.obj)
-        self.evt.coord = lib.get_sync_coord(self.obj)
-        self.evt.ch = lib.get_sync_ch(self.obj)
+        lib.sync_next(self.obj, byref(self.event))  # blocking call
 
     def __exit__(self, exception_type, exception_value, traceback):
         lib.sync_free(self.obj)
@@ -449,12 +389,13 @@ class SyncInput:
 
 
 class AsyncInput:
-    def __init__(self, tty: 'Tty', delim=None):
-        if delim is not None:
-            self.obj: POINTER('CAsyncInput') = lib.read_until_async(tty, delim)
+    def __init__(self, tty: 'Tty', delimiter=None):
+        if delimiter is not None:
+            self.obj: POINTER('CAsyncReader') = \
+                lib.read_until_async(tty, delimiter)
         else:
-            self.obj: POINTER('CAsyncInput') = lib.read_async(tty)
-        self.evt: 'Event' = Event()
+            self.obj: POINTER('CAsyncReader') = lib.read_async(tty)
+        self.event: 'Event' = Event()
 
     def __enter__(self):
         return self
@@ -463,26 +404,10 @@ class AsyncInput:
         return self
 
     def __next__(self) -> bool:
-        if lib.async_next(self.obj):  # non-blocking call
-            self.evt.kind = lib.get_async_kind(self.obj)
-            self.evt.label = lib.get_async_label(self.obj)
-            self.evt.btn = lib.get_async_btn(self.obj)
-            self.evt.coord = lib.get_async_coord(self.obj)
-            self.evt.ch = lib.get_async_ch(self.obj)
-            return True
-        else:
-            return False  # skip if there was no update to evt
+        return lib.async_next(self.obj, byref(self.event))  # non-blocking call
 
     def __exit__(self, exception_type, exception_value, traceback):
         lib.async_free(self.obj)
 
     def close(self):
         lib.async_free(self.obj)
-
-
-class Event:
-    kind: int = 2
-    label: int = None
-    btn: int = None
-    coord: CCoord = None
-    ch: int = None

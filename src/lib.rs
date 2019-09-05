@@ -4,10 +4,10 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 
 mod tty;
-use tty::Tty;
-
-mod ffi;
-use ffi::{Coord, Size, SyncInput, AsyncInput};
+use tty::{
+    Tty, AsyncReader, SyncReader,
+    InputEvent, KeyEvent, MouseEvent, MouseButton
+};
 
 
 #[no_mangle]
@@ -18,18 +18,22 @@ pub extern fn init() -> *mut Tty {
 #[no_mangle]
 pub extern fn terminate(ptr: *mut Tty) {
     unsafe {
-        assert!(!ptr.is_null());
         if ptr.is_null() { return }
+        assert!(!ptr.is_null());
         (&mut *ptr).terminate();
         Box::from_raw(ptr);
     }
 }
 
 #[no_mangle]
-pub extern fn size(ptr: *mut Tty) -> Size {
+pub extern fn size(ptr: *mut Tty) -> u32 {
+    // NOTE: instead of a Tuple, we are sending a u32
+    // that has the first 16 bits containing `w: i16`
+    // and the second 16 bits containing `h: i16`.
     unsafe {
         assert!(!ptr.is_null());
-        (&mut *ptr).size().into()
+        let (w, h) = (&mut *ptr).size();
+        ((w as u32) << 16) | h as u32
     }
 }
 
@@ -78,163 +82,73 @@ pub extern fn read_char(ptr: *mut Tty) -> u32 {
 }
 
 #[no_mangle]
-pub extern fn read_sync(ptr: *mut Tty) -> *mut SyncInput {
+pub extern fn read_sync(ptr: *mut Tty) -> *mut SyncReader {
     unsafe {
         assert!(!ptr.is_null());
-        Box::into_raw(Box::new(SyncInput {
-            iter: (&mut *ptr).read_sync(),
-            event: Default::default(),
-        }))
+        Box::into_raw(Box::new((&mut *ptr).read_sync()))
     }
 }
 
 #[no_mangle]
-pub extern fn sync_next(ptr: *mut SyncInput) {
-    let input = unsafe {
+pub extern fn sync_next(ptr: *mut SyncReader, event: &mut Event) {
+    let stdin = unsafe {
         assert!(!ptr.is_null());
         &mut *ptr
     };
 
-    if let Some(ev) = input.iter.next() {
-        ffi::match_event(ev, &mut input.event);
+    if let Some(evt) = stdin.next() {
+        c_event(evt, event);
     }
 }
 
 #[no_mangle]
-pub extern fn get_sync_kind(ptr: *mut SyncInput) -> u8 {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.kind
-    }
-}
-
-#[no_mangle]
-pub extern fn get_sync_label(ptr: *mut SyncInput) -> u8 {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.label
-    }
-}
-
-#[no_mangle]
-pub extern fn get_sync_btn(ptr: *mut SyncInput) -> u8 {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.btn
-    }
-}
-
-#[no_mangle]
-pub extern fn get_sync_coord(ptr: *mut SyncInput) -> Coord {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.coord.into()
-    }
-}
-
-#[no_mangle]
-pub extern fn get_sync_ch(ptr: *mut SyncInput) -> u32 {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.ch
-    }
-}
-
-#[no_mangle]
-pub extern fn sync_free(ptr: *mut SyncInput) {
+pub extern fn sync_free(ptr: *mut SyncReader) {
     if ptr.is_null() { return }
     unsafe { Box::from_raw(ptr); }
 }
 
 #[no_mangle]
-pub extern fn read_async(ptr: *mut Tty) -> *mut AsyncInput {
+pub extern fn read_async(ptr: *mut Tty) -> *mut AsyncReader {
     unsafe {
         assert!(!ptr.is_null());
-        Box::into_raw(Box::new(AsyncInput {
-            iter: (&mut *ptr).read_async(),
-            event: Default::default(),
-        }))
+        Box::into_raw(Box::new((&mut *ptr).read_async()))
     }
 }
 
 #[no_mangle]
-pub extern fn read_until_async(ptr: *mut Tty, d: u8) -> *mut AsyncInput {
+pub extern fn read_until_async(ptr: *mut Tty, d: u8) -> *mut AsyncReader {
     unsafe {
         assert!(!ptr.is_null());
-        Box::into_raw(Box::new(AsyncInput {
-            iter: (&mut *ptr).read_until_async(d),
-            event: Default::default(),
-        }))
+        Box::into_raw(Box::new((&mut *ptr).read_until_async(d)))
     }
 }
 
 #[no_mangle]
-pub extern fn async_next(ptr: *mut AsyncInput) -> bool {
-    let input = unsafe {
+pub extern fn async_next(ptr: *mut AsyncReader, event: &mut Event) -> bool {
+    let stdin = unsafe {
         assert!(!ptr.is_null());
         &mut *ptr
     };
 
-    if let Some(ev) = input.iter.next() {
-        ffi::match_event(ev, &mut input.event);
-        true
-    } else {
-        false
-    }
+    if let Some(evt) = stdin.next() {
+        c_event(evt, event);
+        return true
+    } else { return false }
 }
 
 #[no_mangle]
-pub extern fn get_async_kind(ptr: *mut AsyncInput) -> u8 {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.kind
-    }
-}
-
-#[no_mangle]
-pub extern fn get_async_label(ptr: *mut AsyncInput) -> u8 {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.label
-    }
-}
-
-#[no_mangle]
-pub extern fn get_async_btn(ptr: *mut AsyncInput) -> u8 {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.btn
-    }
-}
-
-#[no_mangle]
-pub extern fn get_async_coord(ptr: *mut AsyncInput) -> Coord {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.coord.into()
-    }
-}
-
-#[no_mangle]
-pub extern fn get_async_ch(ptr: *mut AsyncInput) -> u32 {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).event.ch
-    }
-}
-
-#[no_mangle]
-pub extern fn async_free(ptr: *mut AsyncInput) {
+pub extern fn async_free(ptr: *mut AsyncReader) {
     if ptr.is_null() { return }
     unsafe { Box::from_raw(ptr); }
 }
 
 #[no_mangle]
-pub extern fn clear(ptr: *mut Tty, m: u8) {
-    let method = ffi::match_method(m);
+pub extern fn clear(ptr: *mut Tty, c_str: *const c_char) {
     unsafe {
+        assert!(!c_str.is_null());
         assert!(!ptr.is_null());
-        (&mut *ptr).clear(method);
+        (&mut *ptr).clear(
+            CStr::from_ptr(c_str).to_str().unwrap());
     }
 }
 
@@ -312,19 +226,24 @@ pub extern fn right(ptr: *mut Tty) {
 }
 
 #[no_mangle]
-pub extern fn dpad(ptr: *mut Tty, d: u8, n: i16) {
-    let dir = ffi::match_direction(d);
+pub extern fn dpad(ptr: *mut Tty, c_str: *const c_char, n: i16) {
     unsafe {
+        assert!(!c_str.is_null());
         assert!(!ptr.is_null());
-        (&mut *ptr).dpad(dir, n);
+        (&mut *ptr).dpad(
+            CStr::from_ptr(c_str).to_str().unwrap(), n);
     }
 }
 
 #[no_mangle]
-pub extern fn pos(ptr: *mut Tty) -> Coord {
+pub extern fn pos(ptr: *mut Tty) -> u32 {
+    // NOTE: instead of a Tuple, we are sending a u32
+    // that has the first 16 bits containing `col: i16`
+    // and the second 16 bits containing `row: i16`.
     unsafe {
         assert!(!ptr.is_null());
-        (&mut *ptr).pos().into()
+        let (col, row) = (&mut *ptr).pos();
+        ((col as u32) << 16) | row as u32
     }
 }
 
@@ -361,26 +280,31 @@ pub extern fn show_cursor(ptr: *mut Tty) {
 }
 
 #[no_mangle]
-pub extern fn set_fg(ptr: *mut Tty, f: u8) {
+pub extern fn set_fg(ptr: *mut Tty, c_str: *const c_char) {
     unsafe {
+        assert!(!c_str.is_null());
         assert!(!ptr.is_null());
-        (&mut *ptr).set_fg(ffi::match_color(f));
+        (&mut *ptr).set_fg(
+            CStr::from_ptr(c_str).to_str().unwrap());
     }
 }
 
 #[no_mangle]
-pub extern fn set_bg(ptr: *mut Tty, b: u8) {
+pub extern fn set_bg(ptr: *mut Tty, c_str: *const c_char) {
     unsafe {
         assert!(!ptr.is_null());
-        (&mut *ptr).set_bg(ffi::match_color(b));
+        (&mut *ptr).set_bg(
+            CStr::from_ptr(c_str).to_str().unwrap());
     };
 }
 
 #[no_mangle]
-pub extern fn set_tx(ptr: *mut Tty, s: u8) {
+pub extern fn set_tx(ptr: *mut Tty, c_str: *const c_char) {
     unsafe {
+        assert!(!c_str.is_null());
         assert!(!ptr.is_null());
-        (&mut *ptr).set_tx(ffi::match_style(s));
+        (&mut *ptr).set_tx(
+            CStr::from_ptr(c_str).to_str().unwrap());
     }
 }
 
@@ -417,13 +341,20 @@ pub extern fn set_bg_ansi(ptr: *mut Tty, v: u8) {
 }
 
 #[no_mangle]
-pub extern fn set_style(ptr: *mut Tty, f: u8, b: u8, s: u8) {
+pub extern fn set_style(
+    ptr: *mut Tty,
+    fg: *const c_char,
+    bg: *const c_char,
+    style: *const c_char) {
     unsafe {
+        assert!(!fg.is_null());
+        assert!(!bg.is_null());
+        assert!(!style.is_null());
         assert!(!ptr.is_null());
         (&mut *ptr).set_style(
-            ffi::match_color(f),
-            ffi::match_color(b),
-            ffi::match_style(s));
+            CStr::from_ptr(fg).to_str().unwrap(),
+            CStr::from_ptr(bg).to_str().unwrap(),
+            CStr::from_ptr(style).to_str().unwrap());
     }
 }
 
@@ -450,5 +381,87 @@ pub extern fn flush(ptr: *mut Tty) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).flush();
+    }
+}
+
+
+// Struct to facilitate FFI for InputEvents.
+
+#[repr(C)]
+pub struct Event {
+    _kind: u8,
+    _data: u32,
+}
+
+
+fn c_event(input: InputEvent, event: &mut Event) {
+    match input {
+        InputEvent::Keyboard(kb) => {
+            match kb {
+                KeyEvent::Null => event._kind = 0,
+                KeyEvent::Backspace => event._kind = 1,
+                KeyEvent::Left => event._kind = 2,
+                KeyEvent::Right => event._kind = 3,
+                KeyEvent::Up => event._kind = 4,
+                KeyEvent::Dn => event._kind = 5,
+                KeyEvent::Home => event._kind = 6,
+                KeyEvent::End => event._kind = 7,
+                KeyEvent::PageUp => event._kind = 8,
+                KeyEvent::PageDn => event._kind = 9,
+                KeyEvent::BackTab => event._kind = 10,
+                KeyEvent::Delete => event._kind = 11,
+                KeyEvent::Insert => event._kind = 12,
+                KeyEvent::F(n) => {
+                    event._kind = 13;
+                    event._data = n as u32;
+                },
+                KeyEvent::Char(c) => {
+                    event._kind = 14;
+                    event._data = c as u32;
+                },
+                KeyEvent::Alt(c) => {
+                    event._kind = 15;
+                    event._data = c as u32;
+                },
+                KeyEvent::Ctrl(c) => {
+                    event._kind = 16;
+                    event._data = c as u32;
+                },
+                KeyEvent::Esc => event._kind = 17,
+                KeyEvent::CtrlUp => event._kind = 18,
+                KeyEvent::CtrlDn => event._kind = 19,
+                KeyEvent::CtrlRight => event._kind = 20,
+                KeyEvent::CtrlLeft => event._kind = 21,
+                KeyEvent::ShiftUp => event._kind = 22,
+                KeyEvent::ShiftDn => event._kind = 23,
+                KeyEvent::ShiftRight => event._kind = 24,
+                KeyEvent::ShiftLeft => event._kind = 25,
+            }
+        },
+        InputEvent::Mouse(ms) => {
+            match ms {
+                MouseEvent::Press(btn, col, row) => {
+                    match btn {
+                        MouseButton::Left => event._kind = 26,
+                        MouseButton::Right => event._kind = 27,
+                        MouseButton::Middle => event._kind = 28,
+                        MouseButton::WheelUp => event._kind = 29,
+                        MouseButton::WheelDn => event._kind = 30,
+                    }
+                    event._data = ((col as u32) << 16) | row as u32;
+                },
+                MouseEvent::Hold(col, row) => {
+                    event._kind = 31;
+                    event._data = ((col as u32) << 16) | row as u32;
+                }
+                MouseEvent::Release(col, row) => {
+                    event._kind = 32;
+                    event._data = ((col as u32) << 16) | row as u32;
+                },
+                MouseEvent::Unknown => event._kind = 0,
+            }
+        },
+        InputEvent::Unknown => event._kind = 0,
+        _ => event._kind = 0,
     }
 }
