@@ -233,6 +233,9 @@ class Tty:
     def __exit__(self, exception_type, exception_value, traceback):
         lib.terminate(self.tty)
 
+    def terminate(self):
+        lib.terminate(self.tty)
+
     def size(self) -> (int, int):
         size = lib.size(self.tty)
         return (size.w, size.h)
@@ -427,16 +430,19 @@ class SyncInput:
     def __enter__(self):
         return self
 
-    def __exit__(self, exception_type, exception_value, traceback):
-        lib.sync_free(self.obj)
+    def __iter__(self):
+        return self
 
-    def next(self):
+    def __next__(self):
         lib.sync_next(self.obj)  # blocking call
         self.evt.kind = lib.get_sync_kind(self.obj)
         self.evt.label = lib.get_sync_label(self.obj)
         self.evt.btn = lib.get_sync_btn(self.obj)
         self.evt.coord = lib.get_sync_coord(self.obj)
         self.evt.ch = lib.get_sync_ch(self.obj)
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        lib.sync_free(self.obj)
 
     def close(self):
         lib.sync_free(self.obj)
@@ -453,10 +459,10 @@ class AsyncInput:
     def __enter__(self):
         return self
 
-    def __exit__(self, exception_type, exception_value, traceback):
-        lib.async_free(self.obj)
+    def __iter__(self):
+        return self
 
-    def next(self) -> bool:
+    def __next__(self) -> bool:
         if lib.async_next(self.obj):  # non-blocking call
             self.evt.kind = lib.get_async_kind(self.obj)
             self.evt.label = lib.get_async_label(self.obj)
@@ -466,6 +472,9 @@ class AsyncInput:
             return True
         else:
             return False  # skip if there was no update to evt
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        lib.async_free(self.obj)
 
     def close(self):
         lib.async_free(self.obj)

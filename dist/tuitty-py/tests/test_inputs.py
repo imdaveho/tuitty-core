@@ -21,7 +21,7 @@ class TestInputs(unittest.TestCase):
                 tty.goto(0, 10)
                 tty.flush()
                 # TODO: make AsyncInput and SyncInput into iterators
-                contains = stdin.next()
+                contains = next(stdin)
                 if not contains:
                     continue
                 tty.clear("currentln")
