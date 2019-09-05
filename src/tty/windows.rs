@@ -166,6 +166,8 @@ impl Tty {
             "currentln" => {
                 if self.ansi_supported {
                     write_ansi(&&screen::ansi::clear(screen::Clear::CurrentLn));
+                    let (_, row) = self.pos();
+                    self.goto(0, row);
                 } else {
                     let (_, row) = cursor::wincon::pos().unwrap();
                     screen::wincon::clear(screen::Clear::CurrentLn).unwrap();
@@ -193,6 +195,7 @@ impl Tty {
     pub fn resize(&mut self, w: i16, h: i16) {
         if self.ansi_supported {
             write_ansi(&screen::ansi::resize(w, h));
+            self.flush();
         } else {
             screen::wincon::resize(w, h).unwrap();
         }
@@ -215,6 +218,7 @@ impl Tty {
             self.cook();
             self.disable_mouse();
             self.show_cursor();
+            self.goto(0, 0);
         } else {
             if self.altscreen.is_none() {
                 self.altscreen = Some(Handle::buffer().unwrap());
@@ -231,6 +235,7 @@ impl Tty {
                 // Add new `Metadata` for the new screen.
                 self._add_metadata();
                 self.index = self.metas.len() - 1;
+                self.goto(0, 0);
             }
         }
     }
@@ -605,6 +610,11 @@ impl Tty {
         }
     }
 
+    pub fn printf(&mut self, s: &str) {
+        self.prints(s);
+        self.flush();
+    }
+
     // pub fn paint() {
     //     // write with colors and styles
     // }
@@ -631,6 +641,13 @@ impl Tty {
             is_cursor_visible: cstate,
             saved_position: None,
         });
+    }
+}
+
+
+impl Drop for Tty {
+    fn drop(&mut self) {
+        self.terminate()
     }
 }
 

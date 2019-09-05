@@ -1,11 +1,11 @@
 use super::{Tty, InputEvent, KeyEvent, MouseEvent, MouseButton};
+use std::thread;
+use std::time::Duration;
+
 
 #[test]
 fn test_inputs() {
     let mut tty = Tty::init();
-
-    use std::time::Duration;
-    use std::thread;
 
     thread::sleep(Duration::from_secs(2));
 
@@ -184,5 +184,6 @@ fn test_inputs() {
 
     thread::sleep(Duration::from_secs(2));
 
-    tty.terminate();
+    // tty should terminate at this point when it is dropped
+    // tty.terminate();
 }

@@ -113,6 +113,8 @@ impl Tty {
             }
             "currentln" => {
                 write_ansi(&screen::ansi::clear(screen::Clear::CurrentLn));
+                let (_, row) = self.pos();
+                self.goto(0, row);
             }
             "cursorup" => {
                 write_ansi(&screen::ansi::clear(screen::Clear::CursorUp));
@@ -126,6 +128,7 @@ impl Tty {
 
     pub fn resize(&mut self, w: i16, h: i16) {
         write_ansi(&screen::ansi::resize(w, h));
+        self.flush();
     }
 
 
@@ -145,6 +148,7 @@ impl Tty {
         self.cook();
         self.disable_mouse();
         self.show_cursor();
+        self.goto(0, 0)
     }
 
 
@@ -356,6 +360,11 @@ impl Tty {
         flush_ansi();
     }
 
+    pub fn printf(&mut self, s: &str) {
+        self.prints(s);
+        self.flush();
+    }
+
     // pub fn paint() {
     //     // write with colors and styles
     // }
@@ -381,5 +390,11 @@ impl Tty {
             is_mouse_enabled: mstate,
             is_cursor_visible: cstate,
         });
+    }
+}
+
+impl Drop for Tty {
+    fn drop(&mut self) {
+        self.terminate()
     }
 }
