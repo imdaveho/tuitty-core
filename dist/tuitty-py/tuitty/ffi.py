@@ -8,7 +8,17 @@ from ctypes import c_bool, c_char_p, c_int, c_uint8, c_int16, c_uint32, cdll, \
 
 prefix = {'win32': ''}.get(sys.platform, 'lib')
 extension = {'darwin': '.dylib', 'win32': '.dll'}.get(sys.platform, '.so')
-root = os.path.dirname(os.path.dirname(__file__))
+
+# Uncomment when `share` is in dist/tuitty-py directory
+# root = os.path.dirname(os.path.abspath(__file__))
+
+# Uncomment when `share` is in the tuitty repo directory
+root = os.path.dirname(       # tuitty (repo)
+    os.path.dirname(          # dist
+        os.path.dirname(      # tuitty-py (dist)
+            os.path.dirname(  # tuitty (dist)
+                os.path.abspath(__file__)))))
+
 system = {"darwin": "macos", "win32": "windows"}.get(sys.platform, "linux")
 bits = "64" if platform.architecture()[0] == "64bit" else "32"
 cpu = {
@@ -19,7 +29,7 @@ cpu = {
 }.get(platform.machine(), "arm")
 
 path = os.path.join(
-    os.path.abspath(root), "lib", system, cpu + bits,
+    os.path.abspath(root), "share", system, cpu + bits,
     prefix + "tuitty" + extension)
 lib = cdll.LoadLibrary(path)
 

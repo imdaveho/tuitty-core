@@ -1,6 +1,8 @@
+use super::{Tty, InputEvent, KeyEvent, MouseEvent, MouseButton};
+
 #[test]
 fn test_inputs() {
-    let mut tty = super::Tty::init();
+    let mut tty = Tty::init();
 
     use std::time::Duration;
     use std::thread;
@@ -19,68 +21,68 @@ fn test_inputs() {
         if let Some(input) = stdin.next() {
             tty.clear("currentln");
             match input {
-                super::InputEvent::Keyboard(kb) => match kb {
-                    super::KeyEvent::Char(c) => {
+                InputEvent::Keyboard(kb) => match kb {
+                    KeyEvent::Char(c) => {
                         tty.prints(&format!("Key Pressed: Char({})", c));
                     }
 
-                    super::KeyEvent::Backspace => {
+                    KeyEvent::Backspace => {
                         tty.prints("Key Pressed: Backspace");
                     }
 
-                    super::KeyEvent::Left => {
+                    KeyEvent::Left => {
                         tty.prints("Key Pressed: Left (←)");
                     }
 
-                    super::KeyEvent::Right => {
+                    KeyEvent::Right => {
                         tty.prints("Key Pressed: Right (→)")
                     }
 
-                    super::KeyEvent::Up => {
+                    KeyEvent::Up => {
                         tty.prints("Key Pressed: Up (↑)")
                     }
 
-                    super::KeyEvent::Dn => {
+                    KeyEvent::Dn => {
                         tty.prints("Key Pressed: Down (↓)")
                     }
 
-                    super::KeyEvent::Home => {
+                    KeyEvent::Home => {
                         tty.prints("Key Pressed: Home")
                     }
 
-                    super::KeyEvent::End => {
+                    KeyEvent::End => {
                         tty.prints("Key Pressed: End")
                     }
 
-                    super::KeyEvent::PageUp => {
+                    KeyEvent::PageUp => {
                         tty.prints("Key Pressed: PageUp")
                     }
 
-                    super::KeyEvent::PageDn => {
+                    KeyEvent::PageDn => {
                         tty.prints("Key Pressed: PageDn")
                     }
 
-                    super::KeyEvent::BackTab => {
+                    KeyEvent::BackTab => {
                         tty.prints("Key Pressed: BackTab")
                     }
 
-                    super::KeyEvent::Delete => {
+                    KeyEvent::Delete => {
                         tty.prints("Key Pressed: Delete")
                     }
 
-                    super::KeyEvent::Insert => {
+                    KeyEvent::Insert => {
                         tty.prints("Key Pressed: Insert")
                     }
 
-                    super::KeyEvent::F(n) => {
+                    KeyEvent::F(n) => {
                         tty.prints(&format!("Key Pressed: F({})", n))
                     }
 
-                    super::KeyEvent::Alt(c) => {
+                    KeyEvent::Alt(c) => {
                         tty.prints(&format!("Key Pressed: Alt({})", c))
                     }
 
-                    super::KeyEvent::Ctrl(c) => {
+                    KeyEvent::Ctrl(c) => {
                         tty.prints(&format!("Key Pressed: Ctrl({})", c));
                         if c == 'q' {
                             tty.clear("currentln");
@@ -92,83 +94,83 @@ fn test_inputs() {
                         }
                     }
 
-                    super::KeyEvent::Esc => {
+                    KeyEvent::Esc => {
                         tty.prints("Key Pressed: Esc")
                     }
 
-                    super::KeyEvent::CtrlUp => {
+                    KeyEvent::CtrlUp => {
                         tty.prints("Key Pressed: CtrlUp")
                     }
 
-                    super::KeyEvent::CtrlDn => {
+                    KeyEvent::CtrlDn => {
                         tty.prints("Key Pressed: CtrlDn")
                     }
 
-                    super::KeyEvent::CtrlRight => {
+                    KeyEvent::CtrlRight => {
                         tty.prints("Key Pressed: CtrlRight")
                     }
 
-                    super::KeyEvent::CtrlLeft => {
+                    KeyEvent::CtrlLeft => {
                         tty.prints("Key Pressed: CtrlLeft")
                     }
 
-                    super::KeyEvent::ShiftUp => {
+                    KeyEvent::ShiftUp => {
                         tty.prints("Key Pressed: ShiftUp")
                     }
 
-                    super::KeyEvent::ShiftDn => {
+                    KeyEvent::ShiftDn => {
                         tty.prints("Key Pressed: ShiftDn")
                     }
 
-                    super::KeyEvent::ShiftRight => {
+                    KeyEvent::ShiftRight => {
                         tty.prints("Key Pressed: ShiftRight")
                     }
 
-                    super::KeyEvent::ShiftLeft => {
+                    KeyEvent::ShiftLeft => {
                         tty.prints("Key Pressed: ShiftLeft")
                     }
 
-                    super::KeyEvent::Null => (),
+                    KeyEvent::Null => (),
                 }
 
-                super::InputEvent::Mouse(me) => match me {
-                    super::MouseEvent::Press(btn, col, row) => match btn {
-                        super::MouseButton::Left => {
+                InputEvent::Mouse(me) => match me {
+                    MouseEvent::Press(btn, col, row) => match btn {
+                        MouseButton::Left => {
                             tty.prints(&format!(
                                 "Mouse Press: Left @ ({}, {})", col, row))
                         }
-                        super::MouseButton::Right => {
+                        MouseButton::Right => {
                             tty.prints(&format!(
                                 "Mouse Press: Right @ ({}, {})", col, row))
                         }
-                        super::MouseButton::Middle => {
+                        MouseButton::Middle => {
                             tty.prints(&format!(
                                 "Mouse Press: Middle @ ({}, {})", col, row))
                         }
-                        super::MouseButton::WheelUp => {
+                        MouseButton::WheelUp => {
                             tty.prints(&format!(
                                 "Mouse Press: WheelUp @ ({}, {})", col, row))
                         }
-                        super::MouseButton::WheelDn => {
+                        MouseButton::WheelDn => {
                             tty.prints(&format!(
                                 "Mouse Press: WheelDn @ ({}, {})", col, row))
                         }
                     }
 
-                    super::MouseEvent::Hold(col, row) => {
+                    MouseEvent::Hold(col, row) => {
                         tty.prints(&format!(
                             "Mouse Hold @ ({}, {})", col, row))
                     }
 
-                    super::MouseEvent::Release(col, row) => {
+                    MouseEvent::Release(col, row) => {
                         tty.prints(&format!(
                             "Mouse Release @ ({}, {})", col, row))
                     }
-                    super::MouseEvent::Unknown => (),
+                    MouseEvent::Unknown => (),
                 }
 
-                super::InputEvent::Unknown => (),
-                super::InputEvent::Unsupported(_) => (),
+                InputEvent::Unknown => (),
+                InputEvent::Unsupported(_) => (),
             }
         }
         thread::sleep(Duration::from_millis(16));

@@ -1,6 +1,9 @@
+use super::Tty;
+
+
 #[test]
 fn test_example() {
-    let mut tty = super::Tty::init();
+    let mut tty = Tty::init();
 
     tty.prints(&format!{"w: {}, h: {}\n", tty.size().0, tty.size().1});
 
