@@ -1,11 +1,11 @@
 //! This module consolidates the parts that make up a TTY into a single struct
 //! and exposes the methods that work specifically on Unix systems.
 
-use super::screen;
 use super::cursor;
 use super::input;
-use super::output::{self, Color, TextStyle};
-use super::shared::{write_ansi, flush_ansi};
+use super::screen::{self, Clear::*};
+use super::output::{self, Color, Format};
+use super::shared::{ansi_write, ansi_flush};
 use super::{AsyncReader, SyncReader, Termios};
 
 
@@ -22,12 +22,12 @@ pub struct Metadata {
     is_cursor_visible: bool,
 }
 
-// struct Cell {
-//     ch: char,
-//     fg: Color,
-//     bg: Color,
-//     tx: output::TextStyle
-// }
+struct Cell {
+    ch: char,
+    fg: Color,
+    bg: Color,
+    fmts: Vec<Format>,
+}
 
 
 impl Tty {
@@ -47,10 +47,9 @@ impl Tty {
     pub fn terminate(&mut self) {
         self.to_main();
         output::ansi::set_mode(&self.original_mode).unwrap();
-        write_ansi(&cursor::ansi::show());
-        write_ansi("\r");
+        ansi_write(&cursor::ansi::show(), false);
+        ansi_write("\r", true);
         self.metas.clear();
-        self.flush();
     }
 
     pub fn size(&self) -> (i16, i16) {
@@ -85,14 +84,13 @@ impl Tty {
 
     pub fn enable_mouse(&mut self) {
         let mut m = &mut self.metas[self.index];
-        write_ansi(&input::ansi::enable_mouse_mode());
+        ansi_write(&input::ansi::enable_mouse_mode(), self.autoflush);
         m.is_mouse_enabled = true;
-        if self.autoflush { self.flush() }
     }
 
     pub fn disable_mouse(&mut self) {
         let mut m = &mut self.metas[self.index];
-        write_ansi(&input::ansi::disable_mouse_mode());
+        ansi_write(&input::ansi::disable_mouse_mode(), self.autoflush);
         m.is_mouse_enabled = false;
         if self.autoflush { self.flush() }
     }
@@ -117,33 +115,31 @@ impl Tty {
     pub fn clear(&mut self, method: &str) {
         match method {
             "all" => {
-                write_ansi(&screen::ansi::clear(screen::Clear::All));
+                ansi_write(&screen::ansi::clear(All), self.autoflush);
                 self.goto(0, 0);
             }
             "newln" => {
-                write_ansi(&screen::ansi::clear(screen::Clear::NewLn));
+                ansi_write(&screen::ansi::clear(NewLn), self.autoflush);
             }
             "currentln" => {
-                write_ansi(&screen::ansi::clear(screen::Clear::CurrentLn));
+                ansi_write(&screen::ansi::clear(CurrentLn), self.autoflush);
                 let (_, row) = self.pos();
                 self.goto(0, row);
             }
             "cursorup" => {
-                write_ansi(&screen::ansi::clear(screen::Clear::CursorUp));
+                ansi_write(&screen::ansi::clear(CursorUp), self.autoflush);
             }
             "cursordn" => {
-                write_ansi(&screen::ansi::clear(screen::Clear::CursorDn));
+                ansi_write(&screen::ansi::clear(CursorDn), self.autoflush);
             }
             _ => ()
         }
-        if self.autoflush { self.flush() }
     }
 
     pub fn resize(&mut self, w: i16, h: i16) {
-        write_ansi(&screen::ansi::resize(w, h));
-        // (imdaveho) NOTE: In order to resize the terminal, this method must
-        // call `flush()` otherwise nothing happens.
-        self.flush();
+        // NOTE (imdaveho): this method must call `flush`
+        // otherwise nothing happens.
+        ansi_write(&screen::ansi::resize(w, h), true);
     }
 
     pub fn manual(&mut self) {
@@ -161,7 +157,7 @@ impl Tty {
         if self.index == 0 {
             // There is no point to switch if you're on another screen
             // since ANSI terminals provide a single "alternate screen".
-            write_ansi(&screen::ansi::enable_alt());
+            ansi_write(&screen::ansi::enable_alt(), false);
         }
         // Add new `Metadata` for the new screen.
         self._add_metadata();
@@ -174,12 +170,8 @@ impl Tty {
         self.disable_mouse();
         self.show_cursor();
         self.goto(0, 0);
-
-        if autoflush {
-            self.flush();
-            // Revert back to previous `autoflush` configuration.
-            self.automatic();
-        }
+        // Revert back to previous `autoflush` configuration.
+        if autoflush { self.flush(); self.automatic() }
     }
 
 
@@ -191,35 +183,22 @@ impl Tty {
             let mstate = metas[0].is_mouse_enabled;
             let cstate = metas[0].is_cursor_visible;
             self.index = 0;
-            write_ansi(&screen::ansi::disable_alt());
-
+            ansi_write(&screen::ansi::disable_alt(), false);
             // Prevent multiple `flush()` calls due to `autoflush` setting.
             let autoflush = self.autoflush;
             if self.autoflush { self.manual() }
 
-            if rstate {
-                self.raw();
-            } else {
-                self.cook();
-            }
+            if rstate { self.raw() }
+            else { self.cook() }
 
-            if mstate {
-                self.enable_mouse();
-            } else {
-                self.disable_mouse();
-            }
+            if mstate { self.enable_mouse() }
+            else { self.disable_mouse() }
 
-            if cstate {
-                self.show_cursor();
-            } else {
-                self.hide_cursor();
-            }
+            if cstate { self.show_cursor() }
+            else { self.hide_cursor() }
 
-            if autoflush {
-                self.flush();
-                // Revert back to previous `autoflush` configuration.
-                self.automatic();
-            }
+            // Revert back to previous `autoflush` configuration.
+            if autoflush { self.flush(); self.automatic() }
         }
     }
 
@@ -241,61 +220,43 @@ impl Tty {
                 let mstate = metas[index].is_mouse_enabled;
                 let cstate = metas[index].is_cursor_visible;
                 self.index = index;
-
                 // Prevent multiple `flush()` calls due to `autoflush` setting.
                 let autoflush = self.autoflush;
                 if self.autoflush { self.manual() }
 
-                if rstate {
-                    self.raw();
-                } else {
-                    self.cook();
-                }
+                if rstate { self.raw() }
+                else { self.cook() }
 
-                if mstate {
-                    self.enable_mouse();
-                } else {
-                    self.disable_mouse();
-                }
+                if mstate { self.enable_mouse() }
+                else { self.disable_mouse() }
 
-                if cstate {
-                    self.show_cursor();
-                } else {
-                    self.hide_cursor();
-                }
+                if cstate { self.show_cursor() }
+                else { self.hide_cursor() }
 
-                if autoflush {
-                    self.flush();
-                    // Revert back to previous `autoflush` configuration.
-                    self.automatic();
-                }
+                // Revert back to previous `autoflush` configuration.
+                if autoflush { self.flush(); self.automatic() }
             }
         }
     }
 
     pub fn goto(&mut self, col: i16, row: i16) {
-        write_ansi(&cursor::ansi::goto(col, row));
-        if self.autoflush { self.flush() }
+        ansi_write(&cursor::ansi::goto(col, row), self.autoflush);
     }
 
     pub fn up(&mut self) {
-        write_ansi(&cursor::ansi::move_up(1));
-        if self.autoflush { self.flush() }
+        ansi_write(&cursor::ansi::move_up(1), self.autoflush);
     }
 
     pub fn dn(&mut self) {
-        write_ansi(&cursor::ansi::move_down(1));
-        if self.autoflush { self.flush() }
+        ansi_write(&cursor::ansi::move_down(1), self.autoflush);
     }
 
     pub fn left(&mut self) {
-        write_ansi(&cursor::ansi::move_left(1));
-        if self.autoflush { self.flush() }
+        ansi_write(&cursor::ansi::move_left(1), self.autoflush);
     }
 
     pub fn right(&mut self) {
-        write_ansi(&cursor::ansi::move_right(1));
-        if self.autoflush { self.flush() }
+        ansi_write(&cursor::ansi::move_right(1), self.autoflush);
     }
 
     pub fn dpad(&mut self, dir: &str, n: i16) {
@@ -304,21 +265,20 @@ impl Tty {
         if n > 0 {
             match d.as_str() {
                 "up" => {
-                    write_ansi(&cursor::ansi::move_up(n));
+                    ansi_write(&cursor::ansi::move_up(n), self.autoflush);
                 },
                 "dn" => {
-                    write_ansi(&cursor::ansi::move_down(n));
+                    ansi_write(&cursor::ansi::move_down(n), self.autoflush);
                 },
                 "left" => {
-                    write_ansi(&cursor::ansi::move_left(n));
+                    ansi_write(&cursor::ansi::move_left(n), self.autoflush);
                 },
                 "right" => {
-                    write_ansi(&cursor::ansi::move_right(n));
+                    ansi_write(&cursor::ansi::move_right(n), self.autoflush);
                 },
                 _ => ()
             };
         }
-        if self.autoflush { self.flush() }
     }
 
     pub fn pos(&mut self) -> (i16, i16) {
@@ -333,108 +293,92 @@ impl Tty {
     }
 
     pub fn mark(&mut self) {
-        write_ansi(&cursor::ansi::save_pos());
-        if self.autoflush { self.flush() }
+        ansi_write(&cursor::ansi::save_pos(), self.autoflush);
     }
 
     pub fn load(&mut self) {
-        write_ansi(&cursor::ansi::load_pos());
-        if self.autoflush { self.flush() }
+        ansi_write(&cursor::ansi::load_pos(), self.autoflush);
     }
 
     pub fn hide_cursor(&mut self) {
         let mut m = &mut self.metas[self.index];
-        write_ansi(&cursor::ansi::hide());
+        ansi_write(&cursor::ansi::hide(), self.autoflush);
         m.is_cursor_visible = false;
-        if self.autoflush { self.flush() }
     }
 
     pub fn show_cursor(&mut self) {
         let mut m = &mut self.metas[self.index];
-        write_ansi(&cursor::ansi::show());
+        ansi_write(&cursor::ansi::show(), self.autoflush);
         m.is_cursor_visible = true;
-        if self.autoflush { self.flush() }
     }
 
     pub fn set_fg(&mut self, color: &str) {
-        let fg_col = output::Color::from(color);
-        write_ansi(&output::ansi::set_fg(fg_col));
-        if self.autoflush { self.flush() }
+        let fg = Color::from(color);
+        ansi_write(&output::ansi::set_fg(fg), self.autoflush);
     }
 
     pub fn set_bg(&mut self, color: &str) {
-        let bg_col = output::Color::from(color);
-        write_ansi(&output::ansi::set_bg(bg_col));
-        if self.autoflush { self.flush() }
+        let bg = Color::from(color);
+        ansi_write(&output::ansi::set_bg(bg), self.autoflush);
     }
 
-    pub fn set_tx(&mut self, style: &str) {
-        // NOTE: `style` will be `reset` if the passed in
+    pub fn set_fmt(&mut self, format: &str) {
+        // NOTE: `format` will be `reset` if the passed in
         // `&str` contains multiple values (eg. "bold, underline").
-        let style = output::TextStyle::from(style);
-        write_ansi(&output::ansi::set_tx(style));
-        if self.autoflush { self.flush() }
+        let fmt = Format::from(format);
+        ansi_write(&output::ansi::set_fmt(fmt), self.autoflush);
     }
 
     pub fn set_fg_rgb(&mut self, r: u8, g:u8, b: u8) {
-        let fg_col = output::Color::Rgb{
+        let fg = output::Color::Rgb{
             r: r,
             g: g,
             b: b,
         };
-        write_ansi(&output::ansi::set_fg(fg_col));
-        if self.autoflush { self.flush() }
+        ansi_write(&output::ansi::set_fg(fg), self.autoflush);
     }
 
     pub fn set_bg_rgb(&mut self, r: u8, g:u8, b: u8) {
-        let bg_col = output::Color::Rgb{
+        let bg = output::Color::Rgb{
             r: r,
             g: g,
             b: b,
         };
-        write_ansi(&output::ansi::set_bg(bg_col));
-        if self.autoflush { self.flush() }
+        ansi_write(&output::ansi::set_bg(bg), self.autoflush);
     }
 
-    pub fn set_fg_ansi(&mut self, v: u8) {
-        let fg_col = output::Color::AnsiValue(v);
-        write_ansi(&output::ansi::set_fg(fg_col));
-        if self.autoflush { self.flush() }
+    pub fn set_fg_ansi(&mut self, value: u8) {
+        let fg = output::Color::AnsiValue(value);
+        ansi_write(&output::ansi::set_fg(fg), self.autoflush);
     }
 
-    pub fn set_bg_ansi(&mut self, v: u8) {
-        let bg_col = output::Color::AnsiValue(v);
-        write_ansi(&output::ansi::set_bg(bg_col));
-        if self.autoflush { self.flush() }
+    pub fn set_bg_ansi(&mut self, value: u8) {
+        let bg = output::Color::AnsiValue(value);
+        ansi_write(&output::ansi::set_bg(bg), self.autoflush);
     }
 
-    pub fn set_style(&mut self, fg: &str, bg: &str, style: &str) {
+    pub fn set_style(&mut self, fg: &str, bg: &str, fmts: &str) {
         // The params fg is a single word, bg is also a single word, however
         // the tx param can be treated as a comma-separated list of words that
         // match the various text styles that are supported: "bold", "dim",
         // "underline", "reverse", "hide", and "reset".
-        write_ansi(&output::ansi::set_all(fg, bg, style));
-        if self.autoflush { self.flush() }
+        ansi_write(&output::ansi::set_all(fg, bg, fmts), self.autoflush);
     }
 
     pub fn reset(&mut self) {
-        write_ansi(&output::ansi::reset());
-        if self.autoflush { self.flush() }
+        ansi_write(&output::ansi::reset(), self.autoflush);
     }
 
-    pub fn prints(&mut self, s: &str) {
-        write_ansi(&output::ansi::prints(s));
-        if self.autoflush { self.flush() }
+    pub fn prints(&mut self, string: &str) {
+        ansi_write(&output::ansi::prints(string), false);
     }
 
     pub fn flush(&mut self) {
-        // ANSI-only
-        flush_ansi();
+        ansi_flush();
     }
 
-    pub fn printf(&mut self, s: &str) {
-        self.prints(s);
-        self.flush();
+    pub fn printf(&mut self, string: &str) {
+        ansi_write(&output::ansi::prints(string), true);
     }
 
     // pub fn paint() {

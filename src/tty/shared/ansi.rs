@@ -3,18 +3,19 @@
 use std::io::{stdout, BufWriter, Write};
 
 
-pub fn write_ansi(s: &str) {
-    let cout = stdout();
-    let lock = cout.lock();
-    let mut writer = BufWriter::new(lock);
-    writer.write(s.as_bytes()).unwrap();
+pub fn ansi_write(string: &str, flush: bool) {
+    let output = stdout();
+    let lock = output.lock();
+    let mut outbuf = BufWriter::new(lock);
+    outbuf.write(string.as_bytes()).expect("I/O error on write");
+    if flush { outbuf.flush().expect("I/O error on flush") }
 }
 
-pub fn flush_ansi() {
-    let cout = stdout();
-    let lock = cout.lock();
-    let mut writer = BufWriter::new(lock);
-    writer.flush().unwrap();
+pub fn ansi_flush() {
+    let output = stdout();
+    let lock = output.lock();
+    let mut outbuf = BufWriter::new(lock);
+    outbuf.flush().expect("I/O error on flush");
 }
 
 // Append a the first few characters of an ANSI escape code to the given string.

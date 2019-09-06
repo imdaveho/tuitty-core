@@ -28,7 +28,7 @@ pub mod wincon;
 enum Style {
     Fg(Color),
     Bg(Color),
-    Tx(TextStyle),
+    Fmt(Format),
 }
 
 // Enum with the different colors to color your test and terminal.
@@ -105,7 +105,7 @@ impl FromStr for Color {
 
 
 #[derive(Clone, Copy)]
-pub enum TextStyle {
+pub enum Format {
     Reset = 0,
     Bold = 1,
     Dim = 2,
@@ -114,28 +114,28 @@ pub enum TextStyle {
     Hide = 8,
 }
 
-impl Display for TextStyle {
+impl Display for Format {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "{}", *self as u8)
     }
 }
 
-impl From<&str> for TextStyle {
+impl From<&str> for Format {
     fn from(src: &str) -> Self {
-        src.parse().unwrap_or(TextStyle::Reset)
+        src.parse().unwrap_or(Format::Reset)
     }
 }
 
-impl FromStr for TextStyle {
+impl FromStr for Format {
     type Err = ();
     fn from_str(src: &str) -> ::std::result::Result<Self, Self::Err> {
         match src.as_ref() {
-            "bold" => Ok(TextStyle::Bold),
-            "dim" => Ok(TextStyle::Dim),
-            "underline" => Ok(TextStyle::Underline),
-            "reverse" => Ok(TextStyle::Reverse),
-            "hide" => Ok(TextStyle::Hide),
-            _ => Ok(TextStyle::Reset),
+            "bold" => Ok(Format::Bold),
+            "dim" => Ok(Format::Dim),
+            "underline" => Ok(Format::Underline),
+            "reverse" => Ok(Format::Reverse),
+            "hide" => Ok(Format::Hide),
+            _ => Ok(Format::Reset),
         }
     }
 }

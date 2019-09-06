@@ -16,6 +16,22 @@ pub extern fn init() -> *mut Tty {
 }
 
 #[no_mangle]
+pub extern fn manual(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).manual();
+    }
+}
+
+#[no_mangle]
+pub extern fn automatic(ptr: *mut Tty) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).automatic();
+    }
+}
+
+#[no_mangle]
 pub extern fn terminate(ptr: *mut Tty) {
     unsafe {
         if ptr.is_null() { return }
@@ -299,11 +315,11 @@ pub extern fn set_bg(ptr: *mut Tty, c_str: *const c_char) {
 }
 
 #[no_mangle]
-pub extern fn set_tx(ptr: *mut Tty, c_str: *const c_char) {
+pub extern fn set_fmt(ptr: *mut Tty, c_str: *const c_char) {
     unsafe {
         assert!(!c_str.is_null());
         assert!(!ptr.is_null());
-        (&mut *ptr).set_tx(
+        (&mut *ptr).set_fmt(
             CStr::from_ptr(c_str).to_str().unwrap());
     }
 }
@@ -325,18 +341,18 @@ pub extern fn set_bg_rgb(ptr: *mut Tty, r: u8, g: u8, b: u8) {
 }
 
 #[no_mangle]
-pub extern fn set_fg_ansi(ptr: *mut Tty, v: u8) {
+pub extern fn set_fg_ansi(ptr: *mut Tty, value: u8) {
     unsafe {
         assert!(!ptr.is_null());
-        (&mut *ptr).set_fg_ansi(v);
+        (&mut *ptr).set_fg_ansi(value);
     }
 }
 
 #[no_mangle]
-pub extern fn set_bg_ansi(ptr: *mut Tty, v: u8) {
+pub extern fn set_bg_ansi(ptr: *mut Tty, value: u8) {
     unsafe {
         assert!(!ptr.is_null());
-        (&mut *ptr).set_bg_ansi(v);
+        (&mut *ptr).set_bg_ansi(value);
     }
 }
 
@@ -345,16 +361,16 @@ pub extern fn set_style(
     ptr: *mut Tty,
     fg: *const c_char,
     bg: *const c_char,
-    style: *const c_char) {
+    fmts: *const c_char) {
     unsafe {
         assert!(!fg.is_null());
         assert!(!bg.is_null());
-        assert!(!style.is_null());
+        assert!(!fmts.is_null());
         assert!(!ptr.is_null());
         (&mut *ptr).set_style(
             CStr::from_ptr(fg).to_str().unwrap(),
             CStr::from_ptr(bg).to_str().unwrap(),
-            CStr::from_ptr(style).to_str().unwrap());
+            CStr::from_ptr(fmts).to_str().unwrap());
     }
 }
 

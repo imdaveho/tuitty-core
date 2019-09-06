@@ -3,7 +3,7 @@
 // * `wincon`, wrappers for pointers to the Handle and ConsoleInfo objects.
 
 mod ansi;
-pub use ansi::{write_ansi, flush_ansi};
+pub use ansi::{ansi_write, ansi_flush};
 
 #[cfg(windows)]
 mod wincon;

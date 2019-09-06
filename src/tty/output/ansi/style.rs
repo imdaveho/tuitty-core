@@ -1,6 +1,6 @@
 // ANSI specific functions to style text output to the terminal.
 
-use super::{csi, Color, Style, TextStyle};
+use super::{csi, Color, Format, Style};
 
 
 pub fn set_fg(color: Color) -> String {
@@ -11,39 +11,39 @@ pub fn set_bg(color: Color) -> String {
     _stylize(Style::Bg(color))
 }
 
-pub fn set_tx(style: TextStyle) -> String {
-    _stylize(Style::Tx(style))
+pub fn set_fmt(format: Format) -> String {
+    _stylize(Style::Fmt(format))
 }
 
-pub fn set_all(fg: &str, bg: &str, tx: &str) -> String {
+pub fn set_all(fg: &str, bg: &str, fmts: &str) -> String {
     let fg_str = _stylize(Style::Fg(Color::from(fg)));
     let bg_str = _stylize(Style::Bg(Color::from(bg)));
 
     // The tx param is should be a comma separated string.
-    let tx_arr: Vec<&str> = tx.split(',').map(|t| t.trim()).collect();
+    let fmt_arr: Vec<&str> = fmts.split(',').map(|t| t.trim()).collect();
     let mut dimmed = false;
-    let mut tx_str = String::new();
-    for s in tx_arr.iter() {
+    let mut fmt_str = String::new();
+    for s in fmt_arr.iter() {
         match *s {
             "bold" => {
                 if dimmed { continue }
-                tx_str.push_str(&_stylize(Style::Tx(TextStyle::from(*s))));
+                fmt_str.push_str(&_stylize(Style::Fmt(Format::from(*s))));
             },
             "dim" => {
                 dimmed = true;
-                tx_str.push_str(&_stylize(Style::Tx(TextStyle::from(*s))));
+                fmt_str.push_str(&_stylize(Style::Fmt(Format::from(*s))));
             },
             "reset" => {
-                tx_str.push_str(&_stylize(Style::Tx(TextStyle::from(*s))));
+                fmt_str.push_str(&_stylize(Style::Fmt(Format::from(*s))));
                 break
             },
             _ => {
-                tx_str.push_str(&_stylize(Style::Tx(TextStyle::from(*s))));
+                fmt_str.push_str(&_stylize(Style::Fmt(Format::from(*s))));
             },
         }
     }
 
-    format!("{}{}{}", fg_str, bg_str, tx_str)
+    format!("{}{}{}", fg_str, bg_str, fmt_str)
 }
 
 pub fn reset() -> String {
@@ -75,8 +75,8 @@ fn _stylize(style: Style) -> String {
                 color = c;
             }
         }
-        Style::Tx(t) => {
-            ansi_value.push_str(&t.to_string());
+        Style::Fmt(fmt) => {
+            ansi_value.push_str(&fmt.to_string());
             return format!(csi!("{}m"), ansi_value);
         }
     }
