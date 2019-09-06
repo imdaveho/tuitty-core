@@ -13,6 +13,7 @@ pub struct Tty {
     index: usize,
     metas: Vec<Metadata>,
     original_mode: Termios,
+    autoflush: bool,
 }
 
 pub struct Metadata {
@@ -32,6 +33,7 @@ impl Tty {
                 is_cursor_visible: true,
             }],
             original_mode: output::ansi::get_mode().unwrap(),
+            autoflush: false,
         }
     }
 
@@ -41,6 +43,7 @@ impl Tty {
         write_ansi(&cursor::ansi::show());
         write_ansi("\n\r");
         self.metas.clear();
+        self.flush();
     }
 
     pub fn size(&self) -> (i16, i16) {
@@ -77,12 +80,14 @@ impl Tty {
         let mut m = &mut self.metas[self.index];
         write_ansi(&input::ansi::enable_mouse_mode());
         m.is_mouse_enabled = true;
+        if self.autoflush { self.flush() }
     }
 
     pub fn disable_mouse(&mut self) {
         let mut m = &mut self.metas[self.index];
         write_ansi(&input::ansi::disable_mouse_mode());
         m.is_mouse_enabled = false;
+        if self.autoflush { self.flush() }
     }
 
     pub fn read_char(&self) -> char {
@@ -124,13 +129,23 @@ impl Tty {
             }
             _ => ()
         }
+        if self.autoflush { self.flush() }
     }
 
     pub fn resize(&mut self, w: i16, h: i16) {
         write_ansi(&screen::ansi::resize(w, h));
+        // (imdaveho) NOTE: In order to resize the terminal, this method must
+        // call `flush()` otherwise nothing happens.
         self.flush();
     }
 
+    pub fn manual(&mut self) {
+        self.autoflush = false;
+    }
+
+    pub fn automatic(&mut self) {
+        self.autoflush = true;
+    }
 
     pub fn switch(&mut self) {
         // In order to support multiple "screens", this function creates a new
@@ -144,11 +159,20 @@ impl Tty {
         // Add new `Metadata` for the new screen.
         self._add_metadata();
         self.index = self.metas.len() - 1;
+        // Prevent multiple `flush()` calls due to `autoflush` setting.
+        let autoflush = self.autoflush;
+        if self.autoflush { self.manual() }
         // Explicitly set default screen settings.
         self.cook();
         self.disable_mouse();
         self.show_cursor();
-        self.goto(0, 0)
+        self.goto(0, 0);
+
+        if autoflush {
+            self.flush();
+            // Revert back to previous `autoflush` configuration.
+            self.automatic();
+        }
     }
 
 
@@ -161,6 +185,10 @@ impl Tty {
             let cstate = metas[0].is_cursor_visible;
             self.index = 0;
             write_ansi(&screen::ansi::disable_alt());
+
+            // Prevent multiple `flush()` calls due to `autoflush` setting.
+            let autoflush = self.autoflush;
+            if self.autoflush { self.manual() }
 
             if rstate {
                 self.raw();
@@ -178,6 +206,12 @@ impl Tty {
                 self.show_cursor();
             } else {
                 self.hide_cursor();
+            }
+
+            if autoflush {
+                self.flush();
+                // Revert back to previous `autoflush` configuration.
+                self.automatic();
             }
         }
     }
@@ -200,6 +234,11 @@ impl Tty {
                 let mstate = metas[index].is_mouse_enabled;
                 let cstate = metas[index].is_cursor_visible;
                 self.index = index;
+
+                // Prevent multiple `flush()` calls due to `autoflush` setting.
+                let autoflush = self.autoflush;
+                if self.autoflush { self.manual() }
+
                 if rstate {
                     self.raw();
                 } else {
@@ -217,28 +256,39 @@ impl Tty {
                 } else {
                     self.hide_cursor();
                 }
+
+                if autoflush {
+                    self.flush();
+                    // Revert back to previous `autoflush` configuration.
+                    self.automatic();
+                }
             }
         }
     }
 
     pub fn goto(&mut self, col: i16, row: i16) {
         write_ansi(&cursor::ansi::goto(col, row));
+        if self.autoflush { self.flush() }
     }
 
     pub fn up(&mut self) {
         write_ansi(&cursor::ansi::move_up(1));
+        if self.autoflush { self.flush() }
     }
 
     pub fn dn(&mut self) {
         write_ansi(&cursor::ansi::move_down(1));
+        if self.autoflush { self.flush() }
     }
 
     pub fn left(&mut self) {
         write_ansi(&cursor::ansi::move_left(1));
+        if self.autoflush { self.flush() }
     }
 
     pub fn right(&mut self) {
         write_ansi(&cursor::ansi::move_right(1));
+        if self.autoflush { self.flush() }
     }
 
     pub fn dpad(&mut self, dir: &str, n: i16) {
@@ -261,6 +311,7 @@ impl Tty {
                 _ => ()
             };
         }
+        if self.autoflush { self.flush() }
     }
 
     pub fn pos(&mut self) -> (i16, i16) {
@@ -276,32 +327,38 @@ impl Tty {
 
     pub fn mark(&mut self) {
         write_ansi(&cursor::ansi::save_pos());
+        if self.autoflush { self.flush() }
     }
 
     pub fn load(&mut self) {
         write_ansi(&cursor::ansi::load_pos());
+        if self.autoflush { self.flush() }
     }
 
     pub fn hide_cursor(&mut self) {
         let mut m = &mut self.metas[self.index];
         write_ansi(&cursor::ansi::hide());
         m.is_cursor_visible = false;
+        if self.autoflush { self.flush() }
     }
 
     pub fn show_cursor(&mut self) {
         let mut m = &mut self.metas[self.index];
         write_ansi(&cursor::ansi::show());
         m.is_cursor_visible = true;
+        if self.autoflush { self.flush() }
     }
 
     pub fn set_fg(&mut self, color: &str) {
         let fg_col = output::Color::from(color);
         write_ansi(&output::ansi::set_fg(fg_col));
+        if self.autoflush { self.flush() }
     }
 
     pub fn set_bg(&mut self, color: &str) {
         let bg_col = output::Color::from(color);
         write_ansi(&output::ansi::set_bg(bg_col));
+        if self.autoflush { self.flush() }
     }
 
     pub fn set_tx(&mut self, style: &str) {
@@ -309,6 +366,7 @@ impl Tty {
         // `&str` contains multiple values (eg. "bold, underline").
         let style = output::TextStyle::from(style);
         write_ansi(&output::ansi::set_tx(style));
+        if self.autoflush { self.flush() }
     }
 
     pub fn set_fg_rgb(&mut self, r: u8, g:u8, b: u8) {
@@ -318,6 +376,7 @@ impl Tty {
             b: b,
         };
         write_ansi(&output::ansi::set_fg(fg_col));
+        if self.autoflush { self.flush() }
     }
 
     pub fn set_bg_rgb(&mut self, r: u8, g:u8, b: u8) {
@@ -327,16 +386,19 @@ impl Tty {
             b: b,
         };
         write_ansi(&output::ansi::set_bg(bg_col));
+        if self.autoflush { self.flush() }
     }
 
     pub fn set_fg_ansi(&mut self, v: u8) {
         let fg_col = output::Color::AnsiValue(v);
         write_ansi(&output::ansi::set_fg(fg_col));
+        if self.autoflush { self.flush() }
     }
 
     pub fn set_bg_ansi(&mut self, v: u8) {
         let bg_col = output::Color::AnsiValue(v);
         write_ansi(&output::ansi::set_bg(bg_col));
+        if self.autoflush { self.flush() }
     }
 
     pub fn set_style(&mut self, fg: &str, bg: &str, style: &str) {
@@ -345,14 +407,17 @@ impl Tty {
         // match the various text styles that are supported: "bold", "dim",
         // "underline", "reverse", "hide", and "reset".
         write_ansi(&output::ansi::set_all(fg, bg, style));
+        if self.autoflush { self.flush() }
     }
 
     pub fn reset(&mut self) {
         write_ansi(&output::ansi::reset());
+        if self.autoflush { self.flush() }
     }
 
     pub fn prints(&mut self, s: &str) {
         write_ansi(&output::ansi::prints(s));
+        if self.autoflush { self.flush() }
     }
 
     pub fn flush(&mut self) {

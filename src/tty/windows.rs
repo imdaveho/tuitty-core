@@ -21,6 +21,7 @@ pub struct Tty {
     metas: Vec<Metadata>,
     original_mode: Termios,
     ansi_supported: bool,
+    autoflush: bool,
     altscreen: Option<Handle>,
     reset_attrs: u16,
 }
@@ -52,6 +53,7 @@ impl Tty {
                 }
             },
             ansi_supported: _is_ansi_supported(),
+            autoflush: false,
 
             altscreen: None,
             reset_attrs: ConsoleInfo::of(
@@ -72,6 +74,7 @@ impl Tty {
             handle.set_mode(&self.original_mode).unwrap();
             write_ansi(&cursor::ansi::show());
             write_ansi("\n\r");
+            self.flush();
         } else {
             handle.set_mode(&self.original_mode).unwrap();
             if let Some(handle) = &self.altscreen {
@@ -190,15 +193,26 @@ impl Tty {
             }
             _ => ()
         }
+        if self.autoflush { self.flush() }
     }
 
     pub fn resize(&mut self, w: i16, h: i16) {
         if self.ansi_supported {
             write_ansi(&screen::ansi::resize(w, h));
+            // (imdaveho) NOTE: In order to resize the terminal, this method
+            // must call `flush()` otherwise nothing happens.
             self.flush();
         } else {
             screen::wincon::resize(w, h).unwrap();
         }
+    }
+
+    pub fn manual(&mut self) {
+        self.autoflush = false;
+    }
+
+    pub fn automatic(&mut self) {
+        self.autoflush = true;
     }
 
     pub fn switch(&mut self) {
@@ -214,11 +228,20 @@ impl Tty {
             // Add new `Metadata` for the new screen.
             self._add_metadata();
             self.index = self.metas.len() - 1;
+            // Prevent multiple `flush()` calls due to `autoflush` setting.
+            let autoflush = self.autoflush;
+            if self.autoflush { self.manual() }
             // Explicitly set default screen settings. (ANSI-only)
             self.cook();
             self.disable_mouse();
             self.show_cursor();
             self.goto(0, 0);
+
+            if autoflush {
+                self.flush();
+                // Revert back to previous `autoflush` configuration.
+                self.automatic();
+            }
         } else {
             if self.altscreen.is_none() {
                 self.altscreen = Some(Handle::buffer().unwrap());
@@ -231,10 +254,10 @@ impl Tty {
                     // need to enable the alternate.
                     handle.show().unwrap();
                 }
-                self.show_cursor();
                 // Add new `Metadata` for the new screen.
                 self._add_metadata();
                 self.index = self.metas.len() - 1;
+                self.show_cursor();
                 self.goto(0, 0);
             }
         }
@@ -250,6 +273,10 @@ impl Tty {
                 let cstate = metas[0].is_cursor_visible;
                 self.id = 0;
                 write_ansi(&screen::ansi::disable_alt());
+
+                // Prevent multiple `flush()` calls due to `autoflush` setting.
+                let autoflush = self.autoflush;
+                if self.autoflush { self.manual() }
 
                 if rstate {
                     self.raw();
@@ -267,6 +294,12 @@ impl Tty {
                     self.show_cursor();
                 } else {
                     self.hide_cursor();
+                }
+
+                if autoflush {
+                    self.flush();
+                    // Revert back to previous `autoflush` configuration.
+                    self.automatic();
                 }
             } else {
                 let metas = &self.metas;
@@ -314,6 +347,12 @@ impl Tty {
                     let mstate = metas[index].is_mouse_enabled;
                     let cstate = metas[index].is_cursor_visible;
                     self.index = index;
+
+                    // Prevent multiple `flush()` calls due to `autoflush`
+                    // setting.
+                    let autoflush = self.autoflush;
+                    if self.autoflush { self.manual() }
+
                     if rstate {
                         self.raw();
                     } else {
@@ -330,6 +369,12 @@ impl Tty {
                         self.show_cursor();
                     } else {
                         self.hide_cursor();
+                    }
+
+                    if autoflush {
+                        self.flush();
+                        // Revert back to previous `autoflush` configuration.
+                        self.automatic();
                     }
                 } else {
                     let metas = &self.metas;
@@ -369,6 +414,7 @@ impl Tty {
     pub fn goto(&mut self, col: i16, row: i16) {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::goto(col, row));
+            if self.autoflush { self.flush() }
         } else {
             cursor::wincon::goto(col, row).unwrap();
         }
@@ -377,6 +423,7 @@ impl Tty {
     pub fn up(&mut self) {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::move_up(1));
+            if self.autoflush { self.flush() }
         } else {
             cursor::wincon::move_up(1).unwrap();
         }
@@ -385,6 +432,7 @@ impl Tty {
     pub fn dn(&mut self) {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::move_down(1));
+            if self.autoflush { self.flush() }
         } else {
             cursor::wincon::move_down(1).unwrap();
         }
@@ -393,6 +441,7 @@ impl Tty {
     pub fn left(&mut self) {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::move_left(1));
+            if self.autoflush { self.flush() }
         } else {
             cursor::wincon::move_left(1).unwrap();
         }
@@ -401,6 +450,7 @@ impl Tty {
     pub fn right(&mut self) {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::move_right(1));
+            if self.autoflush { self.flush() }
         } else {
             cursor::wincon::move_right(1).unwrap();
         }
@@ -442,6 +492,7 @@ impl Tty {
                 _ => ()
             };
         }
+        if self.autoflush { self.flush() }
     }
 
     pub fn pos(&mut self) -> (i16, i16) {
@@ -462,6 +513,7 @@ impl Tty {
     pub fn mark(&mut self) {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::save_pos());
+            if self.autoflush { self.flush() }
         } else {
             self.metas[self.index].saved_position = Some(
                 cursor::wincon::pos().unwrap()
@@ -472,6 +524,7 @@ impl Tty {
     pub fn load(&mut self) {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::load_pos());
+            if self.autoflush { self.flush() }
         } else {
             match self.metas[self.index].saved_position {
                 Some(pos) => {
@@ -485,6 +538,7 @@ impl Tty {
     pub fn hide_cursor(&mut self) {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::hide());
+            if self.autoflush { self.flush() }
         } else {
             cursor::wincon::hide().unwrap();
         }
@@ -495,6 +549,7 @@ impl Tty {
     pub fn show_cursor(&mut self) {
         if self.ansi_supported {
             write_ansi(&cursor::ansi::show());
+            if self.autoflush { self.flush() }
         } else {
             cursor::wincon::show().unwrap();
         }
@@ -506,6 +561,7 @@ impl Tty {
         let fg_col = output::Color::from(color);
         if self.ansi_supported {
             write_ansi(&output::ansi::set_fg(fg_col));
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
@@ -515,6 +571,7 @@ impl Tty {
         let bg_col = output::Color::from(color);
         if self.ansi_supported {
             write_ansi(&output::ansi::set_bg(bg_col));
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
@@ -526,6 +583,7 @@ impl Tty {
         let style = output::TextStyle::from(style);
         if self.ansi_supported {
             write_ansi(&output::ansi::set_tx(style));
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::set_tx(style).unwrap();
         }
@@ -539,6 +597,7 @@ impl Tty {
         };
         if self.ansi_supported {
             write_ansi(&output::ansi::set_fg(fg_col));
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
@@ -552,6 +611,7 @@ impl Tty {
         };
         if self.ansi_supported {
             write_ansi(&output::ansi::set_bg(bg_col));
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
@@ -561,6 +621,7 @@ impl Tty {
         let fg_col = output::Color::AnsiValue(v);
         if self.ansi_supported {
             write_ansi(&output::ansi::set_fg(fg_col));
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
         }
@@ -570,6 +631,7 @@ impl Tty {
         let bg_col = output::Color::AnsiValue(v);
         if self.ansi_supported {
             write_ansi(&output::ansi::set_bg(bg_col));
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
         }
@@ -582,6 +644,7 @@ impl Tty {
         // "underline", "reverse", "hide", and "reset".
         if self.ansi_supported {
             write_ansi(&output::ansi::set_all(fg, bg, style));
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::set_all(fg, bg, style, self.reset_attrs).unwrap();
         }
@@ -590,6 +653,7 @@ impl Tty {
     pub fn reset(&mut self) {
         if self.ansi_supported {
             write_ansi(&output::ansi::reset());
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::reset(self.reset_attrs).unwrap();
         }
@@ -598,6 +662,7 @@ impl Tty {
     pub fn prints(&mut self, s: &str) {
         if self.ansi_supported {
             write_ansi(&output::ansi::prints(s));
+            if self.autoflush { self.flush() }
         } else {
             output::wincon::prints(s).unwrap();
         }
