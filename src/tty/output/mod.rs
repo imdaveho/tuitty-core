@@ -135,7 +135,6 @@ impl FromStr for TextStyle {
             "underline" => Ok(TextStyle::Underline),
             "reverse" => Ok(TextStyle::Reverse),
             "hide" => Ok(TextStyle::Hide),
-            "reset" => Ok(TextStyle::Reset),
             _ => Ok(TextStyle::Reset),
         }
     }

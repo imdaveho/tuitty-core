@@ -3,8 +3,8 @@
 
 use super::screen;
 use super::cursor;
-use super::output;
 use super::input;
+use super::output::{self, Color, TextStyle};
 use super::shared::{write_ansi, flush_ansi};
 use super::{AsyncReader, SyncReader, Termios};
 
@@ -22,8 +22,15 @@ pub struct Metadata {
     is_cursor_visible: bool,
 }
 
-impl Tty {
+// struct Cell {
+//     ch: char,
+//     fg: Color,
+//     bg: Color,
+//     tx: output::TextStyle
+// }
 
+
+impl Tty {
     pub fn init() -> Tty {
         Tty {
             index: 0,
@@ -41,7 +48,7 @@ impl Tty {
         self.to_main();
         output::ansi::set_mode(&self.original_mode).unwrap();
         write_ansi(&cursor::ansi::show());
-        write_ansi("\n\r");
+        write_ansi("\r");
         self.metas.clear();
         self.flush();
     }

@@ -5,7 +5,17 @@ use std::time::Duration;
 
 fn _prompt(tty: &mut Tty, text: &str, err: &str) {
     // TODO: make the below more ergonomic.
+    let (w, h) = tty.size();
+    let linear = "-".repeat(w as usize);
+    tty.goto(0, h - 3);
+    tty.printf(&linear);
+    tty.goto(0, h - 2);
+    tty.flush();
     tty.clear("cursordn");
+    tty.flush();
+    tty.goto(0, h - 2);
+    tty.flush();
+    thread::sleep(Duration::from_millis(400));
     tty.prints("[");
     tty.set_fg("green");
     tty.prints("?");
@@ -31,6 +41,7 @@ fn _prompt(tty: &mut Tty, text: &str, err: &str) {
 
 #[test]
 fn test_screen() {
+    let delay = 800;
     let mut tty = Tty::init();
 
     // NOTE: Methods to be tested:
@@ -53,7 +64,7 @@ fn test_screen() {
     assert_eq!(redims, (80, 30));
 
     tty.goto(0, 0);
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_millis(delay));
 
 
     // NOTE: Test #2 enable_alt (switch)
@@ -62,9 +73,14 @@ fn test_screen() {
     let mut err = "The screen did not switch to an alternate screen.";
     _prompt(&mut tty, text, err);
 
-    tty.goto((text.len() - 1) as i16, 0);
+    let fatline = "=".repeat(80);
+    tty.goto(0, 16);
     tty.flush();
-    thread::sleep(Duration::from_secs(1));
+    tty.printf(&fatline);
+    tty.goto((text.len() - 1) as i16, 16);
+    tty.flush();
+
+    thread::sleep(Duration::from_millis(delay));
 
     // NOTE:  Test #3: clear(currentln)
     tty.clear("currentln");
@@ -73,7 +89,7 @@ fn test_screen() {
     _prompt(&mut tty, text, err);
 
     tty.goto(0, 0);
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_millis(delay));
 
     let words = "A good choice of font for your coding can make a huge \
                  difference and improve your productivity, so take a look at \
@@ -102,7 +118,7 @@ fn test_screen() {
 
     tty.goto(14, 3);
     tty.flush();
-    thread::sleep(Duration::from_secs(2));
+    thread::sleep(Duration::from_millis(delay));
 
     // NOTE:  Test #4: clear(newln)
     tty.clear("newln");
@@ -113,7 +129,7 @@ fn test_screen() {
 
     tty.goto(14, 3);
     tty.flush();
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_millis(delay));
 
     // NOTE:  Test #5: clear(cursordn)
     tty.clear("cursordn");
@@ -124,7 +140,7 @@ fn test_screen() {
 
     tty.goto(14, 2);
     tty.flush();
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_millis(delay));
 
     // NOTE:  Test #6: clear(cursorup)
     tty.clear("cursorup");
@@ -135,18 +151,24 @@ fn test_screen() {
 
     tty.goto(18, 3);
     tty.flush();
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_millis(delay));
 
     // (imdaveho) TODO: "" needs to skip not reset:
-    // (imdaveho) TODO: buggy;
-    tty.set_style("yellow", "reset", "underline");
+    tty.set_style("red", "", "underline");
+    tty.flush();
+    thread::sleep(Duration::from_millis(delay));
     tty.printf("alternate screen <index: 1>");
     tty.reset();
 
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_millis(delay));
 
     // NOTE:  Test #7: disable_alt (to_main)
     tty.to_main();
+
+    tty.goto(0, 3);
+    tty.printf(words);
+    tty.goto(0, 0);
+
     text = "Did the screen switch back to the main screen";
     err = "The screen did not switch back to the main screen.";
     _prompt(&mut tty, text, err);
@@ -156,6 +178,14 @@ fn test_screen() {
     text = "Did the screen clear everything";
     err = "The screen did not clear the entire screen.";
     _prompt(&mut tty, text, err);
+
+    thread::sleep(Duration::from_millis(delay));
+
+    tty.goto(0, 0);
+    tty.flush();
+    tty.printf(words);
+
+    thread::sleep(Duration::from_millis(delay));
 
     // NOTE: Test #9 enable_alt (switch_to)
     tty.switch();
@@ -167,7 +197,7 @@ fn test_screen() {
     tty.switch_to(1);
 
     tty.goto(0, 0);
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_millis(delay));
 
     // (imdaveho) TODO: this will not be possible until `content` is stored in
     // the `Metadata` struct.
@@ -181,6 +211,12 @@ fn test_screen() {
     tty.resize(w, h);
     thread::sleep(Duration::from_millis(200));
     assert_eq!(tty.size(), (w, h));
+
+    tty.goto(0, h - 3);
+    tty.clear("currentln");
+    tty.goto(0, h - 2);
+    tty.clear("currentln");
+    tty.flush();
 
     // tty should terminate at this point when it is dropped
     // tty.terminate();

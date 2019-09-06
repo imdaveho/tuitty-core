@@ -4,24 +4,15 @@ use super::{csi, Color, Style, TextStyle};
 
 
 pub fn set_fg(color: Color) -> String {
-    format!(
-        csi!("{}m"),
-        _stylize(Style::Fg(color)),
-    )
+    _stylize(Style::Fg(color))
 }
 
 pub fn set_bg(color: Color) -> String {
-    format!(
-        csi!("{}m"),
-        _stylize(Style::Bg(color)),
-    )
+    _stylize(Style::Bg(color))
 }
 
 pub fn set_tx(style: TextStyle) -> String {
-    format!(
-        csi!("{}m"),
-        _stylize(Style::Tx(style)),
-    )
+    _stylize(Style::Tx(style))
 }
 
 pub fn set_all(fg: &str, bg: &str, tx: &str) -> String {
@@ -35,42 +26,24 @@ pub fn set_all(fg: &str, bg: &str, tx: &str) -> String {
     for s in tx_arr.iter() {
         match *s {
             "bold" => {
-                if !dimmed {
-                    tx_str.push_str(
-                    format!(
-                        csi!("{}m"),
-                        _stylize(Style::Tx(TextStyle::from(*s)))
-                    ).as_str())
-                }
+                if dimmed { continue }
+                tx_str.push_str(&_stylize(Style::Tx(TextStyle::from(*s))));
             },
             "dim" => {
-                tx_str.push_str(
-                    format!(
-                        csi!("{}m"),
-                        _stylize(Style::Tx(TextStyle::from(*s)))
-                ).as_str());
-                dimmed = true
+                dimmed = true;
+                tx_str.push_str(&_stylize(Style::Tx(TextStyle::from(*s))));
             },
-            "underline" | "reverse" | "hide" => {
-                tx_str.push_str(
-                    format!(
-                        csi!("{}m"),
-                        _stylize(Style::Tx(TextStyle::from(*s)))
-                ).as_str())
-            },
-            "" => tx_str.push_str("m"),
-            _ => {
-                tx_str.push_str(
-                    format!(
-                        csi!("{}m"),
-                        _stylize(Style::Tx(TextStyle::from(*s)))
-                ).as_str());
+            "reset" => {
+                tx_str.push_str(&_stylize(Style::Tx(TextStyle::from(*s))));
                 break
-            }
+            },
+            _ => {
+                tx_str.push_str(&_stylize(Style::Tx(TextStyle::from(*s))));
+            },
         }
     }
 
-    format!(csi!("{}{}{}"), fg_str, bg_str, tx_str)
+    format!("{}{}{}", fg_str, bg_str, tx_str)
 }
 
 pub fn reset() -> String {
@@ -86,8 +59,8 @@ fn _stylize(style: Style) -> String {
     match style {
         Style::Fg(c) => {
             if c == Color::Reset {
-                ansi_value.push_str("39;");
-                return ansi_value;
+                ansi_value.push_str("39");
+                return format!(csi!("{}m"), ansi_value);
             } else {
                 ansi_value.push_str("38;");
                 color = c;
@@ -95,8 +68,8 @@ fn _stylize(style: Style) -> String {
         }
         Style::Bg(c) => {
             if c == Color::Reset {
-                ansi_value.push_str("49;");
-                return ansi_value;
+                ansi_value.push_str("49");
+                return format!(csi!("{}m"), ansi_value);
             } else {
                 ansi_value.push_str("48;");
                 color = c;
@@ -104,7 +77,7 @@ fn _stylize(style: Style) -> String {
         }
         Style::Tx(t) => {
             ansi_value.push_str(&t.to_string());
-            return ansi_value;
+            return format!(csi!("{}m"), ansi_value);
         }
     }
 
@@ -139,5 +112,5 @@ fn _stylize(style: Style) -> String {
     };
 
     ansi_value.push_str(color_val);
-    ansi_value
+    format!(csi!("{}m"), ansi_value)
 }
