@@ -33,7 +33,7 @@ enum Style {
 
 // Enum with the different colors to color your test and terminal.
 // #[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
-#[derive(PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Color {
     Reset,
 
@@ -104,7 +104,7 @@ impl FromStr for Color {
 }
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Format {
     Reset = 0,
     Bold = 1,
@@ -123,6 +123,20 @@ impl Display for Format {
 impl From<&str> for Format {
     fn from(src: &str) -> Self {
         src.parse().unwrap_or(Format::Reset)
+    }
+}
+
+impl From<u8> for Format {
+    fn from(src: u8) -> Self {
+        match src {
+            0 => Format::Reset,
+            1 => Format::Bold,
+            2 => Format::Dim,
+            4 => Format::Underline,
+            7 => Format::Reverse,
+            8 => Format::Hide,
+            _ => Format::Reset,
+        }
     }
 }
 

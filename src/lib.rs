@@ -54,6 +54,18 @@ pub extern fn size(ptr: *mut Tty) -> u32 {
 }
 
 #[no_mangle]
+pub extern fn screen_size(ptr: *mut Tty) -> u32 {
+    // NOTE: instead of a Tuple, we are sending a u32
+    // that has the first 16 bits containing `w: i16`
+    // and the second 16 bits containing `h: i16`.
+    unsafe {
+        assert!(!ptr.is_null());
+        let (w, h) = (&mut *ptr).screen_size();
+        ((w as u32) << 16) | h as u32
+    }
+}
+
+#[no_mangle]
 pub extern fn raw(ptr: *mut Tty) {
     unsafe {
         assert!(!ptr.is_null());

@@ -20,6 +20,7 @@ pub fn set_all(fg: &str, bg: &str, fmts: &str) -> String {
     let bg_str = _stylize(Style::Bg(Color::from(bg)));
 
     // The tx param is should be a comma separated string.
+    // TODO: lowercase()
     let fmt_arr: Vec<&str> = fmts.split(',').map(|t| t.trim()).collect();
     let mut dimmed = false;
     let mut fmt_str = String::new();

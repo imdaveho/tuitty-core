@@ -5,7 +5,7 @@ use std::time::Duration;
 
 fn _prompt(tty: &mut Tty, text: &str, err: &str) {
     // TODO: make the below more ergonomic.
-    let (w, h) = tty.size();
+    let (w, h) = tty.screen_size();
     let linear = "-".repeat(w as usize);
     tty.goto(0, h - 3);
     tty.printf(&linear);
@@ -56,11 +56,11 @@ fn test_screen() {
     // - disable_alt (to_main)
 
     // NOTE:  Test #1: size()
-    let (w, h) = tty.size();
+    let (w, h) = tty.screen_size();
 
     tty.resize(80, 30);
     thread::sleep(Duration::from_millis(200));
-    let redims = tty.size();
+    let redims = tty.screen_size();
     assert_eq!(redims, (80, 30));
 
     tty.goto(0, 0);
@@ -210,7 +210,7 @@ fn test_screen() {
     // NOTE: Test #10 resize()
     tty.resize(w, h);
     thread::sleep(Duration::from_millis(200));
-    assert_eq!(tty.size(), (w, h));
+    assert_eq!(tty.screen_size(), (w, h));
 
     tty.goto(0, h - 3);
     tty.clear("currentln");
