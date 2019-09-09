@@ -32,7 +32,7 @@ pub struct Metadata {
 #[derive(Clone)]
 struct Cell {
     ch: char,
-    sty: CellStyle,
+    style: CellStyle,
     width: usize,
 }
 
@@ -81,8 +81,7 @@ impl Tty {
     }
 
     pub fn screen_size(&self) -> (i16, i16) {
-        let m = &self.metas[self.index];
-        m.screen_size
+        (&self.metas[self.index]).screen_size
     }
 
     // "cooked" vs "raw" mode terminology from Wikipedia:
@@ -119,7 +118,8 @@ impl Tty {
     }
 
     pub fn read_char(&self) -> char {
-        input::ansi::read_char().expect("Could not read the character")
+        input::ansi::read_char()
+            .expect("Could not read the character")
     }
 
     pub fn read_sync(&self) -> SyncReader {
@@ -140,7 +140,7 @@ impl Tty {
             "all" => {
                 let meta = &mut (self.metas[self.index]);
                 ansi_write(&screen::ansi::clear(All), self.autoflush);
-                meta.buffer_reset();
+                meta.backbuf = vec![None; meta.buffer_size()];
                 self.goto(0, 0);
             }
             "newln" => {
@@ -170,6 +170,7 @@ impl Tty {
                 for i in meta.buffer_pos()
                     ..meta.buffer_size() { meta.backbuf[i] = None }
             }
+            // (imdaveho) TODO: implement backspace / delete or "cell"
             _ => ()
         }
     }
@@ -178,7 +179,9 @@ impl Tty {
         // NOTE (imdaveho): this method must call `flush`
         // otherwise nothing happens.
         ansi_write(&screen::ansi::resize(w, h), true);
-        &mut self.metas[self.index].backbuf.resize((w * h) as usize, None);
+        let meta = &mut self.metas[self.index];
+        meta.screen_size = (w, h);
+        meta.backbuf.resize((w * h) as usize, None);
     }
 
     pub fn manual(&mut self) {
@@ -198,13 +201,19 @@ impl Tty {
             // since ANSI terminals provide a single "alternate screen".
             ansi_write(&screen::ansi::enable_alt(), false);
         }
-        // Add new `Metadata` for the new screen.
+        // Add new `Metadata` for the new screen and increment the index.
         self._add_metadata();
         self.index = self.metas.len() - 1;
+        // If this wasn't a switch to the alternate screen (ie. the current
+        // screen is already the alternate screen), then we need to clear it.
+        if self.index >= 1 {
+            ansi_write(&screen::ansi::clear(All), self.autoflush);
+        };
         // Prevent multiple `flush()` calls due to `autoflush` setting.
         let autoflush = self.autoflush;
         if self.autoflush { self.manual() }
         // Explicitly set default screen settings.
+        self.reset();
         self.cook();
         self.disable_mouse();
         self.show_cursor();
@@ -217,82 +226,7 @@ impl Tty {
     pub fn to_main(&mut self) {
         // Only execute if the User is not on the main screen buffer.
         if self.index == 0 { return }
-        let autoflush = {
-            // (imdaveho) NOTE: Encapsulated due to borrowing rules.
-            self.index = 0;
-            let meta = &self.metas[0];
-            let raw = meta.is_raw_enabled;
-            let mouse = meta.is_mouse_enabled;
-            let show = meta.is_cursor_visible;
-            ansi_write(&screen::ansi::disable_alt(), false);
-            // Prevent multiple `flush()` calls due to `autoflush` setting.
-            let autoflush = self.autoflush;
-            if self.autoflush { self.manual() }
-
-            if raw { self.raw() } else { self.cook() }
-            if mouse { self.enable_mouse() } else { self.disable_mouse() }
-            if show { self.show_cursor() } else { self.hide_cursor() }
-
-            autoflush
-        };
-
-        let (col, row) = self.metas[0].cursor_pos;
-        self.goto(col, row);
-
-        // TODO: breakout -- perhaps then this won't need encapsulation.
-        let meta = &self.metas[0];
-        let backbuf = &meta.backbuf;
-        let capacity = meta.buffer_size();
-        let mut frontbuf = String::with_capacity(capacity * 5);
-        let mut prevstyle: CellStyle = Default::default();
-        // TODO: WCWIDTH
-        for cell in backbuf {
-            match cell {
-                Some(c) => {
-                    // TODO: breakout
-                    if c.sty != prevstyle {
-                        frontbuf.push_str(&output::ansi::reset());
-
-                        if c.sty.fg != prevstyle.fg {
-                            frontbuf.push_str(
-                                &output::ansi::set_fg(c.sty.fg))
-                        }
-                        if c.sty.bg != prevstyle.bg {
-                            frontbuf.push_str(
-                                &output::ansi::set_bg(c.sty.bg))
-                        }
-                        if &c.sty.fmts[..] != &prevstyle.fmts[..] {
-                            for fmt in c.sty.fmts.iter() {
-                                if let Some(f) = fmt {
-                                    frontbuf.push_str(
-                                        &output::ansi::set_fmt(*f))
-                                }
-                            }
-                        }
-                    }
-                    frontbuf.push(c.ch);
-                    prevstyle = c.sty;
-                }
-                None => {
-                    // TODO: breakout
-                    let default: CellStyle = Default::default();
-                    // (imdaveho) NOTE: if any style is different, pass the
-                    // reset ansi code to the string; else just push the char.
-                    if prevstyle.fg != default.fg
-                        || prevstyle.bg != default.bg
-                        || &prevstyle.fmts[..] != &default.fmts[..]
-                    { frontbuf.push_str(&output::ansi::reset()) }
-
-                    frontbuf.push(' ');
-                    prevstyle = default;
-                }
-            }
-        }
-
-        // TODO: ansi_write frontbuf
-
-        // Revert back to previous `autoflush` configuration.
-        if autoflush { self.flush(); self.automatic() }
+        self.switch_to(0);
     }
 
 
@@ -300,110 +234,69 @@ impl Tty {
         // If the id and the current id are the same, well, there is nothing to
         // do, you're already on the active screen buffer.
         if index == self.index { return }
-        if index == 0 { self.to_main(); return }
-        let autoflush = {
-            // (imdaveho) NOTE: Encapsulated due to borrowing rules.
-            self.index = index;
-            let meta = &self.metas[index];
-            let raw = meta.is_raw_enabled;
-            let mouse = meta.is_mouse_enabled;
-            let show = meta.is_cursor_visible;
-            ansi_write(&screen::ansi::disable_alt(), false);
-            // Prevent multiple `flush()` calls due to `autoflush` setting.
-            let autoflush = self.autoflush;
-            if self.autoflush { self.manual() }
 
-            if raw { self.raw() } else { self.cook() }
-            if mouse { self.enable_mouse() } else { self.disable_mouse() }
-            if show { self.show_cursor() } else { self.hide_cursor() }
-
-            autoflush
-        };
-
-        let (col, row) = self.metas[index].cursor_pos;
-        self.goto(col, row);
-
-        // TODO: breakout -- perhaps then this won't need encapsulation.
+        self.index = index;
         let meta = &self.metas[index];
-        let backbuf = &meta.backbuf;
-        let capacity = meta.buffer_size();
-        let mut frontbuf = String::with_capacity(capacity * 5);
-        let mut prevstyle: CellStyle = Default::default();
-        // TODO: WCWIDTH
-        for cell in backbuf {
-            match cell {
-                Some(c) => {
-                    // TODO: breakout
-                    if c.sty != prevstyle {
-                        frontbuf.push_str(&output::ansi::reset());
+        let raw = meta.is_raw_enabled;
+        let mouse = meta.is_mouse_enabled;
+        let show = meta.is_cursor_visible;
 
-                        if c.sty.fg != prevstyle.fg {
-                            frontbuf.push_str(
-                                &output::ansi::set_fg(c.sty.fg))
-                        }
-                        if c.sty.bg != prevstyle.bg {
-                            frontbuf.push_str(
-                                &output::ansi::set_bg(c.sty.bg))
-                        }
-                        if &c.sty.fmts[..] != &prevstyle.fmts[..] {
-                            for fmt in c.sty.fmts.iter() {
-                                if let Some(f) = fmt {
-                                    frontbuf.push_str(
-                                        &output::ansi::set_fmt(*f))
-                                }
-                            }
-                        }
-                    }
-                    frontbuf.push(c.ch);
-                    prevstyle = c.sty;
-                }
-                None => {
-                    // TODO: breakout
-                    let default: CellStyle = Default::default();
-                    // (imdaveho) NOTE: if any style is different, pass the
-                    // reset ansi code to the string; else just push the char.
-                    if prevstyle.fg != default.fg
-                        || prevstyle.bg != default.bg
-                        || &prevstyle.fmts[..] != &default.fmts[..]
-                    { frontbuf.push_str(&output::ansi::reset()) }
-
-                    frontbuf.push(' ');
-                    prevstyle = default;
-                }
-            }
+        // Restore screen contents.
+        // (imdaveho) TODO: Confirm if main screen will have native buffer logs,
+        // thereby not needing to restore content manually via library. Also,
+        // because there is going to be output that is not from `tty` which is
+        // not possible to save in the backbuf.
+        if index == 0 {
+            ansi_write(&screen::ansi::disable_alt(), false)
+        } else {
+            ansi_write(&screen::ansi::clear(All), false);
+            ansi_write(&cursor::ansi::goto(0, 0), false);
+            self._flush_backbuf(index);
+            let (col, row) = self.metas[index].cursor_pos;
+            self.goto(col, row);
         }
 
+        // Prevent multiple `flush()` calls due to `autoflush` setting.
+        let autoflush = self.autoflush;
+        if self.autoflush { self.manual() }
+        // Restore settings based on metadata.
+        if raw { self.raw() } else { self.cook() }
+        if mouse { self.enable_mouse() } else { self.disable_mouse() }
+        if show { self.show_cursor() } else { self.hide_cursor() }
+
         // Revert back to previous `autoflush` configuration.
-        if autoflush { self.flush(); self.automatic() }
+        // (imdaveho) NOTE: `_flush_backbuf` always calls `flush` so there
+        // is no need to call it again below as `switch()` does.
+        if autoflush { self.automatic() }
     }
 
     pub fn goto(&mut self, col: i16, row: i16) {
         ansi_write(&cursor::ansi::goto(col, row), self.autoflush);
-        self.metas[self.index].sync_pos(col, row)
+        self.metas[self.index].sync_pos(col, row);
     }
 
     pub fn up(&mut self) {
         // TODO: implement cursor wrapping if not native.
         ansi_write(&cursor::ansi::move_up(1), self.autoflush);
-        self.metas[self.index].vsync_up(1)
+        self.metas[self.index].vsync_up(1);
     }
 
     pub fn dn(&mut self) {
         // TODO: implement cursor wrapping if not native.
         ansi_write(&cursor::ansi::move_down(1), self.autoflush);
-        self.metas[self.index].vsync_dn(1)
+        self.metas[self.index].vsync_dn(1);
     }
 
     pub fn left(&mut self) {
         // TODO: implement cursor wrapping if not native.
         ansi_write(&cursor::ansi::move_left(1), self.autoflush);
-        self.metas[self.index].hsync_lt(1)
+        self.metas[self.index].hsync_lt(1);
     }
 
     pub fn right(&mut self) {
         // TODO: implement cursor wrapping if not native.
         ansi_write(&cursor::ansi::move_right(1), self.autoflush);
-        self.metas[self.index].hsync_gt(1)
+        self.metas[self.index].hsync_gt(1);
     }
 
     pub fn dpad(&mut self, dir: &str, n: i16) {
@@ -539,52 +432,22 @@ impl Tty {
     pub fn prints(&mut self, string: &str) {
         // TODO: THEN TEST ON WINDOWS!
         // TODO: THEN TEST test_screen...
-        let meta = &mut self.metas[self.index];
-        let chars = string.chars();
+        let coords = &self.metas[self.index].cursor_pos;
+        ansi_write(&cursor::ansi::goto(0, 25), false);
+        ansi_write(&format!("col: {}, row: {}", coords.0, coords.1), true);
+        ansi_write(&cursor::ansi::goto(0, 26), false);
+        ansi_write(&format!("buffer_pos: {}", &self.metas[self.index].buffer_pos()), true);
+        ansi_write(&cursor::ansi::goto(coords.0, coords.1), false);
+        // BUG: -->
+        self._write_backbuf(string);
 
-        let mut strpos = 0;
-        let mut lenchk = 0;
-        let bufpos = meta.buffer_pos();
-
-        for ch in chars {
-            match UnicodeWidthChar::width(ch) {
-                Some(w) => {
-                    meta.backbuf[strpos + bufpos] = Some(Cell {
-                        ch: ch,
-                        width: w,
-                        sty: meta.cell_style,
-                    });
-                    strpos += 1;
-                    lenchk += w;
-                }
-                None => {
-                    // (imdaveho) NOTE: This is an escape sequence
-                    // or some char with ambiguous length defaulting
-                    // to 1 or 2, if ::width_cjk().
-
-                    // (imdaveho) TODO: This would only happen if the
-                    // user is trying to manually write an escape sequence.
-                    // Attempt to interpret what the escape sequence is, and
-                    // update meta.cell_style with the details of the sequence.
-                    // Difficulty: medium/hard -
-                    // * create a byte vector that fills with an ansi esc seq
-                    // * when you hit a printable char, take the byte vector,
-                    //   and map it to a cell style (medium) or specific
-                    //   ANSII function (hard).
-                    ()
-                }
-            }
-        }
-
-        // (imdaveho) NOTE: This should always pass if the processed correctly.
-        // It essentially confirms that the amount of set Cells to the backbuf
-        // is equivalent to the length of printable characters passed in.
-        //
-        // This is to ensure that the backbuf is synced with writes to stdout.
-        let strlen = UnicodeWidthStr::width(string);
-        assert_eq!(strlen, lenchk);
-
-        ansi_write(&output::ansi::prints(string), false);
+        ansi_write(&string, false);
+        // DEBUG: -->
+        let (col, row) = &self.metas[self.index].cursor_pos;
+        ansi_write(&cursor::ansi::goto(0, 27), false);
+        ansi_write(&format!("aft col: {}, aft row: {}", col, row), true);
+        ansi_write(&cursor::ansi::goto(0, 28), false);
+        ansi_write(&format!("aft buffer_pos: {}", &self.metas[self.index].buffer_pos()), true);
     }
 
     pub fn flush(&mut self) {
@@ -592,7 +455,8 @@ impl Tty {
     }
 
     pub fn printf(&mut self, string: &str) {
-        ansi_write(&output::ansi::prints(string), true);
+        self.prints(string);
+        ansi_flush();
     }
 
     // pub fn paint() {
@@ -611,6 +475,7 @@ impl Tty {
 
 
     fn _add_metadata(&mut self) {
+        // TODO: perhaps this should always be default?
         let metas = &mut self.metas;
         let rstate = metas[self.index].is_raw_enabled;
         let mstate = metas[self.index].is_mouse_enabled;
@@ -629,6 +494,124 @@ impl Tty {
             backbuf: vec![None; (w * h) as usize],
             screen_size: (w, h),
         });
+    }
+
+    fn _flush_backbuf(&mut self, index: usize) {
+        let meta = &self.metas[index];
+        let backbuf = &meta.backbuf;
+        let capacity = meta.buffer_size();
+        let mut frontbuf = String::with_capacity(capacity);
+        let mut last_style: CellStyle = Default::default();
+        for item in backbuf {
+            // (imdaveho) NOTE: stackoverflow.com/questions/
+            // 23975391/how-to-convert-a-string-into-a-static-str
+            let length = UnicodeWidthStr::width(&*frontbuf) as isize;
+            match item {
+                Some(cell) => {
+                    if capacity as isize - (
+                        length + cell.width as isize) < 0 { break }
+
+                    // TODO: this might be broken;
+                    // if cell.style != last_style {
+                    //     frontbuf.push_str(&output::ansi::reset());
+
+                    //     if cell.style.fg != last_style.fg {
+                    //         frontbuf.push_str(
+                    //             &output::ansi::set_fg(cell.style.fg))
+                    //     }
+                    //     if cell.style.bg != last_style.bg {
+                    //         frontbuf.push_str(
+                    //             &output::ansi::set_bg(cell.style.bg))
+                    //     }
+                    //     if &cell.style.fmts[..] != &last_style.fmts[..] {
+                    //         for fmt in cell.style.fmts.iter() {
+                    //             if let Some(f) = fmt {
+                    //                 frontbuf.push_str(
+                    //                     &output::ansi::set_fmt(*f))
+                    //             }
+                    //         }
+                    //     }
+                    // }
+
+                    frontbuf.push(cell.ch);
+                    last_style = cell.style;
+                }
+                None => {
+                    if capacity as isize - (length + 1) < 0 { break }
+                    // (imdaveho) NOTE: This is to prevent multiple reset seqs
+                    // from being pushed on the frontbuf String.
+                    if last_style == Default::default() {
+                        frontbuf.push(' ');
+                    } else {
+                        frontbuf.push(' ');
+                        frontbuf.push_str(&output::ansi::reset());
+                        last_style = Default::default();
+                    }
+
+                }
+            }
+        }
+        ansi_write(&frontbuf, true);
+    }
+
+    fn _write_backbuf(&mut self, string: &str) {
+        let meta = &mut self.metas[self.index];
+
+        let length = UnicodeWidthStr::width(string);
+        let chars = string.chars();
+
+        let (w, _) = meta.screen_size;  // TODO: `h` to be used when truncating
+        let bufpos = meta.buffer_pos();
+        let newpos = bufpos + length;
+        let new_col = newpos % w as usize;
+        let new_row = newpos / w as usize;
+
+        // (imdaveho) NOTE: Remember that buffer indices are 0-based, which
+        // means that index 0 (col: 0, row: 0) is actually capacity: 1.
+        //
+        // If length == capacity, the cursor will overflow by 1, so subtract it.
+        // TODO: Truncate the first n rows, and print the overflow n rows. Needs
+        // to handle control characters in loop...
+        // let capacity = meta.buffer_size();
+        // if length > capacity - 1 { return };
+
+        let mut i = 0;
+        for ch in chars {
+            match UnicodeWidthChar::width(ch) {
+                Some(w) => {
+                    // (imdaveho) NOTE: The only control character that returns
+                    // Some() is the null byte. If for some reason, there is a
+                    // null byte passed within the &str parameter, we should
+                    // simple ignore it and not update the backbuf.
+                    if ch == '\x00' { continue } ;
+
+                    meta.backbuf[i + bufpos] = Some(Cell {
+                        ch: ch,
+                        width: w,
+                        style: meta.cell_style,
+                    });
+                    i += 1;
+                }
+                None => {
+                    // (imdaveho) NOTE: This is an escape sequence or a `char`
+                    // with ambiguous length defaulting to `::width()` == 1 or
+                    // `::width_cjk()` == 2.
+
+                    // (imdaveho) TODO: This would only happen if the
+                    // user is trying to manually write an escape sequence.
+                    // Attempt to interpret what the escape sequence is, and
+                    // update meta.cell_style with the details of the sequence.
+                    // Difficulty: medium/hard -
+                    // * create a byte vector that fills with an ansi esc seq
+                    // * when you hit a printable char, take the byte vector,
+                    //   and map it to a cell style (medium) or specific
+                    //   ANSII function (hard).
+                    ()
+                }
+            }
+        }
+        // self.goto(new_col as i16, new_row as i16);
+        meta.cursor_pos = (new_col as i16, new_row as i16);
     }
 }
 
@@ -669,10 +652,6 @@ impl Metadata {
 
 
     // Backbuf: helper functions
-    fn buffer_reset(&mut self) {
-        self.backbuf = vec![None; self.buffer_size()]
-    }
-
     fn buffer_size(&self) -> usize {
         // returns the size (capacity) of the backbuf
         let (w, h) = self.screen_size;

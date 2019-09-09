@@ -126,19 +126,19 @@ impl From<&str> for Format {
     }
 }
 
-impl From<u8> for Format {
-    fn from(src: u8) -> Self {
-        match src {
-            0 => Format::Reset,
-            1 => Format::Bold,
-            2 => Format::Dim,
-            4 => Format::Underline,
-            7 => Format::Reverse,
-            8 => Format::Hide,
-            _ => Format::Reset,
-        }
-    }
-}
+// impl From<u8> for Format {
+//     fn from(src: u8) -> Self {
+//         match src {
+//             0 => Format::Reset,
+//             1 => Format::Bold,
+//             2 => Format::Dim,
+//             4 => Format::Underline,
+//             7 => Format::Reverse,
+//             8 => Format::Hide,
+//             _ => Format::Reset,
+//         }
+//     }
+// }
 
 impl FromStr for Format {
     type Err = ();
