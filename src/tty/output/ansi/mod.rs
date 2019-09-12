@@ -1,6 +1,6 @@
 // ANSI functions for writing and styling text to be outputted to the terminal.
 
-use super::{csi, Color, Display, Format, Style};
+use super::{csi, Style, Display};
 
 #[cfg(unix)]
 use super::{Error, Result, Termios};

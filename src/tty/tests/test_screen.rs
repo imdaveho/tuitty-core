@@ -49,7 +49,7 @@ fn test_screen() {
     tty.flush();
     tty.goto(5, 2);
     thread::sleep(Duration::from_millis(2000));
-    tty.set_fg("yellow");
+    // tty.set_fg("yellow");
     tty.printf("hello, world");
 
     thread::sleep(Duration::from_millis(2000));
@@ -57,7 +57,7 @@ fn test_screen() {
     tty.switch();
     tty.flush();
     tty.goto(8, 3);
-    tty.set_fg("cyan");
+    // tty.set_fg("cyan");
     tty.printf("goodbye, world");
 
     thread::sleep(Duration::from_millis(2000));

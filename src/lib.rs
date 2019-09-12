@@ -41,17 +41,17 @@ pub extern fn terminate(ptr: *mut Tty) {
     }
 }
 
-#[no_mangle]
-pub extern fn size(ptr: *mut Tty) -> u32 {
-    // NOTE: instead of a Tuple, we are sending a u32
-    // that has the first 16 bits containing `w: i16`
-    // and the second 16 bits containing `h: i16`.
-    unsafe {
-        assert!(!ptr.is_null());
-        let (w, h) = (&mut *ptr).size();
-        ((w as u32) << 16) | h as u32
-    }
-}
+// #[no_mangle]
+// pub extern fn size(ptr: *mut Tty) -> u32 {
+//     // NOTE: instead of a Tuple, we are sending a u32
+//     // that has the first 16 bits containing `w: i16`
+//     // and the second 16 bits containing `h: i16`.
+//     unsafe {
+//         assert!(!ptr.is_null());
+//         let (w, h) = (&mut *ptr).size();
+//         ((w as u32) << 16) | h as u32
+//     }
+// }
 
 #[no_mangle]
 pub extern fn screen_size(ptr: *mut Tty) -> u32 {
@@ -307,84 +307,84 @@ pub extern fn show_cursor(ptr: *mut Tty) {
     }
 }
 
-#[no_mangle]
-pub extern fn set_fg(ptr: *mut Tty, c_str: *const c_char) {
-    unsafe {
-        assert!(!c_str.is_null());
-        assert!(!ptr.is_null());
-        (&mut *ptr).set_fg(
-            CStr::from_ptr(c_str).to_str().unwrap());
-    }
-}
+// #[no_mangle]
+// pub extern fn set_fgcol(ptr: *mut Tty, c_str: *const c_char) {
+//     unsafe {
+//         assert!(!c_str.is_null());
+//         assert!(!ptr.is_null());
+//         (&mut *ptr).set_fgcol(
+//             CStr::from_ptr(c_str).to_str().unwrap());
+//     }
+// }
 
-#[no_mangle]
-pub extern fn set_bg(ptr: *mut Tty, c_str: *const c_char) {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).set_bg(
-            CStr::from_ptr(c_str).to_str().unwrap());
-    };
-}
+// #[no_mangle]
+// pub extern fn set_bgcol(ptr: *mut Tty, c_str: *const c_char) {
+//     unsafe {
+//         assert!(!ptr.is_null());
+//         (&mut *ptr).set_bgcol(
+//             CStr::from_ptr(c_str).to_str().unwrap());
+//     };
+// }
 
-#[no_mangle]
-pub extern fn set_fmt(ptr: *mut Tty, c_str: *const c_char) {
-    unsafe {
-        assert!(!c_str.is_null());
-        assert!(!ptr.is_null());
-        (&mut *ptr).set_fmt(
-            CStr::from_ptr(c_str).to_str().unwrap());
-    }
-}
+// #[no_mangle]
+// pub extern fn set_txfmt(ptr: *mut Tty, c_str: *const c_char) {
+//     unsafe {
+//         assert!(!c_str.is_null());
+//         assert!(!ptr.is_null());
+//         (&mut *ptr).set_txfmt(
+//             CStr::from_ptr(c_str).to_str().unwrap());
+//     }
+// }
 
-#[no_mangle]
-pub extern fn set_fg_rgb(ptr: *mut Tty, r: u8, g: u8, b: u8) {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).set_fg_rgb(r, g, b);
-    }
-}
+// #[no_mangle]
+// pub extern fn set_fg_rgb(ptr: *mut Tty, r: u8, g: u8, b: u8) {
+//     unsafe {
+//         assert!(!ptr.is_null());
+//         (&mut *ptr).set_fg_rgb(r, g, b);
+//     }
+// }
 
-#[no_mangle]
-pub extern fn set_bg_rgb(ptr: *mut Tty, r: u8, g: u8, b: u8) {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).set_bg_rgb(r, g, b);
-    }
-}
+// #[no_mangle]
+// pub extern fn set_bg_rgb(ptr: *mut Tty, r: u8, g: u8, b: u8) {
+//     unsafe {
+//         assert!(!ptr.is_null());
+//         (&mut *ptr).set_bg_rgb(r, g, b);
+//     }
+// }
 
-#[no_mangle]
-pub extern fn set_fg_ansi(ptr: *mut Tty, value: u8) {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).set_fg_ansi(value);
-    }
-}
+// #[no_mangle]
+// pub extern fn set_fg_ansi(ptr: *mut Tty, value: u8) {
+//     unsafe {
+//         assert!(!ptr.is_null());
+//         (&mut *ptr).set_fg_ansi(value);
+//     }
+// }
 
-#[no_mangle]
-pub extern fn set_bg_ansi(ptr: *mut Tty, value: u8) {
-    unsafe {
-        assert!(!ptr.is_null());
-        (&mut *ptr).set_bg_ansi(value);
-    }
-}
+// #[no_mangle]
+// pub extern fn set_bg_ansi(ptr: *mut Tty, value: u8) {
+//     unsafe {
+//         assert!(!ptr.is_null());
+//         (&mut *ptr).set_bg_ansi(value);
+//     }
+// }
 
-#[no_mangle]
-pub extern fn set_style(
-    ptr: *mut Tty,
-    fg: *const c_char,
-    bg: *const c_char,
-    fmts: *const c_char) {
-    unsafe {
-        assert!(!fg.is_null());
-        assert!(!bg.is_null());
-        assert!(!fmts.is_null());
-        assert!(!ptr.is_null());
-        (&mut *ptr).set_style(
-            CStr::from_ptr(fg).to_str().unwrap(),
-            CStr::from_ptr(bg).to_str().unwrap(),
-            CStr::from_ptr(fmts).to_str().unwrap());
-    }
-}
+// #[no_mangle]
+// pub extern fn set_style(
+//     ptr: *mut Tty,
+//     fg: *const c_char,
+//     bg: *const c_char,
+//     fmts: *const c_char) {
+//     unsafe {
+//         assert!(!fg.is_null());
+//         assert!(!bg.is_null());
+//         assert!(!fmts.is_null());
+//         assert!(!ptr.is_null());
+//         (&mut *ptr).set_style(
+//             CStr::from_ptr(fg).to_str().unwrap(),
+//             CStr::from_ptr(bg).to_str().unwrap(),
+//             CStr::from_ptr(fmts).to_str().unwrap());
+//     }
+// }
 
 #[no_mangle]
 pub extern fn reset(ptr: *mut Tty) {

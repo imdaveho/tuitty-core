@@ -10,7 +10,7 @@ fn test_example() {
     tty.prints(&format!(
         "w: {}, h: {}\n", tty.screen_size().0, tty.screen_size().1));
 
-    tty.set_fg("green");
+    // tty.set_fg("green");
     tty.prints("Hello (g), ");
     tty.reset();
     tty.prints("Hello (d), ");
@@ -20,7 +20,7 @@ fn test_example() {
 
     tty.raw();
     tty.enable_mouse();
-    tty.set_fg("red"); // this sets fg on altern screen
+    // tty.set_fg("red"); // this sets fg on altern screen
 
     let words = "A good choice of font for your coding can make a huge \
                  difference and improve your productivity, so take a look at \
@@ -46,7 +46,7 @@ fn test_example() {
 
     // since fg red was on the altern screen, the main screen is still white
     tty.prints("Hello (r), ");
-    tty.set_fg("darkblue");
+    // tty.set_fg("darkblue");
     tty.prints("Hello (db), ");
     tty.reset();
     tty.prints("End\n");

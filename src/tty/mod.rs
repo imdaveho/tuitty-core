@@ -36,6 +36,5 @@ mod windows;
 #[cfg(windows)]
 pub use windows::Tty;
 
-pub use shared::{UnicodeWidthStr, UnicodeWidthChar};
 #[cfg(test)]
 mod tests;

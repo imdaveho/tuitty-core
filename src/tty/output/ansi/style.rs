@@ -1,50 +1,45 @@
 // ANSI specific functions to style text output to the terminal.
 
-use super::{csi, Color, Format, Style};
+use self::Effect::*;
+use super::{csi, Style, Style::*};
 
-
-pub fn set_fg(color: Color) -> String {
-    _stylize(Style::Fg(color))
-}
-
-pub fn set_bg(color: Color) -> String {
-    _stylize(Style::Bg(color))
-}
-
-pub fn set_fmt(format: Format) -> String {
-    _stylize(Style::Fmt(format))
-}
-
-pub fn set_all(fg: &str, bg: &str, fmts: &str) -> String {
-    let fg_str = _stylize(Style::Fg(Color::from(fg)));
-    let bg_str = _stylize(Style::Bg(Color::from(bg)));
-
-    // The tx param is should be a comma separated string.
-    // TODO: lowercase()
-    let fmt_arr: Vec<&str> = fmts.split(',').map(|t| t.trim()).collect();
-    let mut dimmed = false;
-    let mut fmt_str = String::new();
-    for s in fmt_arr.iter() {
-        match *s {
-            "bold" => {
-                if dimmed { continue }
-                fmt_str.push_str(&_stylize(Style::Fmt(Format::from(*s))));
-            },
-            "dim" => {
-                dimmed = true;
-                fmt_str.push_str(&_stylize(Style::Fmt(Format::from(*s))));
-            },
-            "reset" => {
-                fmt_str.push_str(&_stylize(Style::Fmt(Format::from(*s))));
-                break
-            },
-            _ => {
-                fmt_str.push_str(&_stylize(Style::Fmt(Format::from(*s))));
-            },
+pub fn set_style(style: Style) -> String {
+    match style {
+        Fg(c) => {
+            if c == Color::Reset {
+                return format!(csi!("{}m"), "39");
+            }
+            format!(csi!("38;{}m"), String::from(c))
+        }
+        Bg(c) => {
+            if c == Color::Reset {
+                return format!(csi!("{}m"), "49");
+            }
+            format!(csi!("48;{}m"), String::from(c))
+        }
+        Fx(f) => {
+            // TODO: run through values like in cells.rs and output single
+            // string with all the sequences.
+            let masks = [Reset, Bold, Dim, Underline, Reverse, Hide];
+            let mut fx_str = String::with_capacity(12);
+            for m in &masks {
+                if (f & *m as u32) != 0 {
+                    let value = (*m as u32 >> 9).trailing_zeros() as u8;
+                    fx_str.push_str(&format!(csi!("{}m"), value))
+                } else {
+                    fx_str.push_str("");
+                }
+            }
+            fx_str
         }
     }
+}
 
-    format!("{}{}{}", fg_str, bg_str, fmt_str)
+pub fn set_styles(fgcol: Color, bgcol: Color, effects: Effects) -> String {
+    let fg_str = set_style(Fg(fgcol));
+    let bg_str = set_style(Bg(bgcol));
+    let fx_str = set_style(Fx(effects));
+    format!("{}{}{}", fg_str, bg_str, fx_str)
 }
 
 pub fn reset() -> String {
@@ -52,66 +47,85 @@ pub fn reset() -> String {
 }
 
 
-fn _stylize(style: Style) -> String {
-    let mut ansi_value = String::new();
+pub type Effects = u32;
 
-    let color: Color;
+#[derive(Clone, Copy, PartialEq)]
+pub enum Color {
+    Reset,
 
-    match style {
-        Style::Fg(c) => {
-            if c == Color::Reset {
-                ansi_value.push_str("39");
-                return format!(csi!("{}m"), ansi_value);
-            } else {
-                ansi_value.push_str("38;");
-                color = c;
+    Black,
+    DarkGrey,
+
+    Red,
+    DarkRed,
+
+    Green,
+    DarkGreen,
+
+    Yellow,
+    DarkYellow,
+
+    Blue,
+    DarkBlue,
+
+    Magenta,
+    DarkMagenta,
+
+    Cyan,
+    DarkCyan,
+
+    White,
+    Grey,
+
+    Rgb {
+        r: u8,
+        g: u8,
+        b: u8,
+    },
+
+    AnsiValue(u8),
+}
+
+
+impl From<Color> for String {
+    fn from(src: Color) -> Self {
+        let mut ansi_str = String::with_capacity(7);
+        match src {
+            Color::Black => ansi_str.push_str("5;0"),
+            Color::DarkGrey => ansi_str.push_str("5;8"),
+            Color::Red => ansi_str.push_str("5;9"),
+            Color::DarkRed => ansi_str.push_str("5;1"),
+            Color::Green => ansi_str.push_str("5;10"),
+            Color::DarkGreen => ansi_str.push_str("5;2"),
+            Color::Yellow => ansi_str.push_str("5;11"),
+            Color::DarkYellow => ansi_str.push_str("5;3"),
+            Color::Blue => ansi_str.push_str("5;12"),
+            Color::DarkBlue => ansi_str.push_str("5;4"),
+            Color::Magenta => ansi_str.push_str("5;13"),
+            Color::DarkMagenta => ansi_str.push_str("5;5"),
+            Color::Cyan => ansi_str.push_str("5;14"),
+            Color::DarkCyan => ansi_str.push_str("5;6"),
+            Color::White => ansi_str.push_str("5;15"),
+            Color::Grey => ansi_str.push_str("5;7"),
+            Color::Rgb { r, g, b } => {
+                ansi_str.push_str(&format!("2;{};{};{}", r, g, b))
             }
-        }
-        Style::Bg(c) => {
-            if c == Color::Reset {
-                ansi_value.push_str("49");
-                return format!(csi!("{}m"), ansi_value);
-            } else {
-                ansi_value.push_str("48;");
-                color = c;
+            Color::AnsiValue(val) => {
+                ansi_str.push_str(&format!("5;{}", val))
             }
-        }
-        Style::Fmt(fmt) => {
-            ansi_value.push_str(&fmt.to_string());
-            return format!(csi!("{}m"), ansi_value);
-        }
+            _ => ansi_str.push_str(""),
+        };
+        ansi_str
     }
+}
 
-    let rgb_val: String;
 
-    let color_val = match color {
-        Color::Black => "5;0",
-        Color::DarkGrey => "5;8",
-        Color::Red => "5;9",
-        Color::DarkRed => "5;1",
-        Color::Green => "5;10",
-        Color::DarkGreen => "5;2",
-        Color::Yellow => "5;11",
-        Color::DarkYellow => "5;3",
-        Color::Blue => "5;12",
-        Color::DarkBlue => "5;4",
-        Color::Magenta => "5;13",
-        Color::DarkMagenta => "5;5",
-        Color::Cyan => "5;14",
-        Color::DarkCyan => "5;6",
-        Color::White => "5;15",
-        Color::Grey => "5;7",
-        Color::Rgb { r, g, b } => {
-            rgb_val = format!("2;{};{};{}", r, g, b);
-            rgb_val.as_str()
-        }
-        Color::AnsiValue(val) => {
-            rgb_val = format!("5;{}", val);
-            rgb_val.as_str()
-        }
-        _ => "",
-    };
-
-    ansi_value.push_str(color_val);
-    format!(csi!("{}m"), ansi_value)
+#[derive(Clone, Copy, PartialEq)]
+pub enum Effect {
+    Reset = 1 << (0 + 9),
+    Bold = 1 << (1 + 9),
+    Dim = 1 << (2 + 9),
+    Underline = 1 << (4 + 9),
+    Reverse = 1 << (7 + 9),
+    Hide = 1 << (8 + 9),
 }
