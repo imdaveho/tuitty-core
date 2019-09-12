@@ -3,7 +3,9 @@ use super::{
     InputEvent,
     KeyEvent,
     MouseEvent,
-    MouseButton
+    MouseButton,
+    Color,
+    Effect,
 };
 
 mod test_example;

@@ -1,4 +1,4 @@
-use super::Tty;
+use super::{Tty, Color, Effect};
 use std::thread;
 use std::time::Duration;
 
@@ -48,8 +48,10 @@ fn test_screen() {
     tty.switch();
     tty.flush();
     tty.goto(5, 2);
-    thread::sleep(Duration::from_millis(2000));
     // tty.set_fg("yellow");
+    tty.set_fg(Color::Yellow);
+    // TODO: impl BitOr for these...
+    tty.set_fx(Effect::Underline | Effect::Bold);
     tty.printf("hello, world");
 
     thread::sleep(Duration::from_millis(2000));
@@ -58,6 +60,8 @@ fn test_screen() {
     tty.flush();
     tty.goto(8, 3);
     // tty.set_fg("cyan");
+    tty.set_fg(Color::Cyan);
+    tty.set_fx(Effect::Underline | Effect::Dim);
     tty.printf("goodbye, world");
 
     thread::sleep(Duration::from_millis(2000));

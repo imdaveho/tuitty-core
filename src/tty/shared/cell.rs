@@ -53,25 +53,9 @@ impl CellBuffer {
         }
     }
 
-    // pub fn _width(&self) -> i16 {
-    //     self.size.0
-    // }
-
-    // pub fn _height(&self) -> i16 {
-    //     self.size.1
-    // }
-
     pub fn _screen_size(&self) -> (i16, i16) {
         self.screen_size
     }
-
-    // pub fn _col(&self) -> i16 {
-    //     self.pos.0
-    // }
-
-    // pub fn _row(&self) -> i16 {
-    //     self.pos.1
-    // }
 
     pub fn _screen_pos(&self) -> (i16, i16) {
         self.screen_pos
@@ -121,12 +105,14 @@ impl CellBuffer {
         // TODO: re-calc cursor position
     }
 
-    pub fn _restore(&self) {
+    pub fn _restore_buffer(&self) {
         let (w, h) = self.screen_size;
         let capacity = (w * h) as isize;
+        // TODO: stress test the content.len capacity here.
         let mut contents = String::with_capacity((capacity * 2) as usize);
         let mut previous = CellStyle::new();
-
+        // Reset everything from the previous screens once at the start.
+        contents.push_str(&output::ansi::reset());
         for cell in &self.cells {
             // (imdaveho) NOTE: stackoverflow.com/questions/
             // 23975391/how-to-convert-a-string-into-a-static-str
@@ -137,8 +123,9 @@ impl CellBuffer {
                     let (fg, bg, fx) = (c.style.fg, c.style.bg, c.style.fx);
 
                     if c.style != previous && c.style == CellStyle::new() {
-                        // Style resets everything and isn't following a prior
-                        // reset style.
+                        // Reset not just when the current style differs a bit
+                        // from the previous, but every field is different and
+                        // is a {Color|Effect}::Reset value.
                         contents.push_str(&output::ansi::reset())
                     } else {
                         // If not, well go through each and update them.
@@ -247,6 +234,62 @@ impl CellBuffer {
             bg: Color::Reset,
             fx: Effect::Reset as u32,
         }
+    }
+
+    pub fn _sync_buffer(&mut self, content: &str) {
+        let length = UnicodeWidthStr::width(content);
+        let charbuf = content.chars();
+        let (w, h) = self.screen_size;
+        let (col, row) = self.screen_pos;
+        let here = ((row * w) + col) as usize;
+        let there = here + length;
+        let (ncol, nrow) = (there % w as usize, (there / w as usize));
+
+        // (imdaveho) NOTE: Remember that buffer indices are 0-based, which
+        // means that index 0 (col: 0, row: 0) is actually capacity: 1.
+        let capacity = (w * h) as usize;
+        // If length == capacity, the cursor will overflow by 1, so subtract it.
+        // TODO: Truncate the first n rows, and print the overflow n rows. Needs
+        // to handle control characters in loop...
+        // let capacity = meta.buffer_size();
+        if length > capacity - 1 { return };
+
+        let mut iteration = 0;
+        for ch in charbuf {
+            match UnicodeWidthChar::width(ch) {
+                Some(width) => {
+                    // (imdaveho) NOTE: The only control character that returns
+                    // Some() is the null byte. If for some reason, there is a
+                    // null byte passed within the &str parameter, we should
+                    // simple ignore it and not update the backbuf.
+                    if ch == '\x00' { continue } ;
+
+                    self.cells[here + iteration] = Some(Cell {
+                        rune: ch,
+                        width: width as isize,
+                        style: self.style.clone(),
+                    });
+                    iteration += 1;
+                }
+                None => {
+                    // (imdaveho) note: this is an escape sequence or a `char`
+                    // with ambiguous length defaulting to `::width()` == 1 or
+                    // `::width_cjk()` == 2.
+
+                    // (imdaveho) todo: this would only happen if the
+                    // user is trying to manually write an escape sequence.
+                    // attempt to interpret what the escape sequence is, and
+                    // update meta.cell_style with the details of the sequence.
+                    // difficulty: medium/hard -
+                    // * create a byte vector that fills with an ansi esc seq
+                    // * when you hit a printable char, take the byte vector,
+                    //   and map it to a cell style (medium) or specific
+                    //   ansii function (hard).
+                    ()
+                }
+            }
+        }
+        self.screen_pos = (ncol as i16, nrow as i16);
     }
 }
 

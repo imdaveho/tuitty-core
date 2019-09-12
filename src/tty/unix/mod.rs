@@ -176,7 +176,7 @@ impl Tty {
         // Swap the current self.state for a new Metadata struct.
         self.stash.push(self.state.clone());
         self.state = Metadata::new();
-        self.index = self.stash.len() - 1;
+        self.index = self.stash.len();
         // If this wasn't a switch to the alternate screen (ie. the current
         // screen is already the alternate screen), then we need to clear it.
         if self.index >= 1 {
@@ -216,7 +216,7 @@ impl Tty {
         } else {
             self.stash[self.index] = self.state.clone();
         }
-        // After updating the stash, grab the Metadata at the switch to index.
+        // After updating the stash, clone the Metadata at the switch_to index.
         self.state = self.stash[index].clone();
         // Update `self.index` to the function argument `index`
         self.index = index;
@@ -230,7 +230,7 @@ impl Tty {
             ansi_write(&screen::ansi::clear(All), self.flush_if_auto);
             ansi_write(&cursor::ansi::goto(0, 0), self.flush_if_auto);
             // Restore screen contents. Restore flushes.
-            self.state.cellbuf._restore();
+            self.state.cellbuf._restore_buffer();
             let (col, row) = self.state.cellbuf._screen_pos();
             self.goto(col, row);
         }
@@ -405,38 +405,20 @@ impl Tty {
         ansi_write(
             &output::ansi::reset(),
             self.flush_if_auto);
-        // self.metas[self.index].cell_style = Default::default()
         self.state.cellbuf._reset_style();
     }
 
-    pub fn prints(&mut self, string: &str) {
-        // // TODO: THEN TEST ON WINDOWS!
-        // // TODO: THEN TEST test_screen...
-        // let coords = &self.metas[self.index].cursor_pos;
-        // ansi_write(&cursor::ansi::goto(0, 25), false);
-        // ansi_write(&format!("col: {}, row: {}", coords.0, coords.1), true);
-        // ansi_write(&cursor::ansi::goto(0, 26), false);
-        // ansi_write(&format!("buffer_pos: {}", &self.metas[self.index].buffer_pos()), true);
-        // ansi_write(&cursor::ansi::goto(coords.0, coords.1), false);
-        // // BUG: -->
-        // self._write_backbuf(string);
-
-        // ansi_write(&string, false);
-        // // DEBUG: -->
-        // let (col, row) = &self.metas[self.index].cursor_pos;
-        // ansi_write(&cursor::ansi::goto(0, 27), false);
-        // ansi_write(&format!("aft col: {}, aft row: {}", col, row), true);
-        // ansi_write(&cursor::ansi::goto(0, 28), false);
-        // ansi_write(&format!("aft buffer_pos: {}", &self.metas[self.index].buffer_pos()), true);
-        ()
+    pub fn prints(&mut self, content: &str) {
+        self.state.cellbuf._sync_buffer(content);
+        ansi_write(&content, self.flush_if_auto);
     }
 
     pub fn flush(&mut self) {
         ansi_flush();
     }
 
-    pub fn printf(&mut self, string: &str) {
-        self.prints(string);
+    pub fn printf(&mut self, content: &str) {
+        self.prints(content);
         ansi_flush();
     }
 
@@ -461,67 +443,6 @@ impl Tty {
         self.stash.clear();
     }
 
-
-    fn _write_backbuf(&mut self, string: &str) {
-    //     let meta = &mut self.metas[self.index];
-
-    //     let length = UnicodeWidthStr::width(string);
-    //     let chars = string.chars();
-
-    //     let (w, _) = meta.screen_size;  // TODO: `h` to be used when truncating
-    //     let bufpos = meta.buffer_pos();
-    //     let newpos = bufpos + length;
-    //     let new_col = newpos % w as usize;
-    //     let new_row = newpos / w as usize;
-
-    //     // (imdaveho) NOTE: Remember that buffer indices are 0-based, which
-    //     // means that index 0 (col: 0, row: 0) is actually capacity: 1.
-    //     //
-    //     // If length == capacity, the cursor will overflow by 1, so subtract it.
-    //     // TODO: Truncate the first n rows, and print the overflow n rows. Needs
-    //     // to handle control characters in loop...
-    //     // let capacity = meta.buffer_size();
-    //     // if length > capacity - 1 { return };
-
-    //     let mut i = 0;
-    //     for ch in chars {
-    //         match UnicodeWidthChar::width(ch) {
-    //             Some(w) => {
-    //                 // (imdaveho) NOTE: The only control character that returns
-    //                 // Some() is the null byte. If for some reason, there is a
-    //                 // null byte passed within the &str parameter, we should
-    //                 // simple ignore it and not update the backbuf.
-    //                 if ch == '\x00' { continue } ;
-
-    //                 meta.backbuf[i + bufpos] = Some(Cell {
-    //                     ch: ch,
-    //                     width: w,
-    //                     style: meta.cell_style,
-    //                 });
-    //                 i += 1;
-    //             }
-    //             None => {
-    //                 // (imdaveho) NOTE: This is an escape sequence or a `char`
-    //                 // with ambiguous length defaulting to `::width()` == 1 or
-    //                 // `::width_cjk()` == 2.
-
-    //                 // (imdaveho) TODO: This would only happen if the
-    //                 // user is trying to manually write an escape sequence.
-    //                 // Attempt to interpret what the escape sequence is, and
-    //                 // update meta.cell_style with the details of the sequence.
-    //                 // Difficulty: medium/hard -
-    //                 // * create a byte vector that fills with an ansi esc seq
-    //                 // * when you hit a printable char, take the byte vector,
-    //                 //   and map it to a cell style (medium) or specific
-    //                 //   ANSII function (hard).
-    //                 ()
-    //             }
-    //         }
-    //     }
-    //     // self.goto(new_col as i16, new_row as i16);
-    //     meta.cursor_pos = (new_col as i16, new_row as i16);
-        ()
-    }
 }
 
 

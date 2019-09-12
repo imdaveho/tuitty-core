@@ -18,6 +18,7 @@ mod output;
 mod screen;
 mod shared;
 
+pub use output::{Color, Effect, Effects};
 pub use input::{InputEvent, KeyEvent, MouseEvent, MouseButton};
 
 #[cfg(unix)]

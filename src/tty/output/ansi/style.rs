@@ -1,5 +1,6 @@
 // ANSI specific functions to style text output to the terminal.
 
+use std::ops::BitOr;
 use self::Effect::*;
 use super::{csi, Style, Style::*};
 
@@ -128,4 +129,20 @@ pub enum Effect {
     Underline = 1 << (4 + 9),
     Reverse = 1 << (7 + 9),
     Hide = 1 << (8 + 9),
+}
+
+impl BitOr for Effect {
+    type Output = Effects;
+
+    fn bitor(self, rhs: Self) -> Effects {
+        self as Effects | rhs as Effects
+    }
+}
+
+impl BitOr<Effect> for Effects {
+    type Output = Self;
+
+    fn bitor(self, rhs: Effect) -> Self {
+        self | rhs as Effects
+    }
 }
