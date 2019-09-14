@@ -54,7 +54,11 @@ fn test_screen() {
     // let (w, h) = super::screen::wincon::size();
     // tty.printf(&format!("{}, {}", w, h));
 
-
+    // (imdaveho) NOTE: https://github.com/cmderdev/
+    // cmder/issues/1392
+    // terminal prompt not wrapping correctly while
+    // emulating bash on windows #1392
+    // https://github.com/cmderdev/cmder/issues/2165
 
 
     let delay = 2000;
