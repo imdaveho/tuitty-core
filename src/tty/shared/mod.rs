@@ -16,7 +16,10 @@ mod wincon;
 pub use wincon::{Handle, ConsoleInfo};
 
 mod cell;
-pub use cell::{CellBuffer, Cell, CellStyle};
+use cell::{CellBuffer, Cell, CellStyle};
 
 mod wcwidth;
 use wcwidth::{UnicodeWidthChar, UnicodeWidthStr};
+
+mod metadata;
+pub use metadata::Metadata;

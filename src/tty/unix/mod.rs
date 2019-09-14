@@ -5,11 +5,11 @@ use super::cursor;
 use super::input;
 use super::screen::{self, Clear::*};
 use super::output::{self, Color, Effects, Style::*};
-use super::shared::{ansi_write, ansi_flush, CellBuffer};
+use super::shared::{ansi_write, ansi_flush, CellBuffer, Metadata};
 use super::{AsyncReader, SyncReader, Termios};
 
-mod metadata;
-use metadata::Metadata;
+// mod metadata;
+// use metadata::Metadata;
 
 
 pub struct Tty {
@@ -33,6 +33,7 @@ impl Tty {
     }
 
     // (imdaveho) NOTE: size in this context is more for internal use.
+    // See: CellBuffer::new()
     // pub fn size(&self) -> (i16, i16) {
     //     // Unix specific dependency on `libc`.
     //     screen::ansi::size()
@@ -171,17 +172,17 @@ impl Tty {
             // There is no point to switch if you're on another screen
             // since ANSI terminals provide a single "alternate screen".
             ansi_write(&screen::ansi::enable_alt(), self.flush_if_auto);
+        } else {
+            // If this wasn't a switch to the alternate screen (ie. the current
+            // screen is already the alternate screen), then we need to clear it
+            // without modifying the cellbuffer.
+            ansi_write(&screen::ansi::clear(All), self.flush_if_auto);
         }
         // Push current self.state `Metadata` to stash and increment the index.
         // Swap the current self.state for a new Metadata struct.
         self.stash.push(self.state.clone());
         self.state = Metadata::new();
         self.index = self.stash.len();
-        // If this wasn't a switch to the alternate screen (ie. the current
-        // screen is already the alternate screen), then we need to clear it.
-        if self.index >= 1 {
-            ansi_write(&screen::ansi::clear(All), self.flush_if_auto);
-        };
         // Prevent multiple `flush()` calls due to `flush_if_auto` setting.
         let auto = self.flush_if_auto;
         if auto { self.manual() }
@@ -218,15 +219,15 @@ impl Tty {
         }
         // After updating the stash, clone the Metadata at the switch_to index.
         self.state = self.stash[index].clone();
-        // Update `self.index` to the function argument `index`
-        self.index = index;
-        // (imdaveho) TODO: Confirm if main screen will have native buffer logs,
-        // thereby not needing to restore content manually via library. Also,
-        // because there is going to be output that is not from `tty` which is
-        // not possible to save in the backbuf.
+        // Enable/Disable alternate screen based on current and target indices.
         if index == 0 {
+            // Disable if you are reverting back to main.
             ansi_write(&screen::ansi::disable_alt(), self.flush_if_auto)
         } else {
+            if self.index == 0 {
+                // Enable if you are already on main switching to an altscreen.
+                ansi_write(&screen::ansi::enable_alt(), self.flush_if_auto)
+            }
             ansi_write(&screen::ansi::clear(All), self.flush_if_auto);
             ansi_write(&cursor::ansi::goto(0, 0), self.flush_if_auto);
             // Restore screen contents. Restore flushes.
@@ -234,6 +235,13 @@ impl Tty {
             let (col, row) = self.state.cellbuf._screen_pos();
             self.goto(col, row);
         }
+        // Update `self.index` to the function argument `index`
+        // (imdaveho) TODO: Confirm if main screen will have native buffer logs,
+        // thereby not needing to restore content manually via library. Also,
+        // because there is going to be output that is not from `tty` which is
+        // not possible to save in the backbuf.
+        self.index = index;
+        
         // Prevent multiple `flush()` calls due to `autoflush` setting.
         let auto = self.flush_if_auto;
         if auto { self.manual() }
@@ -286,7 +294,7 @@ impl Tty {
         ansi_write(
             &cursor::ansi::move_right(1),
             self.flush_if_auto);
-        self.state.cellbuf._sync_right(1)
+        self.state.cellbuf._sync_right(1);
     }
 
     pub fn dpad(&mut self, dir: &str, n: i16) {
@@ -344,17 +352,20 @@ impl Tty {
     }
 
     pub fn mark(&mut self) {
-        ansi_write(
-            &cursor::ansi::save_pos(),
-            self.flush_if_auto);
+        // ansi_write(
+        //     &cursor::ansi::save_pos(),
+        //     self.flush_if_auto);
+        self.state._mark_position();
     }
 
     pub fn load(&mut self) {
-        ansi_write(
-            &cursor::ansi::load_pos(),
-            self.flush_if_auto);
-        // TODO: On ANSI do we need to flush immediately after load so that the
-        // call to `pos()` can properly reposition the cellbuffer?
+        // ansi_write(
+        //     &cursor::ansi::load_pos(),
+        //     self.flush_if_auto);
+        // // TODO: On ANSI do we need to flush immediately after load so that the
+        // // call to `pos()` can properly reposition the cellbuffer?
+        let (col, row) = self.state._saved_position();
+        self.goto(col, row);
     }
 
     pub fn hide_cursor(&mut self) {
@@ -410,7 +421,7 @@ impl Tty {
 
     pub fn prints(&mut self, content: &str) {
         self.state.cellbuf._sync_buffer(content);
-        ansi_write(&content, self.flush_if_auto);
+        ansi_write(&output::ansi::prints(content), self.flush_if_auto);
     }
 
     pub fn flush(&mut self) {
@@ -439,7 +450,7 @@ impl Tty {
         self.to_main();
         self.cook();
         self.show_cursor();
-        ansi_write("\r", true);
+        ansi_write("\n\r", true);
         self.stash.clear();
     }
 

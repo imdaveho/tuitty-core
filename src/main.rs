@@ -1,5 +1,5 @@
 // extern crate tuitty;
-
+//
 // use winapi::um::{
 //     wincon::{
 //         SetConsoleTextAttribute,
@@ -13,7 +13,58 @@
 // use std::mem::zeroed;
 // use winapi::shared::ntdef::{NULL, VOID};
 
+// use std::thread;
+// use std::time::Duration;
+
+// mod tty;
+
 fn main() {
+
+    // let mut tty = tty::Tty::init();
+    // tty.printf(&format!("{}", tty.is_ansi()));
+
+    // let mut tty = tty::Tty::init();
+    // tty.switch();
+    // tty.prints("hello world");
+    // tty.goto(5, 2);
+    // let output = stdout();
+    // let lock = output.lock();
+    // let mut outbuf = BufWriter::new(lock);
+    // outbuf.write("\x1B[?47h".as_bytes()).expect("I/O error on write");
+    // outbuf.flush();
+    // // tty.flush();
+    // thread::sleep(Duration::from_millis(2000));
+    // tty.to_main();
+    // thread::sleep(Duration::from_millis(2000));
+    // outbuf.write("\x1B[?47l".as_bytes()).expect("I/O error on write");
+    // outbuf.flush();
+    // thread::sleep(Duration::from_millis(2000));
+
+    // use std::io::{stdout, BufWriter, Write};
+    // let output = stdout();
+    // let lock = output.lock();
+    // let mut outbuf = BufWriter::new(lock);
+    // // outbuf.write("\x1B[?47h".as_bytes()).expect("I/O error on write");
+    // // outbuf.flush();
+    // outbuf.write("\x1B[?1049h".as_bytes()).expect("I/O error on write");
+    // outbuf.flush();
+    // // // outbuf.write("\x1B[2J".as_bytes()).expect("I/O error on write");
+    // // // outbuf.flush();
+    // outbuf.write("hello world".as_bytes()).expect("I/O error on write");
+    // outbuf.flush();
+    // outbuf.write("\x1B[5;2H".as_bytes()).expect("I/O error on write");
+    // outbuf.flush();
+    // thread::sleep(Duration::from_millis(2000));
+    // outbuf.write("\x1B[?1049l".as_bytes()).expect("I/O error on write");
+    // outbuf.flush();
+    // // outbuf.write("\x1B[?47l".as_bytes()).expect("I/O error on write");
+    // // outbuf.flush();
+    // thread::sleep(Duration::from_millis(2000));
+
+
+
+
+
     // println!("{}", std::env::var("MSYSTEM").unwrap());
     // let mut tty = tuitty::tty::Tty::trial();
     // println!("{}", tty);

@@ -6,17 +6,18 @@ pub struct Metadata {
     is_raw_enabled: bool,
     is_mouse_enabled: bool,
     is_cursor_visible: bool,
+    saved_position: (i16, i16),
     pub cellbuf: super::CellBuffer,
 }
 
 impl Metadata {
     pub fn new() -> Metadata {
-        let (w, h) = super::screen::ansi::size();
         Metadata {
             is_raw_enabled: false,
             is_mouse_enabled: false,
             is_cursor_visible: true,
-            cellbuf: super::CellBuffer::new(w, h)
+            saved_position: (0, 0),
+            cellbuf: super::CellBuffer::new()
         }
     }
 
@@ -54,5 +55,13 @@ impl Metadata {
 
     pub fn _is_cursor(&self) -> bool {
         self.is_cursor_visible
+    }
+
+    pub fn _mark_position(&mut self) {
+        self.saved_position = self.cellbuf._screen_pos();
+    }
+
+    pub fn _saved_position(&self) -> (i16, i16) {
+        self.saved_position
     }
 }

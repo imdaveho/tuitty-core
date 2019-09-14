@@ -1,7 +1,3 @@
-use super::{Tty, Color, Effect};
-use std::thread;
-use std::time::Duration;
-
 
 // fn _prompt(tty: &mut Tty, text: &str, err: &str) {
 //     // TODO: make the below more ergonomic.
@@ -38,41 +34,57 @@ use std::time::Duration;
 //     }
 // }
 
+use super::{Tty, Color, Effect};
+use std::thread;
+use std::time::Duration;
 
 #[test]
 fn test_screen() {
-    let delay = 800;
+  
+    // let mut tty = Tty::init();
+    // tty.switch();
+    // tty.prints("hello world");
+    // tty.goto(5, 2);
+    // tty.flush();
+    // thread::sleep(Duration::from_millis(2000));
+    // tty.to_main();
+    // thread::sleep(Duration::from_millis(2000));
+
+    // let mut tty = Tty::init();
+    // let (w, h) = super::screen::wincon::size();
+    // tty.printf(&format!("{}, {}", w, h));
+
+
+
+
+    let delay = 2000;
     let mut tty = Tty::init();
-
-
     tty.switch();
     tty.flush();
     tty.goto(5, 2);
-    // tty.set_fg("yellow");
-    tty.set_fg(Color::Yellow);
-    // TODO: impl BitOr for these...
-    tty.set_fx(Effect::Underline | Effect::Bold);
+    tty.flush();
+    // // tty.set_fg("yellow");
+    // tty.set_fg(Color::Yellow);
+    // tty.set_fx(Effect::Underline | Effect::Bold);
     tty.printf("hello, world");
-
-    thread::sleep(Duration::from_millis(2000));
+    thread::sleep(Duration::from_millis(4000));
 
     tty.switch();
     tty.flush();
     tty.goto(8, 3);
-    // tty.set_fg("cyan");
-    tty.set_fg(Color::Cyan);
-    tty.set_fx(Effect::Underline | Effect::Dim);
+    tty.flush();
+    // // tty.set_fg("cyan");
+    // tty.set_fg(Color::Cyan);
+    // tty.set_fx(Effect::Underline | Effect::Dim);
     tty.printf("goodbye, world");
-
     thread::sleep(Duration::from_millis(2000));
 
     tty.switch_to(1);
     tty.flush();
-
-    thread::sleep(Duration::from_millis(2000 + delay));
+    thread::sleep(Duration::from_millis(delay));
 
     tty.to_main();
-
+    thread::sleep(Duration::from_millis(1000));
 
 
 

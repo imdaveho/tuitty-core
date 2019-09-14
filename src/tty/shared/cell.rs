@@ -43,7 +43,12 @@ pub struct CellBuffer {
 }
 
 impl CellBuffer {
-    pub fn new(w: i16, h: i16) -> CellBuffer {
+    pub fn new() -> CellBuffer {
+        #[cfg(unix)]
+        let (w, h) = super::super::screen::ansi::size();        
+        #[cfg(windows)]
+        let (w, h) = super::super::screen::wincon::size();
+        
         let capacity = (w * h) as usize;
         CellBuffer {
             screen_pos: (0, 0),
@@ -120,27 +125,27 @@ impl CellBuffer {
             match cell {
                 Some(c) => {
                     if capacity - (cellspace + c.width) < 0 { break }
-                    let (fg, bg, fx) = (c.style.fg, c.style.bg, c.style.fx);
+                    // let (fg, bg, fx) = (c.style.fg, c.style.bg, c.style.fx);
 
-                    if c.style != previous && c.style == CellStyle::new() {
-                        // Reset not just when the current style differs a bit
-                        // from the previous, but every field is different and
-                        // is a {Color|Effect}::Reset value.
-                        contents.push_str(&output::ansi::reset())
-                    } else {
-                        // If not, well go through each and update them.
-                        if fg != previous.fg {
-                            contents.push_str(&output::ansi::set_style(Fg(fg)))
-                        }
+                    // if c.style != previous && c.style == CellStyle::new() {
+                    //     // Reset not just when the current style differs a bit
+                    //     // from the previous, but every field is different and
+                    //     // is a {Color|Effect}::Reset value.
+                    //     contents.push_str(&output::ansi::reset())
+                    // } else {
+                    //     // If not, well go through each and update them.
+                    //     if fg != previous.fg {
+                    //         contents.push_str(&output::ansi::set_style(Fg(fg)))
+                    //     }
 
-                        if bg != previous.bg {
-                            contents.push_str(&output::ansi::set_style(Bg(bg)))
-                        }
+                    //     if bg != previous.bg {
+                    //         contents.push_str(&output::ansi::set_style(Bg(bg)))
+                    //     }
 
-                        if fx != previous.fx {
-                            contents.push_str(&output::ansi::set_style(Fx(fx)))
-                        }
-                    }
+                    //     if fx != previous.fx {
+                    //         contents.push_str(&output::ansi::set_style(Fx(fx)))
+                    //     }
+                    // }
                     contents.push(c.rune);
                     previous = c.style;
                 }

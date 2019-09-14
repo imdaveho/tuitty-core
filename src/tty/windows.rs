@@ -5,11 +5,11 @@
 //! on the Windows system (eg. xterm, MinTTY, Cygwin, etc.) as well as check if
 //! the terminal has support for ANSI sequences.
 
-use super::screen;
 use super::cursor;
-use super::output;
 use super::input;
-use super::shared::{write_ansi, flush_ansi};
+use super::screen::{self, Clear::*};
+use super::output::{self, Color, Effects, Style::*};
+use super::shared::{ansi_write, ansi_flush, Metadata};
 use super::{AsyncReader, SyncReader, Termios};
 
 #[cfg(windows)]
@@ -18,19 +18,13 @@ use super::{Handle, ConsoleInfo};
 
 pub struct Tty {
     index: usize,
-    metas: Vec<Metadata>,
+    state: Metadata,
+    stash: Vec<Metadata>,
     original_mode: Termios,
     ansi_supported: bool,
-    autoflush: bool,
     altscreen: Option<Handle>,
     reset_attrs: u16,
-}
-
-pub struct Metadata {
-    is_raw_enabled: bool,
-    is_mouse_enabled: bool,
-    is_cursor_visible: bool,
-    saved_position: Option<(i16, i16)>,
+    flush_if_auto: bool,
 }
 
 impl Tty {
@@ -38,12 +32,8 @@ impl Tty {
     pub fn init() -> Tty {
         Tty {
             index: 0,
-            metas: vec![Metadata {
-                is_raw_enabled: false,
-                is_mouse_enabled: false,
-                is_cursor_visible: true,
-                saved_position: None,
-            }],
+            state: Metadata::new(),
+            stash: Vec::with_capacity(5),
             original_mode: {
                 if !_is_wincon_supported() {
                     Handle::conout().unwrap()
@@ -53,43 +43,23 @@ impl Tty {
                 }
             },
             ansi_supported: _is_ansi_supported(),
-            autoflush: false,
-
             altscreen: None,
             reset_attrs: ConsoleInfo::of(
                 &Handle::conout().unwrap()
             ).unwrap().attributes(),
+            flush_if_auto: false,
         }
     }
 
-    pub fn terminate(&mut self) {
-        let handle = match _is_wincon_supported() {
-            true => Handle::stdout().unwrap(),
-            false => Handle::conout().unwrap(),
-        };
+    // (imdaveho) NOTE: size in this context is more for internal use.
+    // See: CellBuffer::new()
+    // pub fn size(&self) -> (i16, i16) {
+    //     // Windows Console API only (no ANSI equivalent).
+    //     screen::wincon::size()
+    // }
 
-        self.to_main();
-
-        if self.ansi_supported {
-            handle.set_mode(&self.original_mode).unwrap();
-            write_ansi(&cursor::ansi::show());
-            write_ansi("\n\r");
-            self.flush();
-        } else {
-            handle.set_mode(&self.original_mode).unwrap();
-            if let Some(handle) = &self.altscreen {
-                handle.close().unwrap();
-            }
-            self.altscreen = None;
-            cursor::wincon::show().unwrap();
-            self.write("\n\r");
-        }
-        self.metas.clear();
-    }
-
-    pub fn size(&self) -> (i16, i16) {
-        // Windows Console API only (no ANSI equivalent).
-        screen::wincon::size()
+    pub fn screen_size(&self) -> (i16, i16) {
+        self.state.cellbuf._screen_size()
     }
 
     // "cooked" vs "raw" mode terminology from Wikipedia:
@@ -101,16 +71,14 @@ impl Tty {
     // data as-is to the program without interpreting any special characters.
     pub fn raw(&mut self) {
         // Windows Console API only (no ANSI equivalent).
-        let mut m = &mut self.metas[self.index];
         output::wincon::enable_raw().unwrap();
-        m.is_raw_enabled = true;
+        self.state._raw();
     }
 
     pub fn cook(&mut self) {
         // Windows Console API only (no ANSI equivalent).
-        let mut m = &mut self.metas[self.index];
         output::wincon::disable_raw().unwrap();
-        m.is_raw_enabled = false;
+        self.state._cook();
     }
 
     // Input module functions are OS-specific.
@@ -118,15 +86,13 @@ impl Tty {
     // * read_char/sync/async/until_async
 
     pub fn enable_mouse(&mut self) {
-        let mut m = &mut self.metas[self.index];
         input::wincon::enable_mouse_mode().unwrap();
-        m.is_mouse_enabled = true;
+        self.state._enable_mouse();
     }
 
     pub fn disable_mouse(&mut self) {
-        let mut m = &mut self.metas[self.index];
         input::wincon::disable_mouse_mode().unwrap();
-        m.is_mouse_enabled = false;
+        self.state._disable_mouse();
     }
 
     pub fn read_char(&self) -> char {
@@ -150,25 +116,39 @@ impl Tty {
         match method {
             "all" => {
                 if self.ansi_supported {
-                    write_ansi(&&screen::ansi::clear(screen::Clear::All));
-                    self.goto(0, 0);
+                    ansi_write(
+                        &screen::ansi::clear(All),
+                        self.flush_if_auto);
                 } else {
                     screen::wincon::clear(screen::Clear::All).unwrap();
                     self.goto(0, 0);
                 }
+                self.state.cellbuf._clear(All);
+                // (imdaveho) NOTE: might be too many "side effects" in a single
+                // method call...this should be explicit for the user to batch
+                // operations together; eg. clear all, goto(0,0), flush()
+                // self.goto(0, 0);
+                // (imdaveho) NOTE: there might be differences between ansi and
+                // wincon that perhaps this "goto" normalizes...
+                // TODO: TEST this.
             }
             "newln" => {
                 if self.ansi_supported {
-                    write_ansi(&&screen::ansi::clear(screen::Clear::NewLn));
+                    ansi_write(
+                        &screen::ansi::clear(NewLn),
+                        self.flush_if_auto);
                 } else {
                     let (col, row) = cursor::wincon::pos().unwrap();
                     screen::wincon::clear(screen::Clear::NewLn).unwrap();
                     self.goto(col, row);
                 }
+                self.state.cellbuf._clear(NewLn);
             }
             "currentln" => {
                 if self.ansi_supported {
-                    write_ansi(&&screen::ansi::clear(screen::Clear::CurrentLn));
+                    ansi_write(
+                        &screen::ansi::clear(CurrentLn),
+                        self.flush_if_auto);
                     let (_, row) = self.pos();
                     self.goto(0, row);
                 } else {
@@ -176,507 +156,453 @@ impl Tty {
                     screen::wincon::clear(screen::Clear::CurrentLn).unwrap();
                     self.goto(0, row);
                 }
+                self.state.cellbuf._clear(CurrentLn);
             }
             "cursorup" => {
                 if self.ansi_supported {
-                    write_ansi(&&screen::ansi::clear(screen::Clear::CursorUp));
+                    ansi_write(
+                        &screen::ansi::clear(CursorUp),
+                        self.flush_if_auto);
                 } else {
                     screen::wincon::clear(screen::Clear::CursorUp).unwrap();
                 }
+                self.state.cellbuf._clear(CursorUp)
             }
             "cursordn" => {
                 if self.ansi_supported {
-                    write_ansi(&&screen::ansi::clear(screen::Clear::CursorDn));
+                    ansi_write(
+                        &screen::ansi::clear(CursorDn),
+                        self.flush_if_auto);
                 } else {
                     screen::wincon::clear(screen::Clear::CursorDn).unwrap();
                 }
+                self.state.cellbuf._clear(CursorDn);
             }
             _ => ()
         }
-        if self.autoflush { self.flush() }
     }
 
     pub fn resize(&mut self, w: i16, h: i16) {
         if self.ansi_supported {
-            write_ansi(&screen::ansi::resize(w, h));
-            // (imdaveho) NOTE: In order to resize the terminal, this method
-            // must call `flush()` otherwise nothing happens.
-            self.flush();
+            ansi_write(
+                &screen::ansi::resize(w, h),
+                self.flush_if_auto);
         } else {
             screen::wincon::resize(w, h).unwrap();
         }
+        self.state.cellbuf._resize(w, h);
     }
 
     pub fn manual(&mut self) {
-        self.autoflush = false;
+        self.flush_if_auto = false;
     }
 
     pub fn automatic(&mut self) {
-        self.autoflush = true;
+        self.flush_if_auto = true;
     }
 
     pub fn switch(&mut self) {
         // In order to support multiple "screens", this function creates a new
         // Metadata entry which stores any screen specific changes that a User
         // might want to be restored when switching between screens.
-        if self.ansi_supported {
-            if self.index == 0 {
-                // There is no point to switch if you're on another screen
-                // since ANSI terminals provide a single "alternate screen".
-                write_ansi(&screen::ansi::enable_alt());
+        if self.index == 0 {
+            if self.ansi_supported {
+                // // There is no point to switch if you're on another screen
+                // // since ANSI terminals provide a single "alternate screen".
+                ansi_write(&screen::ansi::enable_alt(), self.flush_if_auto);
+                ansi_write(&screen::ansi::clear(All), self.flush_if_auto);
+            } else {
+                if self.altscreen.is_none() {
+                    self.altscreen = Some(Handle::buffer().unwrap());
+                }
+                if let Some(handle) = &self.altscreen {
+                    handle.set_mode(&self.original_mode).unwrap();
+                    // There is a single handle for the alternate screen buffer;
+                    // so only if you're on index == 0 or the main screen, do you
+                    // need to enable the alternate.
+                    handle.show().unwrap();
+                }
             }
-            // Add new `Metadata` for the new screen.
-            self._add_metadata();
-            self.index = self.metas.len() - 1;
+        } else {
+            // If this wasn't a switch to the alternate screen (ie. the current
+            // screen is already the alternate screen), then we need to clear it
+            // without modifying the cellbuffer.
+            if self.ansi_supported {
+                ansi_write(&screen::ansi::clear(All), self.flush_if_auto);
+            } else {
+                screen::wincon::clear(screen::Clear::All).unwrap();
+            }
+        }
+        // Push current self.state `Metadata` to stash and increment the index.
+        // Swap the current self.state for a new Metadata struct.
+        self.stash.push(self.state.clone());
+        self.state = Metadata::new();
+        self.index = self.stash.len();
+
+        if self.ansi_supported {
             // Prevent multiple `flush()` calls due to `autoflush` setting.
-            let autoflush = self.autoflush;
-            if self.autoflush { self.manual() }
+            let auto = self.flush_if_auto;
+            if auto { self.manual() }
             // Explicitly set default screen settings. (ANSI-only)
             self.cook();
             self.disable_mouse();
             self.show_cursor();
             self.goto(0, 0);
-
-            if autoflush {
-                self.flush();
-                // Revert back to previous `autoflush` configuration.
-                self.automatic();
-            }
+            // Revert back to previous `autoflush` configuration.
+            if auto { self.automatic(); self.flush(); }
         } else {
-            if self.altscreen.is_none() {
-                self.altscreen = Some(Handle::buffer().unwrap());
-            }
-            if let Some(handle) = &self.altscreen {
-                handle.set_mode(&self.original_mode).unwrap();
-                if self.id == 0 {
-                    // There is a single handle for the alternate screen buffer;
-                    // so only if you're on id == 0 or the main screen, do you
-                    // need to enable the alternate.
-                    handle.show().unwrap();
-                }
-                // Add new `Metadata` for the new screen.
-                self._add_metadata();
-                self.index = self.metas.len() - 1;
-                self.show_cursor();
-                self.goto(0, 0);
-            }
+            self.show_cursor();
+            self.goto(0, 0);
         }
     }
 
     pub fn to_main(&mut self) {
-        // Only execute if the User is not on the main screen buffer.
-        if self.index != 0 {
-            if self.ansi_supported {
-                let metas = &self.metas;
-                let rstate = metas[0].is_raw_enabled;
-                let mstate = metas[0].is_mouse_enabled;
-                let cstate = metas[0].is_cursor_visible;
-                self.id = 0;
-                write_ansi(&screen::ansi::disable_alt());
-
-                // Prevent multiple `flush()` calls due to `autoflush` setting.
-                let autoflush = self.autoflush;
-                if self.autoflush { self.manual() }
-
-                if rstate {
-                    self.raw();
-                } else {
-                    self.cook();
-                }
-
-                if mstate {
-                    self.enable_mouse();
-                } else {
-                    self.disable_mouse();
-                }
-
-                if cstate {
-                    self.show_cursor();
-                } else {
-                    self.hide_cursor();
-                }
-
-                if autoflush {
-                    self.flush();
-                    // Revert back to previous `autoflush` configuration.
-                    self.automatic();
-                }
-            } else {
-                let metas = &self.metas;
-                let rstate = metas[0].is_raw_enabled;
-                let mstate = metas[0].is_mouse_enabled;
-                let cstate = metas[0].is_cursor_visible;
-                let mode = &self.original_mode;
-                let stdout = Handle::stdout().unwrap();
-                stdout.set_mode(mode).unwrap();
-                self.id = 0;
-                screen::wincon::disable_alt().unwrap();
-
-                if rstate {
-                    self.raw();
-                }
-
-                if mstate {
-                    self.enable_mouse();
-                }
-
-                if cstate {
-                    self.show_cursor();
-                } else {
-                    self.hide_cursor();
-                }
-            }
-        }
+        if self.index == 0 { return }
+        self.switch_to(0);
     }
 
     pub fn switch_to(&mut self, index: usize) {
-        // This only switches the screen buffer and updates the settings.
-        // Updating the content that will be passed in and rendered, that is
-        // up to the implementation.
-
         // If the id and the current id are the same, well, there is nothing to
         // do, you're already on the active screen buffer.
-        if index != self.index {
-            if index == 0 {
-                // Switch to the main screen.
-                self.to_main();
+        if index == self.index { return }
+        // The below is to handle cases where `switch()` created a `Metadata`
+        // state that has not yet been pushed to self.stash. If it has already
+        // been pushed, update the stash at the current `self.index` before
+        // getting the Metadata at the switched to (function argument) `index`.
+        if self.stash.len() - 1 < self.index {
+            self.stash.push(self.state.clone())
+        } else {
+            self.stash[self.index] = self.state.clone();
+        }
+        // After updating the stash, clone the Metadata at the switch_to index.
+        self.state = self.stash[index].clone();
+        // Enable/Disable alternate screen based on current and target indices.
+        if index == 0 {
+            // Disable if you are reverting back to main.
+            if self.ansi_supported {
+                ansi_write(&screen::ansi::disable_alt(), self.flush_if_auto)
             } else {
-                if self.ansi_supported {
-                    let metas = &self.metas;
-                    let rstate = metas[index].is_raw_enabled;
-                    let mstate = metas[index].is_mouse_enabled;
-                    let cstate = metas[index].is_cursor_visible;
-                    self.index = index;
-
-                    // Prevent multiple `flush()` calls due to `autoflush`
-                    // setting.
-                    let autoflush = self.autoflush;
-                    if self.autoflush { self.manual() }
-
-                    if rstate {
-                        self.raw();
-                    } else {
-                        self.cook();
-                    }
-
-                    if mstate {
-                        self.enable_mouse();
-                    } else {
-                        self.disable_mouse();
-                    }
-
-                    if cstate {
-                        self.show_cursor();
-                    } else {
-                        self.hide_cursor();
-                    }
-
-                    if autoflush {
-                        self.flush();
-                        // Revert back to previous `autoflush` configuration.
-                        self.automatic();
-                    }
-                } else {
-                    let metas = &self.metas;
-                    let rstate = metas[index].is_raw_enabled;
-                    let mstate = metas[index].is_mouse_enabled;
-                    let cstate = metas[index].is_cursor_visible;
-                    let mode = &self.original_mode;
+                screen::wincon::disable_alt().unwrap();
+                let handle = Handle::stdout().unwrap();
+                handle.set_mode(&self.original_mode).unwrap();
+            }
+        } else {
+            if self.ansi_supported {
+                if self.index == 0 {
+                    // Enable if you are already on main switching to an
+                    // alternate screen.
+                    ansi_write(&screen::ansi::enable_alt(), self.flush_if_auto)
+                }
+                ansi_write(&screen::ansi::clear(All), self.flush_if_auto);
+                ansi_write(&cursor::ansi::goto(0, 0), self.flush_if_auto);
+            } else {
+                if self.index == 0 {
+                    // Enable if you are already on main switching to an
+                    // alternate altscreen.
                     if let Some(handle) = &self.altscreen {
-                        handle.set_mode(mode).unwrap();
-                        // Only show the altscreen handle if there is a switch
-                        // from the main screen. Otherwise, the altscreen is
-                        // already showing and no need to call `show()`.
-                        if self.id == 0 {
-                            handle.show().unwrap();
-                        }
-                        self.index = index;
-
-                        if rstate {
-                            self.raw();
-                        }
-
-                        if mstate {
-                            self.enable_mouse();
-                        }
-
-                        if cstate {
-                            self.show_cursor();
-                        } else {
-                            self.hide_cursor();
-                        }
+                        handle.set_mode(&self.original_mode).unwrap();
+                        handle.show().unwrap();
                     }
                 }
+                screen::wincon::clear(All).unwrap();
+                cursor::wincon::goto(0, 0).unwrap();
             }
+            // Restore screen contents. Restore flushes.
+            self.state.cellbuf._restore_buffer();
+            let (col, row) = self.state.cellbuf._screen_pos();
+            self.goto(col, row);
+        }
+        // Update `self.index` to the function argument `index`
+        // (imdaveho) TODO: Confirm if main screen will have native buffer logs,
+        // thereby not needing to restore content manually via library. Also,
+        // because there is going to be output that is not from `tty` which is
+        // not possible to save in the backbuf.
+        self.index = index;
+        
+        if self.ansi_supported {
+            let auto = self.flush_if_auto;
+            if auto { self.manual() }
+            let (raw, mouse, show) = (
+                self.state._is_raw(),
+                self.state._is_mouse(),
+                self.state._is_cursor());
+            // Restore settings based on metadata.
+            if raw { self.raw() } else { self.cook() }
+            if mouse { self.enable_mouse() } else { self.disable_mouse() }
+            if show { self.show_cursor() } else { self.hide_cursor() }
+
+            // Revert back to previous `autoflush` configuration.
+            // (imdaveho) NOTE: `_flush_backbuf` always calls `flush` so there
+            // is no need to call it again below as `switch()` does.
+            if auto { self.automatic() }
+        } else {
+            let (raw, mouse, show) = (
+                self.state._is_raw(),
+                self.state._is_mouse(),
+                self.state._is_cursor());
+            if raw { self.raw() } 
+            if mouse { self.enable_mouse() }
+            if show { self.show_cursor() } else { self.hide_cursor() }
         }
     }
 
     pub fn goto(&mut self, col: i16, row: i16) {
+        // (imdaveho) NOTE: Disallow negative values.
+        if col < 0 || row < 0 { return }
         if self.ansi_supported {
-            write_ansi(&cursor::ansi::goto(col, row));
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &cursor::ansi::goto(col, row),
+                self.flush_if_auto);
         } else {
             cursor::wincon::goto(col, row).unwrap();
         }
+        self.state.cellbuf._reposition(col, row);
     }
 
     pub fn up(&mut self) {
         if self.ansi_supported {
-            write_ansi(&cursor::ansi::move_up(1));
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &cursor::ansi::move_up(1),
+                self.flush_if_auto);
         } else {
             cursor::wincon::move_up(1).unwrap();
         }
+        self.state.cellbuf._sync_up(1);
     }
 
     pub fn dn(&mut self) {
         if self.ansi_supported {
-            write_ansi(&cursor::ansi::move_down(1));
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &cursor::ansi::move_down(1),
+                self.flush_if_auto);
         } else {
             cursor::wincon::move_down(1).unwrap();
         }
+        self.state.cellbuf._sync_dn(1);
     }
 
     pub fn left(&mut self) {
         if self.ansi_supported {
-            write_ansi(&cursor::ansi::move_left(1));
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &cursor::ansi::move_left(1),
+                self.flush_if_auto);
         } else {
             cursor::wincon::move_left(1).unwrap();
         }
+        self.state.cellbuf._sync_left(1);
     }
 
     pub fn right(&mut self) {
         if self.ansi_supported {
-            write_ansi(&cursor::ansi::move_right(1));
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &cursor::ansi::move_right(1),
+                self.flush_if_auto);
         } else {
             cursor::wincon::move_right(1).unwrap();
         }
+        self.state.cellbuf._sync_right(1);
     }
 
     pub fn dpad(&mut self, dir: &str, n: i16) {
+        // (imdaveho) NOTE: Only deal with non-negative `n`. We use i16 to
+        // mirror types for getting cursor position and returning terminal size.
+        if n < 0 { return }
         // Case-insensitive.
-        let d = dir.to_lowercase();
-        if n > 0 {
-            match d.as_str() {
-                "up" => {
-                    if self.ansi_supported {
-                        write_ansi(&cursor::ansi::move_up(n));
-                    } else {
-                        cursor::wincon::move_up(n).unwrap();
-                    }
-                },
-                "dn" => {
-                    if self.ansi_supported {
-                        write_ansi(&cursor::ansi::move_down(n));
-                    } else {
-                        cursor::wincon::move_down(n).unwrap();
-                    }
-                },
-                "left" => {
-                    if self.ansi_supported {
-                        write_ansi(&cursor::ansi::move_left(n));
-                    } else {
-                        cursor::wincon::move_left(n).unwrap();
-                    }
-                },
-                "right" => {
-                    if self.ansi_supported {
-                        write_ansi(&cursor::ansi::move_right(n));
-                    } else {
-                        cursor::wincon::move_right(n).unwrap();
-                    }
-                },
-                _ => ()
-            };
+        match dir.to_lowercase().as_str() {
+            "up" => {
+                if self.ansi_supported {
+                    ansi_write(
+                        &cursor::ansi::move_up(n),
+                        self.flush_if_auto);
+                } else {
+                    cursor::wincon::move_up(n).unwrap();
+                }
+                self.state.cellbuf._sync_up(n);
+            },
+            "dn" => {
+                if self.ansi_supported {
+                    ansi_write(
+                        &cursor::ansi::move_down(n),
+                        self.flush_if_auto);
+                } else {
+                    cursor::wincon::move_down(n).unwrap();
+                }
+                self.state.cellbuf._sync_dn(n);
+            },
+            "left" => {
+                if self.ansi_supported {
+                    ansi_write(
+                        &cursor::ansi::move_left(n),
+                        self.flush_if_auto);
+                } else {
+                    cursor::wincon::move_left(n).unwrap();
+                }
+                self.state.cellbuf._sync_left(n);
+            },
+            "right" => {
+                if self.ansi_supported {
+                    ansi_write(
+                        &cursor::ansi::move_right(n),
+                        self.flush_if_auto);
+                } else {
+                    cursor::wincon::move_right(n).unwrap();
+                }
+                self.state.cellbuf._sync_right(n);
+            },
+            _ => ()
         }
-        if self.autoflush { self.flush() }
     }
 
     pub fn pos(&mut self) -> (i16, i16) {
+        let err_message = "Error reading cursor position (I/O related)";
         if self.ansi_supported {
-            if self.metas[self.index].is_raw_enabled {
-                cursor::ansi::pos_raw().unwrap()
+            let (col, row) = if self.state._is_raw() {
+                cursor::ansi::pos_raw()
+                    .expect(err_message)
             } else {
                 self.raw();
-                let (col, row) = cursor::ansi::pos_raw().unwrap();
+                let (col, row) = cursor::ansi::pos_raw()
+                    .expect(err_message);
                 self.cook();
-                return (col, row);
-            }
+                (col, row)
+            };
+            self.state.cellbuf._reposition(col, row);
+            (col, row)
         } else {
-            cursor::wincon::pos().unwrap()
+            cursor::wincon::pos().expect(err_message)
         }
+    }
+
+    pub fn screen_pos(&mut self) -> (i16, i16) {
+        self.state.cellbuf._screen_pos()
     }
 
     pub fn mark(&mut self) {
-        if self.ansi_supported {
-            write_ansi(&cursor::ansi::save_pos());
-            if self.autoflush { self.flush() }
-        } else {
-            self.metas[self.index].saved_position = Some(
-                cursor::wincon::pos().unwrap()
-            );
-        }
+        // if self.ansi_supported {
+        //     write_ansi(&cursor::ansi::save_pos());
+        //     if self.autoflush { self.flush() }
+        // } else {
+        //     self.metas[self.index].saved_position = Some(
+        //         cursor::wincon::pos().unwrap()
+        //     );
+        // }
+        self.state._mark_position();
     }
 
     pub fn load(&mut self) {
-        if self.ansi_supported {
-            write_ansi(&cursor::ansi::load_pos());
-            if self.autoflush { self.flush() }
-        } else {
-            match self.metas[self.index].saved_position {
-                Some(pos) => {
-                    self.goto(pos.0, pos.1);
-                }
-                None => ()
-            }
-        }
+        // if self.ansi_supported {
+        //     write_ansi(&cursor::ansi::load_pos());
+        //     if self.autoflush { self.flush() }
+        // } else {
+        //     match self.metas[self.index].saved_position {
+        //         Some(pos) => {
+        //             self.goto(pos.0, pos.1);
+        //         }
+        //         None => ()
+        //     }
+        // }
+        let (col, row) = self.state._saved_position();
+        self.goto(col, row);
     }
 
     pub fn hide_cursor(&mut self) {
         if self.ansi_supported {
-            write_ansi(&cursor::ansi::hide());
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &cursor::ansi::hide(),
+                self.flush_if_auto);
         } else {
             cursor::wincon::hide().unwrap();
         }
-        let mut m = &mut self.metas[self.index];
-        m.is_cursor_visible = false;
+        self.state._hide_cursor();
     }
 
     pub fn show_cursor(&mut self) {
         if self.ansi_supported {
-            write_ansi(&cursor::ansi::show());
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &cursor::ansi::show(),
+                self.flush_if_auto);
         } else {
             cursor::wincon::show().unwrap();
         }
-        let mut m = &mut self.metas[self.index];
-        m.is_cursor_visible = true;
+        self.state._show_cursor();
     }
 
-    pub fn set_fg(&mut self, color: &str) {
-        let fg_col = output::Color::from(color);
+    pub fn set_fg(&mut self, color: Color) {
         if self.ansi_supported {
-            write_ansi(&output::ansi::set_fg(fg_col));
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &output::ansi::set_style(Fg(color)),
+                self.flush_if_auto);
+        
         } else {
-            output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
+            output::wincon::set_fg(color, self.reset_attrs).unwrap();
         }
+        self.state.cellbuf._sync_style(Fg(color));
     }
 
-    pub fn set_bg(&mut self, color: &str) {
-        let bg_col = output::Color::from(color);
+    pub fn set_bg(&mut self, color: Color) {
         if self.ansi_supported {
-            write_ansi(&output::ansi::set_bg(bg_col));
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &output::ansi::set_style(Bg(color)),
+                self.flush_if_auto);
         } else {
-            output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
+            output::wincon::set_bg(color, self.reset_attrs).unwrap();
         }
+        self.state.cellbuf._sync_style(Bg(color));
     }
 
-    pub fn set_tx(&mut self, style: &str) {
-        // NOTE: `style` will be `reset` if the passed in
-        // `&str` contains multiple values (eg. "bold, underline").
-        let style = output::TextStyle::from(style);
+    pub fn set_fx(&mut self, effects: Effects) {
         if self.ansi_supported {
-            write_ansi(&output::ansi::set_tx(style));
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &output::ansi::set_style(Fx(effects)),
+                self.flush_if_auto);
         } else {
-            output::wincon::set_tx(style).unwrap();
+            // output::wincon::set_tx(effects).unwrap();
         }
+        self.state.cellbuf._sync_style(Fx(effects));
     }
 
-    pub fn set_fg_rgb(&mut self, r: u8, g:u8, b: u8) {
-        let fg_col = output::Color::Rgb{
-            r: r,
-            g: g,
-            b: b,
-        };
+    pub fn set_styles(&mut self, fgcol: Color, bgcol: Color, effects: Effects) {
         if self.ansi_supported {
-            write_ansi(&output::ansi::set_fg(fg_col));
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &output::ansi::set_styles(fgcol, bgcol, effects),
+                self.flush_if_auto);
+            self.state.cellbuf._sync_style(Fg(fgcol));
+            self.state.cellbuf._sync_style(Bg(bgcol));
+            self.state.cellbuf._sync_style(Fx(effects));
         } else {
-            output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
-        }
-    }
-
-    pub fn set_bg_rgb(&mut self, r: u8, g:u8, b: u8) {
-        let bg_col = output::Color::Rgb{
-            r: r,
-            g: g,
-            b: b,
-        };
-        if self.ansi_supported {
-            write_ansi(&output::ansi::set_bg(bg_col));
-            if self.autoflush { self.flush() }
-        } else {
-            output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
-        }
-    }
-
-    pub fn set_fg_ansi(&mut self, v: u8) {
-        let fg_col = output::Color::AnsiValue(v);
-        if self.ansi_supported {
-            write_ansi(&output::ansi::set_fg(fg_col));
-            if self.autoflush { self.flush() }
-        } else {
-            output::wincon::set_fg(fg_col, self.reset_attrs).unwrap();
-        }
-    }
-
-    pub fn set_bg_ansi(&mut self, v: u8) {
-        let bg_col = output::Color::AnsiValue(v);
-        if self.ansi_supported {
-            write_ansi(&output::ansi::set_bg(bg_col));
-            if self.autoflush { self.flush() }
-        } else {
-            output::wincon::set_bg(bg_col, self.reset_attrs).unwrap();
-        }
-    }
-
-    pub fn set_style(&mut self, fg: &str, bg: &str, style: &str) {
-        // The params fg is a single word, bg is also a single word, however
-        // the tx param can be treated as a comma-separated list of words that
-        // match the various text styles that are supported: "bold", "dim",
-        // "underline", "reverse", "hide", and "reset".
-        if self.ansi_supported {
-            write_ansi(&output::ansi::set_all(fg, bg, style));
-            if self.autoflush { self.flush() }
-        } else {
-            output::wincon::set_all(fg, bg, style, self.reset_attrs).unwrap();
+            // output::wincon::set_all(fg, bg, style, self.reset_attrs).unwrap();
         }
     }
 
     pub fn reset(&mut self) {
         if self.ansi_supported {
-            write_ansi(&output::ansi::reset());
-            if self.autoflush { self.flush() }
+            ansi_write(
+                &output::ansi::reset(),
+                self.flush_if_auto);
         } else {
             output::wincon::reset(self.reset_attrs).unwrap();
         }
+        self.state.cellbuf._reset_style();
     }
 
-    pub fn prints(&mut self, s: &str) {
+    pub fn prints(&mut self, content: &str) {
+        self.state.cellbuf._sync_buffer(content);
         if self.ansi_supported {
-            write_ansi(&output::ansi::prints(s));
-            if self.autoflush { self.flush() }
+            ansi_write(&output::ansi::prints(content), self.flush_if_auto);
         } else {
-            output::wincon::prints(s).unwrap();
+            output::wincon::prints(content).unwrap();
         }
     }
 
     pub fn flush(&mut self) {
         // ANSI-only
         if self.ansi_supported {
-            flush_ansi();
+            ansi_flush();
         }
     }
 
-    pub fn printf(&mut self, s: &str) {
-        self.prints(s);
+    pub fn printf(&mut self, content: &str) {
+        self.prints(content);
         self.flush();
     }
 
@@ -694,19 +620,34 @@ impl Tty {
     // }
 
 
+    pub fn terminate(&mut self) {
+        let stdout = match _is_wincon_supported() {
+            true => Handle::stdout().unwrap(),
+            false => Handle::conout().unwrap(),
+        };
 
-    fn _add_metadata(&mut self) {
-        let metas = &mut self.metas;
-        let rstate = metas[self.index].is_raw_enabled;
-        let mstate = metas[self.index].is_mouse_enabled;
-        let cstate = metas[self.index].is_cursor_visible;
-        metas.push(Metadata{
-            is_raw_enabled: rstate,
-            is_mouse_enabled: mstate,
-            is_cursor_visible: cstate,
-            saved_position: None,
-        });
+        self.to_main();
+
+        if self.ansi_supported {
+            stdout.set_mode(&self.original_mode).unwrap();
+            self.show_cursor();
+            ansi_write("\n\r", true);
+            self.flush();
+        } else {
+            stdout.set_mode(&self.original_mode).unwrap();
+            if let Some(handle) = &self.altscreen {
+                handle.close().unwrap();
+            }
+            self.altscreen = None;
+            cursor::wincon::show().unwrap();
+            self.prints("\n\r");
+        }
+        self.stash.clear();
     }
+
+    // pub fn is_ansi(&self) -> bool {
+    //     self.ansi_supported
+    // }
 }
 
 

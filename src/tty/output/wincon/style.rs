@@ -8,7 +8,7 @@ use winapi::um::wincon::{
     BACKGROUND_BLUE as BG_BLUE, BACKGROUND_INTENSITY as BG_INTENSITY,
     COMMON_LVB_UNDERSCORE, COMMON_LVB_REVERSE_VIDEO,
 };
-use super::{Color, Error, Result, Style, Handle, ConsoleInfo, TextStyle};
+use super::{Color, Error, Result, Style, Handle, ConsoleInfo, Effects, Effect, Effect::*};
 
 type Fg = u16;
 type Bg = u16;
@@ -53,11 +53,11 @@ pub fn set_bg(color: Color, reset: u16) -> Result<()> {
     Ok(())
 }
 
-pub fn set_tx(style: TextStyle) -> Result<()> {
+pub fn set_tx(style: Effects) -> Result<()> {
     let handle = Handle::conout()?;
     let info = ConsoleInfo::of(&handle)?;
     let curr_at = info.attributes();
-    let attr: Attrs = _stylize(Style::Tx(style), curr_at);
+    let attr: Attrs = _stylize(Style::Fx(style), curr_at);
     unsafe {
         if SetConsoleTextAttribute(handle.0, attr) == 0 {
             return Err(Error::last_os_error());
@@ -66,14 +66,14 @@ pub fn set_tx(style: TextStyle) -> Result<()> {
     Ok(())
 }
 
-pub fn set_all(fg: &str, bg: &str, tx: &str, reset: u16) -> Result<()> {
+pub fn set_all(fg: Color, bg: Color, fx: Effects, reset: u16) -> Result<()> {
     let handle = Handle::conout()?;
     let info = ConsoleInfo::of(&handle)?;
     let curr_at = info.attributes();
     // Start with getting only the Fg Attributes.
     let (fg_attr, bg_attr, mut attrs): (u16, u16, u16);
     match fg {
-        "reset" => fg_attr = reset & 0x000f,
+        Color::Reset => fg_attr = reset & 0x000f,
         _ => {
             let mask_fg = 0x000f;
             let attr: Fg = _stylize(Style::Fg(Color::from(fg)), curr_at);
@@ -85,7 +85,7 @@ pub fn set_all(fg: &str, bg: &str, tx: &str, reset: u16) -> Result<()> {
     }
     // Then getting only the Bg Attributes.
     match bg {
-        "reset" => bg_attr = reset & 0x00f0,
+        Color::Reset => bg_attr = reset & 0x00f0,
         _ => {
             let mask_bg = 0x00f0;
             let attr: Bg = _stylize(Style::Bg(Color::from(bg)), curr_at);
@@ -95,34 +95,39 @@ pub fn set_all(fg: &str, bg: &str, tx: &str, reset: u16) -> Result<()> {
             } else { bg_attr = attr & mask_bg }
         }
     }
-
-    // The tx param is should be a comma separated string.
-    let tx_arr: Vec<&str> = tx.split(',').map(|t| t.trim()).collect();
     // Combine Fg and Bg into the remaining and additively
     // apply each text style.
     attrs = fg_attr | bg_attr;
+    // // The tx param is should be a comma separated string.
+    // let tx_arr: Vec<&str> = tx.split(',').map(|t| t.trim()).collect();
     // Dim may be the only attribute that is diminutive.
     // So if there is a "dim" found, that needs to persist.
-    let mut dimmed = false;
-    for s in tx_arr.iter() {
-        match *s {
-            "bold" | "underline" | "reverse" | "hide" => {
-                attrs = _stylize(Style::Tx(TextStyle::from(*s)), attrs);
-                if dimmed {
-                    attrs &= !FG_INTENSITY
-                }
-            }
-            "dim" => {
-                attrs = _stylize(Style::Tx(TextStyle::from(*s)), attrs);
-                dimmed = true;
-            }
-            _ => {
-                let at = _stylize(Style::Tx(TextStyle::from(*s)), curr_at);
-                attrs = fg_attr | bg_attr | at;
-                break;
-            }
-        }
-    }
+    // let mut dimmed = false;
+    // let masks = [Reset, Bold, Dim, Underline, Reverse, Hide];
+    // for m in &masks {
+    //     if (fx & *m as u32) != 0 {
+    //         attrs = _stylize(Style::Fx(*m as u32), attrs);
+    //     }
+    // }
+    // for s in tx_arr.iter() {
+    //     match *s {
+    //         "bold" | "underline" | "reverse" | "hide" => {
+    //             attrs = _stylize(Style::Tx(TextStyle::from(*s)), attrs);
+    //             if dimmed {
+    //                 attrs &= !FG_INTENSITY
+    //             }
+    //         }
+    //         "dim" => {
+    //             attrs = _stylize(Style::Tx(TextStyle::from(*s)), attrs);
+    //             dimmed = true;
+    //         }
+    //         _ => {
+    //             let at = _stylize(Style::Tx(TextStyle::from(*s)), curr_at);
+    //             attrs = fg_attr | bg_attr | at;
+    //             break;
+    //         }
+    //     }
+    // }
     // Finally apply the combined styles.
     unsafe {
         if SetConsoleTextAttribute(handle.0, attrs) == 0 {
@@ -166,10 +171,11 @@ fn _stylize(style: Style, attr: u16) -> Attrs {
             let tx = attr & mask_tx;
             attrs = fg | bg | tx;
         }
-        Style::Tx(t) => {
-            let tx = _match_tx(t, at);
+        Style::Fx(t) => {
+            // let tx = _match_tx(t, attr);
             let fg = attr & mask_fg;
             let bg = attr & mask_bg;
+            let tx = 0;
             attrs = fg | bg | tx;
         }
     }
@@ -233,16 +239,16 @@ fn _match_bg(color: Color) -> Bg {
     }
 }
 
-fn _match_tx(style: TextStyle, attr: u16) -> Attrs {
+fn _match_tx(style: Effect, attr: u16) -> Attrs {
     // Returns Fg, Bg, and Tx attributes. Since
     // text styling is additive we will apply and
     // return the existing attributes as a whole.
     match style {
-        TextStyle::Bold => attr | FG_INTENSITY,
-        TextStyle::Dim => attr & !FG_INTENSITY,
-        TextStyle::Underline => attr | COMMON_LVB_UNDERSCORE,
-        TextStyle::Reverse => attr | COMMON_LVB_REVERSE_VIDEO,
-        TextStyle::Hide => {
+        Effect::Bold => attr | FG_INTENSITY,
+        Effect::Dim => attr & !FG_INTENSITY,
+        Effect::Underline => attr | COMMON_LVB_UNDERSCORE,
+        Effect::Reverse => attr | COMMON_LVB_REVERSE_VIDEO,
+        Effect::Hide => {
             // Get the BG color.
             let (mask_fg, mask_bg) = (0x000f, 0x00f0);
             let bg = attr & mask_bg;
@@ -257,7 +263,7 @@ fn _match_tx(style: TextStyle, attr: u16) -> Attrs {
             // GROUND should remain the same within the current attrs.
             fg | (attr & !mask_fg)
         },
-        TextStyle::Reset => {
+        Effect::Reset => {
             let mask_tx = 0xdf00;
             // Since Windows Attributes are "additive", we can simply
             // unmask all of them if Attribute::Reset.
