@@ -4,7 +4,8 @@ use winapi::um::consoleapi::WriteConsoleW;
 use winapi::shared::ntdef::{NULL, VOID};
 use super::{
     Display, Error, Result, Color, Style,
-    Handle, ConsoleInfo, Termios, Effects, Effect,
+    Handle, ConsoleInfo, Termios, Effect,
+    Foreground, Background, RESET, IGNORE
 };
 
 #[cfg(windows)]

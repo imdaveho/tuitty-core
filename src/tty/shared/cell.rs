@@ -2,7 +2,7 @@
 
 use super::{
     ansi_write,
-    Clear, Color, Effect, Effects, Style::*,
+    Clear, Color, Effect, Style::*,
     Style, UnicodeWidthStr, UnicodeWidthChar,
 };
 use super::super::output;
@@ -20,7 +20,7 @@ pub struct Cell {
 pub struct CellStyle {
     fg: Color,
     bg: Color,
-    fx: Effects,
+    fx: u32,
 }
 
 impl CellStyle {

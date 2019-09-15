@@ -68,7 +68,7 @@ fn test_screen() {
     tty.goto(5, 2);
     tty.flush();
     // // tty.set_fg("yellow");
-    // tty.set_fg(Color::Yellow);
+    tty.set_fg(Color::Yellow);
     // tty.set_fx(Effect::Underline | Effect::Bold);
     tty.printf("hello, world");
     thread::sleep(Duration::from_millis(4000));
@@ -78,7 +78,7 @@ fn test_screen() {
     tty.goto(8, 3);
     tty.flush();
     // // tty.set_fg("cyan");
-    // tty.set_fg(Color::Cyan);
+    tty.set_fg(Color::Cyan);
     // tty.set_fx(Effect::Underline | Effect::Dim);
     tty.printf("goodbye, world");
     thread::sleep(Duration::from_millis(2000));

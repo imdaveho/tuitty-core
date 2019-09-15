@@ -8,12 +8,12 @@
 use super::cursor;
 use super::input;
 use super::screen::{self, Clear::*};
-use super::output::{self, Color, Effects, Style::*};
+use super::output::{self, Color, Style::*};
 use super::shared::{ansi_write, ansi_flush, Metadata};
 use super::{AsyncReader, SyncReader, Termios};
 
 #[cfg(windows)]
-use super::{Handle, ConsoleInfo};
+use super::{Handle, ConsoleInfo, ConsoleOutput};
 
 
 pub struct Tty {
@@ -23,7 +23,7 @@ pub struct Tty {
     original_mode: Termios,
     ansi_supported: bool,
     altscreen: Option<Handle>,
-    reset_attrs: u16,
+    console_output: ConsoleOutput,
     flush_if_auto: bool,
 }
 
@@ -44,9 +44,10 @@ impl Tty {
             },
             ansi_supported: _is_ansi_supported(),
             altscreen: None,
-            reset_attrs: ConsoleInfo::of(
-                &Handle::conout().unwrap()
-            ).unwrap().attributes(),
+            console_output: ConsoleOutput(
+                ConsoleInfo::of(&Handle::conout().unwrap())
+                .unwrap().attributes()
+            ),
             flush_if_auto: false,
         }
     }
@@ -534,7 +535,7 @@ impl Tty {
                 self.flush_if_auto);
         
         } else {
-            output::wincon::set_fg(color, self.reset_attrs).unwrap();
+            self.console_output.set_style(Fg(color)).unwrap()
         }
         self.state.cellbuf._sync_style(Fg(color));
     }
@@ -545,23 +546,23 @@ impl Tty {
                 &output::ansi::set_style(Bg(color)),
                 self.flush_if_auto);
         } else {
-            output::wincon::set_bg(color, self.reset_attrs).unwrap();
+            self.console_output.set_style(Bg(color)).unwrap()
         }
         self.state.cellbuf._sync_style(Bg(color));
     }
 
-    pub fn set_fx(&mut self, effects: Effects) {
+    pub fn set_fx(&mut self, effects: u32) {
         if self.ansi_supported {
             ansi_write(
                 &output::ansi::set_style(Fx(effects)),
                 self.flush_if_auto);
         } else {
-            // output::wincon::set_tx(effects).unwrap();
+            self.console_output.set_style(Fx(effects)).unwrap()
         }
         self.state.cellbuf._sync_style(Fx(effects));
     }
 
-    pub fn set_styles(&mut self, fgcol: Color, bgcol: Color, effects: Effects) {
+    pub fn set_styles(&mut self, fgcol: Color, bgcol: Color, effects: u32) {
         if self.ansi_supported {
             ansi_write(
                 &output::ansi::set_styles(fgcol, bgcol, effects),
@@ -570,7 +571,7 @@ impl Tty {
             self.state.cellbuf._sync_style(Bg(bgcol));
             self.state.cellbuf._sync_style(Fx(effects));
         } else {
-            // output::wincon::set_all(fg, bg, style, self.reset_attrs).unwrap();
+            self.console_output.set_styles(fgcol, bgcol, effects).unwrap()
         }
     }
 
@@ -580,7 +581,7 @@ impl Tty {
                 &output::ansi::reset(),
                 self.flush_if_auto);
         } else {
-            output::wincon::reset(self.reset_attrs).unwrap();
+            self.console_output.reset().unwrap();
         }
         self.state.cellbuf._reset_style();
     }
