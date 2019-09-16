@@ -9,14 +9,14 @@ use libc::termios as Termios;
 #[cfg(windows)]
 type Termios = u32;
 
-#[cfg(windows)]
-use shared::{Handle, ConsoleInfo};
-
 mod cursor;
 mod input;
 mod output;
 mod screen;
 mod shared;
+
+#[cfg(windows)]
+pub use shared::{Handle, ConsoleInfo};
 
 pub use output::{Color, Effect};
 

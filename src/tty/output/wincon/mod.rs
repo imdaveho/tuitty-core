@@ -23,14 +23,13 @@ pub fn prints<D: Display>(value: D) -> Result<usize> {
         .encode_utf16()
         .map(|x| x)
         .collect::<Vec<u16>>();
-    let length = text.len() as u32;
     let mut size = 0;
     unsafe {
         // https://docs.microsoft.com/en-us/windows/console/writeconsole
         if WriteConsoleW(
             handle.0,
             text.as_ptr() as *const VOID,
-            length,
+            text.len() as u32,
             &mut size, NULL
         ) == 0 {
             return Err(Error::last_os_error());

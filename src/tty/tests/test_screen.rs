@@ -60,6 +60,36 @@ fn test_screen() {
     // emulating bash on windows #1392
     // https://github.com/cmderdev/cmder/issues/2165
 
+    // let mut t = Tty::init();
+    // t.switch();
+    // t.flush();
+    // let (w, h) = t.screen_size();
+
+    // t.printf(&format!("{}, {}", w, h));
+    // t.goto(0, 0);
+
+    // thread::sleep(Duration::from_millis(2000));
+
+    // let mut s = String::new();
+
+    // let end = ((w * 2) + 5) as usize;
+
+    // for i in 0..end {
+    //     if i % 10 == 0 {
+    //         s.push_str("*")
+    //     } else {
+    //         s.push_str("-")
+    //     }
+    // }
+
+    // s.push_str("hello, world");
+    // // super::super::output::ansi::prints(&s);
+    // // t.flush();
+    // t.printf(&s);
+
+    // t.goto(5, 4);
+    // t.printf("hello, world");
+    // thread::sleep(Duration::from_millis(2000));
 
     let delay = 2000;
     let mut tty = Tty::init();
@@ -68,17 +98,17 @@ fn test_screen() {
     tty.goto(5, 2);
     tty.flush();
     // // tty.set_fg("yellow");
-    tty.set_fg(Color::Yellow);
+    // tty.set_fg(Color::Yellow);
     // tty.set_fx(Effect::Underline | Effect::Bold);
     tty.printf("hello, world");
-    thread::sleep(Duration::from_millis(4000));
+    thread::sleep(Duration::from_millis(2000));
 
     tty.switch();
     tty.flush();
     tty.goto(8, 3);
     tty.flush();
     // // tty.set_fg("cyan");
-    tty.set_fg(Color::Cyan);
+    // tty.set_fg(Color::Cyan);
     // tty.set_fx(Effect::Underline | Effect::Dim);
     tty.printf("goodbye, world");
     thread::sleep(Duration::from_millis(2000));
@@ -87,8 +117,8 @@ fn test_screen() {
     tty.flush();
     thread::sleep(Duration::from_millis(delay));
 
-    tty.to_main();
-    thread::sleep(Duration::from_millis(1000));
+    // tty.to_main();
+    // thread::sleep(Duration::from_millis(1000));
 
 
 
