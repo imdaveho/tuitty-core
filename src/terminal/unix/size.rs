@@ -1,3 +1,5 @@
+// Unix specific function to fetch the terminal screen size.
+
 use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 
 

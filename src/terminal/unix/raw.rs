@@ -1,4 +1,4 @@
-// ANSI functions for enabling and disabling raw mode.
+// Unix specific functions for enabling and disabling raw mode.
 //
 // Normally the terminal uses line buffering. This means input will be sent
 // line by line. With raw mode, input is sent one byte at a time. Because of

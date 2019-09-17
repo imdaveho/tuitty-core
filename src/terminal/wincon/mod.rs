@@ -1,7 +1,7 @@
-// Windows Console API specific functions that align with ANSI implementation.
+// Windows Console API specific functions.
 
-pub mod handle;
 pub mod cursor;
 pub mod screen;
 pub mod output;
 pub mod style;
+pub mod handle;

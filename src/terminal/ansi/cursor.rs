@@ -1,4 +1,5 @@
 // ANSI specific functions for controlling the terminal cursor.
+
 use std::io::{stdin, stdout, Result, Write};
 
 
@@ -14,7 +15,7 @@ pub fn move_right(n: i16) -> String {
     format!("\x1B[{}C"), n)
 }
 
-pub fn move_down(n: i16) -> String {
+pub fn move_dn(n: i16) -> String {
     format!("\x1B[{}B"), n)
 }
 

@@ -1,10 +1,13 @@
+use super::cache::ScreenCache;
+
+
 #[derive(Clone)]
 pub struct Metadata {
     is_raw_enabled: bool,
     is_mouse_enabled: bool,
     is_cursor_visible: bool,
     saved_position: (i16, i16),
-    // TODO: pub cellbuf: super::CellBuffer,
+    pub cache: ScreenCache,
 }
 
 impl Metadata {
@@ -14,7 +17,7 @@ impl Metadata {
             is_mouse_enabled: false,
             is_cursor_visible: true,
             saved_position: (0, 0),
-            // TODO: cellbuf: super::CellBuffer::new()
+            cache: ScreenCache::new(),
         }
     }
 
@@ -26,7 +29,7 @@ impl Metadata {
         self.is_raw_enabled = false;
     }
 
-    pub fn _is_raw(&self) -> bool {
+    pub fn _is_raw_on(&self) -> bool {
         self.is_raw_enabled
     }
 
@@ -38,7 +41,7 @@ impl Metadata {
         self.is_mouse_enabled = false;
     }
 
-    pub fn _is_mouse(&self) -> bool {
+    pub fn _is_mouse_on(&self) -> bool {
         self.is_mouse_enabled
     }
 
@@ -50,12 +53,12 @@ impl Metadata {
         self.is_cursor_visible = false;
     }
 
-    pub fn _is_cursor(&self) -> bool {
+    pub fn _is_cursor_on(&self) -> bool {
         self.is_cursor_visible
     }
 
     pub fn _mark_position(&mut self) {
-        self.saved_position = self.cellbuf._screen_pos();
+        self.saved_position = self.cache._screen_pos();
     }
 
     pub fn _saved_position(&self) -> (i16, i16) {

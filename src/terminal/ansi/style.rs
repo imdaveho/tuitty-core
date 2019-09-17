@@ -1,3 +1,5 @@
+// Ansi specific functions to colorize and format text in the terminal.
+
 use crate::common::enums::{Style, Color, Effect::*};
 
 

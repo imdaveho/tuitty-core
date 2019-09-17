@@ -4,6 +4,10 @@
 // * Style
 // * Color
 // * Effect
+// * InputEvent
+// * MouseEvent
+// * MouseButton
+// * KeyEvent
 
 
 pub enum Clear {
@@ -75,4 +79,59 @@ impl BitOr<Effect> for u32 {
     fn bitor(self, rhs: Effect) -> Self {
         self as u32 | rhs as u32
     }
+}
+
+
+pub enum InputEvent {
+    Keyboard(KeyEvent),
+    Mouse(MouseEvent),
+    Unsupported(Vec<u8>),
+    Unknown,
+}
+
+
+pub enum MouseEvent {
+    Press(MouseButton, i16, i16),
+    Release(i16, i16),
+    Hold(i16, i16),
+    Unknown,
+}
+
+
+pub enum MouseButton {
+    Left,
+    Right,
+    Middle,
+    WheelUp,
+    WheelDn,
+}
+
+
+pub enum KeyEvent {
+    Backspace,
+    Left,
+    Right,
+    Up,
+    Dn,
+    Home,
+    End,
+    PageUp,
+    PageDn,
+    BackTab,
+    Delete,
+    Insert,
+    F(u8),
+    Char(char),
+    Alt(char),
+    Ctrl(char),
+    Null,
+    Esc,
+    CtrlUp,
+    CtrlDn,
+    CtrlRight,
+    CtrlLeft,
+    ShiftUp,
+    ShiftDn,
+    ShiftRight,
+    ShiftLeft,
 }

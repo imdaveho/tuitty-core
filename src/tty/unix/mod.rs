@@ -335,7 +335,7 @@ impl Tty {
         let err_message = "Error reading cursor position (I/O related)";
         let (col, row) = if self.state._is_raw() {
             cursor::ansi::pos_raw()
-                .expect(err_message)
+                .expect(err_message) // TODO: .unwrap_or((0, 0))
         } else {
             self.raw();
             let (col, row) = cursor::ansi::pos_raw()

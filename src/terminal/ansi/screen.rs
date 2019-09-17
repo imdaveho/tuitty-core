@@ -1,4 +1,5 @@
 // ANSI functions for configuring the terminal size and clearing the screen.
+
 use crate::common::enums::Clear;
 
 

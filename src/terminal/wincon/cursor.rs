@@ -90,7 +90,7 @@ pub fn show_cursor() -> Result<()> {
 }
 
 pub fn pos() -> Result<(i16, i16)> {
-        let handle = Handle::conout()?;
-        let info = ConsoleInfo::of(&handle)?;
-        Ok(info.cursor_pos())
+    let handle = Handle::conout()?;
+    let info = ConsoleInfo::of(&handle)?;
+    Ok(info.cursor_pos())
 }

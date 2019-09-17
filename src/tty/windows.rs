@@ -459,7 +459,7 @@ impl Tty {
         if self.ansi_supported {
             let (col, row) = if self.state._is_raw() {
                 cursor::ansi::pos_raw()
-                    .expect(err_message)
+                    .expect(err_message) // TODO: .unwrap_or((0, 0))
             } else {
                 self.raw();
                 let (col, row) = cursor::ansi::pos_raw()
@@ -470,7 +470,7 @@ impl Tty {
             self.state.cellbuf._reposition(col, row);
             (col, row)
         } else {
-            cursor::wincon::pos().expect(err_message)
+            cursor::wincon::pos().expect(err_message) // TODO .unwrap_or((0, 0))
         }
     }
 
