@@ -15,9 +15,19 @@ pub const RESET: u16 = 0xFFFF;
 pub const IGNORE: u16 = 0xFFF0;
 
 
-pub struct ConsoleOutput(pub u16);
+pub struct ConsoleOutput(u16);
 
 impl ConsoleOutput {
+    pub fn new() -> ConsoleOutput {
+        ConsoleOutput(
+            ConsoleInfo::of(
+                &Handle::conout()
+                .expect("Error fetching $CONOUT"))
+            .expect("Error fetching ConsoleInfo from $CONOUT")
+            .attributes()
+        )
+    }
+
     pub fn reset(&self) -> Result<()> {
         let handle = Handle::conout()?;
         unsafe {

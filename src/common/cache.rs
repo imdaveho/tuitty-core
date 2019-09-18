@@ -9,7 +9,7 @@ use crate::wincon::cell::CharInfoCache;
 pub enum ScreenCache {
     Ansi(CellInfoCache),
     #[cfg(windows)]
-    Wapi(CharInfoCache),
+    Win32(CharInfoCache),
 }
 
 impl ScreenCache {
@@ -19,7 +19,7 @@ impl ScreenCache {
         }
         #[cfg(windows)]
         else { 
-            ScreenCache::Wapi(CharInfoCache::new())
+            ScreenCache::Win32(CharInfoCache::new())
         }
     }
 
@@ -27,18 +27,19 @@ impl ScreenCache {
         match self {
             Ansi(b) => b,
             #[cfg(windows)]
-            Wapi(_) => panic!("ScreenCache is not Ansi"),
+            Win32(_) => panic!("ScreenCache is not Ansi"),
         }
     }
 
     #[cfg(windows)]
-    pub fn wincon(&self) -> &mut CharInfoCache {
+    pub fn win32(&self) -> &mut CharInfoCache {
         match self {
-            Ansi(_) => panic!("ScreenCache is not WinAPI"),
-            Wapi(b) => b,
+            Ansi(_) => panic!("ScreenCache is not Win32"),
+            Win32(b) => b,
         }
     }
 }
+
 
 trait CacheHandler {
     fn new() -> ScreenCache;

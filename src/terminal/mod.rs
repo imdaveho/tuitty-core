@@ -9,36 +9,26 @@ mod wincon;
 #[cfg(windows)]
 mod windows;
 
+use crate::common::enums::{ Clear, Direction, Style, Color };
 
-trait Teletype {
-    fn init();
-    fn terminate();
-    fn manual();
-    fn automatic();
-    fn screen_pos(); // cursor::pos
-    fn screen_size(); // screen::size
-    // screen
-    fn clear();
-    fn resize();
-    // cursor
-    fn goto();
-    fn up();
-    fn down();
-    fn left();
-    fn right();
-    fn moves();
-    fn mark_pos();
-    fn load_pos();
-    fn hide_cursor();
-    fn show_cursor();
-    // style
-    fn set_fg(); // Style
-    fn set_bg(); // STyle
-    fn set_fx();
-    fn set_styles(); // Color, u32
-    fn reset_styles();
-    // output
-    fn prints();
-    fn flush();
-    fn printf();
+
+trait PartialTerminalApi {
+    fn clear(&self, method: Clear);
+    fn resize(&self, w: i16, h: i16);
+    fn goto(&self, col: i16, row: i16);
+    fn up(&self);
+    fn down(&self);
+    fn left(&self);
+    fn right(&self);
+    fn moves(&self, direction: Direction);
+    fn hide_cursor(&self);
+    fn show_cursor(&self);
+    fn set_style(&self, style: Style);
+    fn set_styles(&self, fg: Color, bg: Color, fx: u32);
+    fn unset_styles(&self);
+    fn enable_mouse(&self);
+    fn disable_mouse(&self);
+    fn prints(&self, content: &str);
+    // (imdaveho) NOTE: Just a bit of OS specific logic for pos.
+    fn pos(&self) -> (i16, i16);
 }

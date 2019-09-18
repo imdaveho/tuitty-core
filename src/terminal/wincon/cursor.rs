@@ -42,22 +42,22 @@ pub fn goto(col: i16, row: i16) -> Result<()> {
 }
 
 pub fn move_up(n: i16) -> Result<()> {
-    let (col, row) = pos().unwrap();
+    let (col, row) = pos()?;
     goto(col, row - n)
 }
 
 pub fn move_right(n: i16) -> Result<()> {
-    let (col, row) = pos().unwrap();
+    let (col, row) = pos()?;
     goto(col + n, row)
 }
 
 pub fn move_down(n: i16) -> Result<()> {
-    let (col, row) = pos().unwrap();
+    let (col, row) = pos()?;
     goto(col, row + n)
 }
 
 pub fn move_left(n: i16) -> Result<()> {
-    let (col, row) = pos().unwrap();
+    let (col, row) = pos()?;
     goto(col - n, row)
 }
 
