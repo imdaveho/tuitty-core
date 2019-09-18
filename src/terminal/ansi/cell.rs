@@ -35,7 +35,7 @@ impl CacheHandler for CellInfoCache {
         CellInfoCache {
             screen_pos: (0, 0),
             screen_size: (w, h),
-            style: (Color::Reset, Color::Reset, Effect::Reset as u32),
+            style: (Color::Reset, Color::Reset, Effect::Reset),
             cells: vec![None, capacity],
         }
     }
@@ -46,52 +46,6 @@ impl CacheHandler for CellInfoCache {
 
     pub fn _screen_pos(&self) -> (i16, i16) {
         self.screen_pos
-    }
-
-    pub fn _clear(&mut self, method: Clear) {
-        match method {
-            Clear::All => {
-                let (w, h) = self.screen_size;
-                let capacity = (w * h) as usize;
-                self.buffer = vec![None; capacity];
-            }
-            Clear::NewLn => {
-                let (w, (col, row)) = (self.screen_size.0, self.screen_pos);
-                let (here, there) = ((row * w) + col, (row + 1) * w);
-                for i in (here as usize)..(there as usize) {
-                    self.buffer[i] = None;
-                }
-            }
-            Clear::CurrentLn => {
-                let (w, row) = (self.screen_size.0, self.screen_pos.1);
-                let (here, there) = ((row * w), (row + 1) * w);
-                for i in (here as usize)..(there as usize) {
-                    self.buffer[i] = None;
-                }
-            }
-            Clear::CursorUp => {
-                let (w, (col, row)) = (self.screen_size.0, self.screen_pos);
-                let here = (row * w) + col;
-                for i in 0..(here as usize) {
-                    self.buffer[i] = None;
-                }
-            }
-            Clear::CursorDn => {
-                let ((w, h), (col, row)) = (self.screen_size, self.screen_pos);
-                let (here, there) = ((row * w) + col, w * h);
-                for i in (here as usize)..(there as usize) {
-                    self.buffer[i] = None;
-                }
-            }
-        }
-    }
-
-    pub fn _clear_style(&mut self) {
-        self.style = (
-            Color::Reset,
-            Color::Reset,
-            Effect::Reset as u32
-        )
     }
 
     pub fn _sync_size(&mut self, w: i16, h: i16) {
@@ -169,6 +123,14 @@ impl CacheHandler for CellInfoCache {
         }
     }
 
+    pub fn _sync_styles(&mut self, fg: Color, bg: Color, fx: u32) {
+        self.style = (fg, bg, fx)
+    }
+
+    pub fn _reset_styles(&mut self) {
+        self.style = (Color::Reset, Color::Reset, Effect::Reset);
+    }
+
     pub fn _flush(&self) {
         let (w, h) = self.screen_size;
         let capacity = (w * h) as isize;
@@ -225,7 +187,7 @@ impl CacheHandler for CellInfoCache {
         output::printf(&contents);
     }
 
-    pub fn _cache(&mut self, content: &str) {
+    pub fn _sync_content(&mut self, content: &str) {
         let length = UnicodeWidthStr::width(content);
         let charbuf = content.chars();
         let (w, h) = self.screen_size;
@@ -280,4 +242,43 @@ impl CacheHandler for CellInfoCache {
         }
         self.screen_pos = (new_col as i16, new_row as i16);
     }
+
+    pub fn _clear(&mut self, method: Clear) {
+        match method {
+            Clear::All => {
+                let (w, h) = self.screen_size;
+                let capacity = (w * h) as usize;
+                self.buffer = vec![None; capacity];
+            }
+            Clear::NewLn => {
+                let (w, (col, row)) = (self.screen_size.0, self.screen_pos);
+                let (here, there) = ((row * w) + col, (row + 1) * w);
+                for i in (here as usize)..(there as usize) {
+                    self.buffer[i] = None;
+                }
+            }
+            Clear::CurrentLn => {
+                let (w, row) = (self.screen_size.0, self.screen_pos.1);
+                let (here, there) = ((row * w), (row + 1) * w);
+                for i in (here as usize)..(there as usize) {
+                    self.buffer[i] = None;
+                }
+            }
+            Clear::CursorUp => {
+                let (w, (col, row)) = (self.screen_size.0, self.screen_pos);
+                let here = (row * w) + col;
+                for i in 0..(here as usize) {
+                    self.buffer[i] = None;
+                }
+            }
+            Clear::CursorDn => {
+                let ((w, h), (col, row)) = (self.screen_size, self.screen_pos);
+                let (here, there) = ((row * w) + col, w * h);
+                for i in (here as usize)..(there as usize) {
+                    self.buffer[i] = None;
+                }
+            }
+        }
+    }
+
 }

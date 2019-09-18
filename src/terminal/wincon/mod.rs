@@ -7,13 +7,14 @@ mod style;
 mod mouse;
 mod handle;
 
-use crate::terminal::PartialTerminalApi;
+pub use handle::Handle;
+use crate::terminal::CommonTerminalApi;
 use crate::common::enums::{ Clear, Direction, Style, Color };
 
 
 pub struct Win32Console(style::ConsoleOutput)
 
-impl PartialTerminalApi for Win32Console {
+impl CommonTerminalApi for Win32Console {
     pub fn new() -> Win32Console {
         Win32Console(style::ConsoleOutput::new())
     }
@@ -42,58 +43,28 @@ impl PartialTerminalApi for Win32Console {
             .expect("Error setting the cursor position");
     }
 
-    pub fn up(&self) {
-        cursor::move_up(1)
-            .expect("Error moving the cursor up by 1");
+    pub fn up(&self, n: i16) {
+        if n < 0 { return }
+        cursor::move_up(n)
+            .expect(format!("Error moving the cursor up by {}", n));
     }
 
-    pub fn dn(&self) {
-        cursor::move_dn(1)
-            .expect("Error moving the cursor down by 1");
+    pub fn dn(&self, n: i16) {
+        if n < 0 { return }
+        cursor::move_dn(n)
+            .expect(format!("Error moving the cursor down by {}", n));
     }
 
-    pub fn left(&self) {
-        cursor::move_left(1)
-            .expect("Error moving the cursor left by 1");
+    pub fn left(&self, n: i16) {
+        if n < 0 { return }
+        cursor::move_left(n)
+            .expect(format!("Error moving the cursor left by {}", n));
     }
 
-    pub fn right(&self) {
-        cursor::move_right(1)
-            .expect("Error moving the cursor right by 1");
-    }
-
-    pub fn moves(&self, direction: Direction) {
-        let err_msg = "Error moving the cursor ";
-        match direction {
-            Direction::Up(n) => {
-                if n < 0 { return }
-                else { 
-                    cursor::move_up(n)
-                        .expect(format!("{} up by {}", err_msg, n));
-                }
-            }
-            Direction::Dn(n) => {
-                if n < 0 { return }
-                else { 
-                    cursor::move_dn(n)
-                        .expect(format!("{} up down {}", err_msg, n));
-                }
-            }
-            Direction::Left(n) => {
-                if n < 0 { return }
-                else { 
-                    cursor::move_left(n)
-                        .expect(format!("{} up left {}", err_msg, n));
-                }
-            }
-            Direction::Right(n) => {
-                if n < 0 { return }
-                else {
-                    cursor::move_right(n)
-                        .expect(format!("{} up right {}", err_msg, n));
-                }
-            }
-        }
+    pub fn right(&self, n: i16) {
+        if n < 0 { return }
+        cursor::move_right(n)
+            .expect(format!("Error moving the cursor right by {}", n));
     }
 
     pub fn hide_cursor(&self) {
@@ -116,7 +87,7 @@ impl PartialTerminalApi for Win32Console {
             .expect("Error setting console styles");
     }
 
-    pub fn unset_styles(&self) {
+    pub fn reset_styles(&self) {
         self.0.reset()
             .expect("Error unsetting console styles");
     }
@@ -131,13 +102,26 @@ impl PartialTerminalApi for Win32Console {
             .expect("Error disabling mouse mode");
     }
 
+    pub fn pos(&self) -> (i16, i16) {
+        crate::terminal::wincon::cursor::pos()
+            .expect("Error reading cursor position (Handle related)")
+    }
+    
+    
+    // (imdaveho) NOTE: The below are still common API methods as part of the 
+    // struct. But left out of the trait to prevent duplication when combined
+    // together into a single `Terminal` struct.
     pub fn prints(&self, content: &str) {
         output::prints(content)
             .expect("Error writing to console");
     }
-    
-    pub fn pos(&self) -> (i16, i16) {
-        crate::terminal::wincon::cursor::pos()
-            .expect("Error reading cursor position (Handle related)")
+    // (imdaveho) NOTE: Wincon printf identical to prints.
+    pub fn printf(&self, content: &str) {
+        output::prints(content)
+            .expect("Error writing to console");
+    }
+    // (imdaveho) NOTE: Wincon flush is no-op.
+    pub fn flush(&self) {
+        ()
     }
 }

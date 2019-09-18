@@ -7,13 +7,13 @@ mod style;
 mod mouse;
 mod cell;
 
-use crate::terminal::PartialTerminalApi;
+use crate::terminal::CommonTerminalApi;
 use crate::common::enums::{ Clear, Direction, Style, Color };
 
 
 pub struct AnsiTerminal()
 
-impl PartialTerminalApi for AnsiTerminal {
+impl CommonTerminalApi for AnsiTerminal {
     pub new() -> AnsiTerminal {
         AnsiTerminal()
     }
@@ -40,41 +40,24 @@ impl PartialTerminalApi for AnsiTerminal {
         output::prints(&cursor::goto(col, row));
     }
 
-    pub fn up(&self) {
-        output::prints(&cursor::move_up(1));
+    pub fn up(&self, n: i16) {
+        if n < 0 { return }
+        output::prints(&cursor::move_up(n));
     }
     
-    pub fn dn(&self) {
-        output::prints(&cursor::move_dn(1));
+    pub fn dn(&self, n: i16) {
+        if n < 0 { return }
+        output::prints(&cursor::move_dn(n));
     }
     
-    pub fn left(&self) {
-        output::prints(&cursor::move_left(1));
+    pub fn left(&self, n: i16) {
+        if n < 0 { return }
+        output::prints(&cursor::move_left(n));
     }
     
-    pub fn right(&self) {
-        output::prints(&cursor::move_right(1));
-    }
-
-    pub fn moves(&self, direction: Direction) {
-        match direction {
-            Direction::Up(n) => {
-                if n < 0 { return } 
-                else { output::prints(&cursor::move_up(n)) }
-            }
-            Direction::Dn(n) => {
-                if n < 0 { return } 
-                else { output::prints(&cursor::move_dn(n)) }
-            }
-            Direction::Left(n) => {
-                if n < 0 { return } 
-                else { output::prints(&cursor::move_left(n)) }
-            }
-            Direction::Right(n) => {
-                if n < 0 { return } 
-                else { output::prints(&cursor::move_right(n)) }
-            }
-        }
+    pub fn right(&self, n: i16) {
+        if n < 0 { return }
+        output::prints(&cursor::move_right(n));
     }
 
     pub fn hide_cursor(&self) {
@@ -93,7 +76,7 @@ impl PartialTerminalApi for AnsiTerminal {
         output::prints(&style::set_styles(fg, bg, fx));
     }
 
-    pub fn unset_styles(&self) {
+    pub fn reset_styles(&self) {
         output::prints(&style::reset());
     }
 
@@ -105,10 +88,7 @@ impl PartialTerminalApi for AnsiTerminal {
         output.prints(&mouse::disable_mouse_mode());
     }
 
-    pub fn prints(&self, content: &str) {
-        output::prints(content);
-    }
-
+    // (imdaveho) NOTE: Just a bit of OS specific logic.
     pub fn pos(&self) -> (i16, i16) {
         #[cfg(windows)]
         crate::terminal::wincon::cursor::pos()
@@ -117,5 +97,21 @@ impl PartialTerminalApi for AnsiTerminal {
         #[cfg(unix)]
         crate::terminal::unix::pos()
             .expect("Error reading cursor position (I/O related)")
+    }
+
+
+    // (imdaveho) NOTE: The below are still common API methods as part of the 
+    // struct. But left out of the trait to prevent duplication when combined
+    // together into a single `Terminal` struct
+    pub fn prints(&self, content: &str) {
+        output::prints(content);
+    }
+
+    pub fn printf(&self, content: &str) {
+        output::printf(content);
+    }
+
+    pub fn flush(&self) {
+        output::flush();
     }
 }

@@ -9,6 +9,8 @@
 // * MouseButton
 // * KeyEvent
 
+use std::ops::{ BitAnd, BitOr };
+
 
 pub enum Clear {
     /// clear all cells in terminal
@@ -65,8 +67,16 @@ pub enum Effect {
     Hide = 1 << (8 + 9),
 }
 
-impl BitOr for Effect {
+impl BitOr<u32> for Effect {
     type Output = u32;
+
+    fn bitor(self, rhs: u32) -> u32 {
+        self as u32 | rhs
+    }
+}
+
+impl BitOr<Effect> for Effect {
+    type Output = Self;
 
     fn bitor(self, rhs: Self) -> u32 {
         self as u32 | rhs as u32
@@ -77,7 +87,31 @@ impl BitOr<Effect> for u32 {
     type Output = Self;
 
     fn bitor(self, rhs: Effect) -> Self {
-        self as u32 | rhs as u32
+        self | rhs as u32
+    }
+}
+
+impl BitAnd<u32> for Effect {
+    type Output = u32;
+
+    fn bitand(self, rhs: u32) -> u32 {
+        self as u32 & rhs
+    }
+}
+
+impl BitAnd<Effect> for Effect {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> u32 {
+        self as u32 & rhs as u32
+    }
+}
+
+impl BitAnd<Effect> for u32 {
+    type Output = Self;
+
+    fn bitand(self, rhs: Effect) -> Self {
+        self & rhs as u32
     }
 }
 

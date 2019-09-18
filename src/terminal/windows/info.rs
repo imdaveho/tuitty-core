@@ -27,7 +27,7 @@ impl CacheHandler for CharInfoCache {
         CharInfoCache {
             screen_pos: (0, 0),
             screen_size: (w, h),
-            style: (Color::Reset, Color::Reset, Effect::Reset as u32),
+            style: (Color::Reset, Color::Reset, Effect::Reset),
             buffer: unsafe {vec![zeroed(); capacity]},
         }
     }
@@ -38,14 +38,6 @@ impl CacheHandler for CharInfoCache {
 
     pub fn _screen_pos(&self) -> (i16, i16) {
         self.screen_pos
-    }
-
-    pub fn _clear_style(&mut self) {
-        self.style = (
-            Color::Reset,
-            Color::Reset,
-            Effect::Reset as u32
-        )
     }
 
     pub fn _sync_size(&mut self, w: i16, h: i16) {
@@ -123,6 +115,14 @@ impl CacheHandler for CharInfoCache {
             Bg(c) => self.style.1 = c,
             Fx(f) => self.style.2 = f,
         }
+    }
+
+    pub fn _sync_styles(&mut self, fg: Color, bg: Color, fx: u32) {
+        self.style = (fg, bg, fx)
+    }
+
+    pub fn _reset_styles(&mut self) {
+        self.style = (Color::Reset, Color::Reset, Effect::Reset);
     }
 
     pub fn _flush(&self) {
