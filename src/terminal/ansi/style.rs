@@ -27,7 +27,7 @@ pub fn set_style(style: Style) -> String {
             for fx in &fxs {
                 if (f & *fx as u32) != 0 {
                     let value = (*fx as u32 >> 9).trailing_zeros() as u8;
-                    csi.push_str(&format!("\x1B[{}m"), value)
+                    csi.push_str(&format!("\x1B[{}m", value));
                 } else {
                     csi.push_str("");
                 }

@@ -3,14 +3,14 @@
 
 use std::{
     char, thread, io::{ Error, ErrorKind, Result },
-    sync::{
-        Arc, mpsc::{ Receiver, Sender, channel },
-        atomic::{ AtomicBool, Ordering },
-    },
+    sync::atomic::Ordering,
     time::Duration,
 };
 use winapi::um::winnt::INT;
-use super::parser::{read_single_event, read_input_events};
+
+use super::parser::read_input_events;
+use super::{ SyncReader, AsyncReader };
+use crate::common::enums::{ InputEvent, KeyEvent };
 
 
 extern "C" { fn _getwche() -> INT; }

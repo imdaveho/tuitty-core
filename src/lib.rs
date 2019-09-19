@@ -3,7 +3,8 @@
 // use std::ffi::CStr;
 // use std::os::raw::c_char;
 
-mod tty;
+// mod tty;
+// mod terminal;
 
 // use tty::{
 //     Tty, AsyncReader, SyncReader,

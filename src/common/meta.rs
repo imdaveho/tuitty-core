@@ -1,4 +1,4 @@
-use super::cache::ScreenCache;
+use super::cache::{ ScreenCache, CacheUpdater };
 
 
 #[derive(Clone)]

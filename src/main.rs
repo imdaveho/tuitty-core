@@ -2,7 +2,8 @@
 
 use std::thread;
 use std::time::Duration;
-mod tty;
+mod terminal;
+mod common;
 
 fn main() {
 

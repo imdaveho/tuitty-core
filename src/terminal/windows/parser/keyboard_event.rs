@@ -4,7 +4,7 @@ use super::input_event::ControlKeyState;
 
 // Describes a keyboard input event in a console INPUT_RECORD structure.
 // https://docs.microsoft.com/en-us/windows/console/key-event-record-str
-struct KeyEventRecord {
+pub struct KeyEventRecord {
     // If the key is pressed, this member is TRUE. Otherwise, this member is
     // FALSE (the key is released).
     pub key_down: bool,

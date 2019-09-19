@@ -1,10 +1,19 @@
 // Functions to parse Windows Console inputs and map them to the proper event.
 
-use std::{
-    borrow::ToOwned,
-    io::{ Error, Result },
+mod input_event;
+use input_event::{ 
+    InputRecord, InputEventType,
+    ControlKeyState, EventFlags
 };
-use winapi::shared::minwindef::{DWORD, WORD};
+
+mod keyboard_event;
+use keyboard_event::KeyEventRecord;
+
+mod mouse_event;
+use mouse_event::{ MouseEventRecord, ButtonState };
+
+use std::{ borrow::ToOwned, io::{ Error, Result } };
+use winapi::shared::minwindef::DWORD;
 use winapi::um::{
     wincon::{
         INPUT_RECORD,
@@ -22,16 +31,8 @@ use winapi::um::{
         GetNumberOfConsoleInputEvents, ReadConsoleInputW,
     },
 };
-use crate::wincon::handle::Handle;
+use crate::terminal::wincon::Handle;
 use crate::common::enums::{ InputEvent, KeyEvent, MouseEvent, MouseButton };
-
-mod input_event;
-use input_event::{InputRecord, InputEventType};
-mod keyboard_event;
-use keyboard_event::KeyEventRecord;
-mod mouse_event;
-use mouse_event::{MouseEventRecord, ButtonState};
-
 
 
 pub fn read_single_event() -> Result<Option<InputEvent>> {
@@ -210,9 +211,9 @@ fn parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
                     else { KeyEvent::Right }
                 }
                 VK_DOWN => {
-                    if ctrl { KeyEvent::CtrlDn }
-                    else if shift { KeyEvent::ShiftDn }
-                    else { KeyEvent::Dn }
+                    if ctrl { KeyEvent::CtrlDown }
+                    else if shift { KeyEvent::ShiftDown }
+                    else { KeyEvent::Down }
                 }
                 _ => KeyEvent::Null,
             }
@@ -222,7 +223,7 @@ fn parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
         // if PAGEUP (b'5') or PAGEDOWN (b'6')
         VK_PRIOR | VK_NEXT => {
             if kcode == VK_PRIOR { KeyEvent::PageUp }
-            else if kcode == VK_NEXT { KeyEvent::PageDn }
+            else if kcode == VK_NEXT { KeyEvent::PageDown }
             else { KeyEvent::Null }
         }
         // END 0x23 | HOME 0x24
@@ -351,7 +352,7 @@ fn parse_mouse_event(mevt: &MouseEventRecord) -> MouseEvent {
                 MouseEvent::Press(MouseButton::WheelUp, xpos, ypos)
             } else {
                 // format!("\x1B[<65;{};{};M")
-                MouseEvent::Press(MouseButton::WheelDn, xpos, ypos)
+                MouseEvent::Press(MouseButton::WheelDown, xpos, ypos)
             }
         }
         EventFlags::DoubleClick => MouseEvent::Unknown,

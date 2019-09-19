@@ -1,4 +1,7 @@
-use super::handle::Handle;
+// Windows Console API specific functions that enable/disable mouse mode.
+
+use std::io::Result;
+use super::Handle;
 
 
 const MOUSE_MODE: u32 = 0x0010 | 0x0080 | 0x0008;

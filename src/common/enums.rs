@@ -12,6 +12,7 @@
 use std::ops::{ BitAnd, BitOr };
 
 
+#[derive(Copy, Clone)]
 pub enum Clear {
     /// clear all cells in terminal
     All,
@@ -26,6 +27,7 @@ pub enum Clear {
 }
 
 
+#[derive(Copy, Clone)]
 pub enum Style {
     Fg(Color),
     Bg(Color),
@@ -76,7 +78,7 @@ impl BitOr<u32> for Effect {
 }
 
 impl BitOr<Effect> for Effect {
-    type Output = Self;
+    type Output = u32;
 
     fn bitor(self, rhs: Self) -> u32 {
         self as u32 | rhs as u32
@@ -100,7 +102,7 @@ impl BitAnd<u32> for Effect {
 }
 
 impl BitAnd<Effect> for Effect {
-    type Output = Self;
+    type Output = u32;
 
     fn bitand(self, rhs: Self) -> u32 {
         self as u32 & rhs as u32
@@ -137,7 +139,7 @@ pub enum MouseButton {
     Right,
     Middle,
     WheelUp,
-    WheelDn,
+    WheelDown,
 }
 
 
@@ -146,11 +148,11 @@ pub enum KeyEvent {
     Left,
     Right,
     Up,
-    Dn,
+    Down,
     Home,
     End,
     PageUp,
-    PageDn,
+    PageDown,
     BackTab,
     Delete,
     Insert,
@@ -161,18 +163,18 @@ pub enum KeyEvent {
     Null,
     Esc,
     CtrlUp,
-    CtrlDn,
+    CtrlDown,
     CtrlRight,
     CtrlLeft,
     ShiftUp,
-    ShiftDn,
+    ShiftDown,
     ShiftRight,
     ShiftLeft,
 }
 
 pub enum Direction {
     Up(i16),
-    Dn(i16),
+    Down(i16),
     Left(i16),
     Right(i16),
 }

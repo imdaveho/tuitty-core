@@ -7,7 +7,7 @@ use winapi::um::wincon::{
     COMMON_LVB_UNDERSCORE as UNDERLINE,
     COMMON_LVB_REVERSE_VIDEO as REVERSE
 };
-use super::handle:{Handle, ConsoleInfo};
+use super::handle::{Handle, ConsoleInfo};
 use crate::common::enums::{Style, Color, Effect::*};
 
 
@@ -44,7 +44,7 @@ impl ConsoleOutput {
         let current = info.attributes();
         // let (just_fg, just_bg, just_fx) = (
         //     current & 0x000f, current & 0x00f0, current & 0xdf00);
-        let updated: ConsoleAttribute = match style {
+        let updated: u16 = match style {
             Style::Fg(c) => {
                 let mut updated_fg = Foreground::from(c);
                 if updated_fg == RESET { 
@@ -115,9 +115,9 @@ impl ConsoleOutput {
     }
 
     pub fn set_styles(&self, fg: Color, bg: Color, fx: u32) -> Result<()> {
-        self.set_style(Fg(fg))?;
-        self.set_style(Bg(bg))?;
-        self.set_style(Fx(fx))?;
+        self.set_style(Style::Fg(fg))?;
+        self.set_style(Style::Bg(bg))?;
+        self.set_style(Style::Fx(fx))?;
         Ok(())
     }
 }
@@ -131,7 +131,6 @@ impl From<Color> for Foreground {
             FOREGROUND_RED as RED,
             FOREGROUND_GREEN as GREEN,
             FOREGROUND_BLUE as BLUE,
-            FOREGROUND_INTENSITY as INTENSE,
         };
 
         match src {

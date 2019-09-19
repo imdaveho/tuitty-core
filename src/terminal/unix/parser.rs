@@ -85,7 +85,7 @@ where I: Iterator<Item = u8> {
         Some(b'D') => InputEvent::Keyboard(KeyEvent::Left),
         Some(b'C') => InputEvent::Keyboard(KeyEvent::Right),
         Some(b'A') => InputEvent::Keyboard(KeyEvent::Up),
-        Some(b'B') => InputEvent::Keyboard(KeyEvent::Dn),
+        Some(b'B') => InputEvent::Keyboard(KeyEvent::Down),
         Some(b'H') => InputEvent::Keyboard(KeyEvent::Home),
         Some(b'F') => InputEvent::Keyboard(KeyEvent::End),
         Some(b'Z') => InputEvent::Keyboard(KeyEvent::BackTab),
@@ -111,7 +111,7 @@ where I: Iterator<Item = u8> {
                 }
                 1 => {
                     if cb & 0x40 != 0 {
-                        MouseEvent::Press(MouseButton::WheelDn, cx, cy)
+                        MouseEvent::Press(MouseButton::WheelDown, cx, cy)
                     } else {
                         MouseEvent::Press(MouseButton::Middle, cx, cy)
                     }
@@ -147,7 +147,7 @@ where I: Iterator<Item = u8> {
                         1 => MouseButton::Middle,
                         2 => MouseButton::Right,
                         64 => MouseButton::WheelUp,
-                        65 => MouseButton::WheelDn,
+                        65 => MouseButton::WheelDown,
                         _ => unreachable!(),
                     };
                     match c {
@@ -234,7 +234,7 @@ where I: Iterator<Item = u8> {
                         3 => InputEvent::Keyboard(KeyEvent::Delete),
                         4 | 8 => InputEvent::Keyboard(KeyEvent::End),
                         5 => InputEvent::Keyboard(KeyEvent::PageUp),
-                        6 => InputEvent::Keyboard(KeyEvent::PageDn),
+                        6 => InputEvent::Keyboard(KeyEvent::PageDown),
                         v @ 11..=15 => {
                             InputEvent::Keyboard(KeyEvent::F(v - 10))
                         }
@@ -253,11 +253,11 @@ where I: Iterator<Item = u8> {
                 // _ = InputEvent::Unknown,
                 e => match (buf.last().unwrap(), e) {
                     (53, 65) => InputEvent::Keyboard(KeyEvent::CtrlUp),
-                    (53, 66) => InputEvent::Keyboard(KeyEvent::CtrlDn),
+                    (53, 66) => InputEvent::Keyboard(KeyEvent::CtrlDown),
                     (53, 67) => InputEvent::Keyboard(KeyEvent::CtrlRight),
                     (53, 68) => InputEvent::Keyboard(KeyEvent::CtrlLeft),
                     (50, 65) => InputEvent::Keyboard(KeyEvent::ShiftUp),
-                    (50, 66) => InputEvent::Keyboard(KeyEvent::ShiftDn),
+                    (50, 66) => InputEvent::Keyboard(KeyEvent::ShiftDown),
                     (50, 67) => InputEvent::Keyboard(KeyEvent::ShiftRight),
                     (50, 68) => InputEvent::Keyboard(KeyEvent::ShiftLeft),
                     _ => InputEvent::Unknown,

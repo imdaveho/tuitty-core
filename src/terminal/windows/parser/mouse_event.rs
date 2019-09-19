@@ -1,9 +1,10 @@
 use winapi::shared::minwindef::DWORD;
-use super::input_event::{ ControlKeyState, EventFlags };
+use winapi::um::wincon::MOUSE_EVENT_RECORD;
+use super::{ ControlKeyState, EventFlags };
 
 
 #[derive(PartialEq, Debug, Copy, Clone)]
-struct MouseEventRecord {
+pub struct MouseEventRecord {
     pub mouse_position: (i16, i16),
     pub button_state: ButtonState,
     pub control_key_state: ControlKeyState,
@@ -22,7 +23,7 @@ impl From<MOUSE_EVENT_RECORD> for MouseEventRecord {
 }
 
 
-/ The status of the mouse buttons.
+// The status of the mouse buttons.
 // The least significant bit corresponds to the leftmost mouse button.
 // The next least significant bit corresponds to the rightmost mouse button.
 // The next bit indicates the next-to-leftmost mouse button.
@@ -32,7 +33,7 @@ impl From<MOUSE_EVENT_RECORD> for MouseEventRecord {
 // https://docs.microsoft.com/en-us/windows/console/mouse-event-record-str
 // #members
 #[derive(PartialEq, Debug, Copy, Clone)]
-enum ButtonState {
+pub enum ButtonState {
     Release = 0x0000,
     // The leftmost mouse button.
     FromLeft1stButtonPressed = 0x0001,

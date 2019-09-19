@@ -1,5 +1,6 @@
 #[cfg(windows)]
-use crate::wincon::Handle
+use crate::terminal::wincon::Handle;
+
 
 pub fn is_ansi_enabled() -> bool {
     const TERMS: [&'static str; 15] = [
@@ -24,9 +25,8 @@ pub fn is_ansi_enabled() -> bool {
 
     if matched_terms {
         return true
-    }
-    #[cfg(windows)]
-    else {
+    } else {
+        #[cfg(windows)] {
         let enable_vt = 0x0004;
         let handle = match Handle::stdout() {
             Ok(h) => h,
@@ -39,10 +39,10 @@ pub fn is_ansi_enabled() -> bool {
         match handle.set_mode(&(mode | enable_vt)) {
             Ok(_) => return true,
             Err(_) => return false,
-        }
+        }}
+        #[cfg(not(windows))]
+        return false
     }
-    #[cfg(!windows)]
-    else { return false }
 }
 
 pub fn is_wincon_enabled() -> bool {

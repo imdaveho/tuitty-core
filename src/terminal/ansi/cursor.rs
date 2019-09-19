@@ -2,23 +2,23 @@
 
 
 pub fn goto(col: i16, row: i16) -> String {
-    format!("\x1B[{};{}H"), row + 1, col + 1)
+    format!("\x1B[{};{}H", row + 1, col + 1)
 }
 
 pub fn move_up(n: i16) -> String {
-    format!("\x1B[{}A"), n)
+    format!("\x1B[{}A", n)
 }
 
 pub fn move_right(n: i16) -> String {
-    format!("\x1B[{}C"), n)
+    format!("\x1B[{}C", n)
 }
 
-pub fn move_dn(n: i16) -> String {
-    format!("\x1B[{}B"), n)
+pub fn move_down(n: i16) -> String {
+    format!("\x1B[{}B", n)
 }
 
 pub fn move_left(n: i16) -> String {
-    format!("\x1B[{}D"), n)
+    format!("\x1B[{}D", n)
 }
 
 pub fn hide_cursor() -> String {

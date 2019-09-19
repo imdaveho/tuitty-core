@@ -1,117 +1,133 @@
 // ANSI specific functions.
 
 mod cursor;
-mod screen;
 mod output;
+mod screen;
 mod style;
 mod mouse;
+
 mod cell;
+pub use cell::CellInfoCache;
 
-use crate::terminal::CommonTerminalApi;
-use crate::common::enums::{ Clear, Direction, Style, Color };
+use crate::common::traits::{ 
+    CommonCursor, CommonWriter, 
+    CommonFormatter, CommonModifier
+};
+use crate::common::enums::{ Clear, Style, Color };
 
 
-pub struct AnsiTerminal()
+pub struct AnsiTerminal();
 
-impl CommonTerminalApi for AnsiTerminal {
-    pub new() -> AnsiTerminal {
+impl AnsiTerminal {
+    pub fn new() -> AnsiTerminal {
         AnsiTerminal()
-    }
+    }    
+}
 
-    pub fn clear(&self, method: Clear) {
-        output::prints(&screen::clear(method));
-        match method {
-            Clear::All => cursor::goto(0, 0),
-            Clear::CurrentLn => {
-                let (_, row) = self.pos();
-                cursor::goto(0, row);
-            },
-            _ => (),
-        }
-        Ok(())
-    }
-
-    pub fn resize(&self, w: i16, h: i16) {
-        output::printf(&screen::resize(w, h));
-    }
-
-    pub fn goto(&self, col: i16, row: i16) {
+impl CommonCursor for AnsiTerminal {
+    fn goto(&self, col: i16, row: i16) {
         if col < 0 || row < 0 { return }
         output::prints(&cursor::goto(col, row));
     }
 
-    pub fn up(&self, n: i16) {
+    fn up(&self, n: i16) {
         if n < 0 { return }
         output::prints(&cursor::move_up(n));
     }
     
-    pub fn dn(&self, n: i16) {
+    fn down(&self, n: i16) {
         if n < 0 { return }
-        output::prints(&cursor::move_dn(n));
+        output::prints(&cursor::move_down(n));
     }
     
-    pub fn left(&self, n: i16) {
+    fn left(&self, n: i16) {
         if n < 0 { return }
         output::prints(&cursor::move_left(n));
     }
     
-    pub fn right(&self, n: i16) {
+    fn right(&self, n: i16) {
         if n < 0 { return }
         output::prints(&cursor::move_right(n));
     }
 
-    pub fn hide_cursor(&self) {
-        output::prints(&cursor::hide_cursor());
+    // (imdaveho) NOTE: Just a bit of OS specific logic.
+    fn pos(&self) -> (i16, i16) {
+        #[cfg(windows)] {
+        crate::terminal::wincon::cursor::pos()
+            .expect("Error reading cursor position (Handle related)")}
+
+        #[cfg(unix)] {
+        crate::terminal::unix::pos()
+            .expect("Error reading cursor position (I/O related)")}
+    }
+}
+
+impl CommonFormatter for AnsiTerminal {
+    fn clear(&self, method: Clear) {
+        output::prints(&screen::clear(method));
+        // match method {
+        //     Clear::All => output::prints(&cursor::goto(0, 0)),
+        //     Clear::CurrentLn => {
+        //         let (_, row) = self.pos();
+        //         output::prints(&cursor::goto(0, row));
+        //     },
+        //     _ => (),
+        // }
     }
 
-    pub fn show_cursor(&self) {
-        output::prints(&cursor::show_cursor());
+    fn resize(&self, w: i16, h: i16) {
+        output::printf(&screen::resize(w, h));
     }
 
-    pub fn set_style(&self, style: Style) {
+    fn set_style(&self, style: Style) {
         output::prints(&style::set_style(style));
     }
 
-    pub fn set_styles(&self, fg: Color, bg: Color, fx: u32) {
+    fn set_styles(&self, fg: Color, bg: Color, fx: u32) {
         output::prints(&style::set_styles(fg, bg, fx));
     }
 
-    pub fn reset_styles(&self) {
+    fn reset_styles(&self) {
         output::prints(&style::reset());
     }
+}
 
-    pub fn enable_mouse(&self) {
+impl CommonModifier for AnsiTerminal {
+    fn hide_cursor(&self) {
+        output::prints(&cursor::hide_cursor());
+    }
+
+    fn show_cursor(&self) {
+        output::prints(&cursor::show_cursor());
+    }
+
+    fn enable_mouse(&self) {
         output::prints(&mouse::enable_mouse_mode());
     }
 
-    pub fn disable_mouse(&self) {
-        output.prints(&mouse::disable_mouse_mode());
+    fn disable_mouse(&self) {
+        output::prints(&mouse::disable_mouse_mode());
     }
 
-    // (imdaveho) NOTE: Just a bit of OS specific logic.
-    pub fn pos(&self) -> (i16, i16) {
-        #[cfg(windows)]
-        crate::terminal::wincon::cursor::pos()
-            .expect("Error reading cursor position (Handle related)")
-        
-        #[cfg(unix)]
-        crate::terminal::unix::pos()
-            .expect("Error reading cursor position (I/O related)")
+    fn enable_alt(&self) {
+        output::printf(&screen::enable_alt());
     }
 
+    fn disable_alt(&self) {
+        output::printf(&screen::disable_alt());
+    }
+}
 
-    // (imdaveho) NOTE: The below are still common API methods as part of the 
-    // struct. But left out of the trait to prevent duplication when combined
-    // together into a single `Terminal` struct
-    pub fn prints(&self, content: &str) {
+impl CommonWriter for AnsiTerminal {
+    fn prints(&self, content: &str) {
         output::prints(content);
     }
 
-    pub fn printf(&self, content: &str) {
+    fn printf(&self, content: &str) {
         output::printf(content);
     }
 
-    pub fn flush(&self) {
+    fn flush(&self) {
         output::flush();
     }
 }

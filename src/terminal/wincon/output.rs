@@ -24,7 +24,7 @@ use winapi::{
     },
     shared::ntdef::{ NULL, VOID }
 };
-use super::handle:Handle;
+use super::handle::Handle;
 
 
 pub fn prints(content: &str) -> Result<usize> {
