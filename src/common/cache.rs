@@ -1,9 +1,11 @@
+// TODO:
+
 use super::enums::{ Style, Color, Clear };
-use super::runtime::is_ansi_enabled;
 
 use crate::terminal::ansi::CellInfoCache;
+
 #[cfg(windows)]
-use crate::terminal::windows::CharInfoCache;
+use crate::terminal::windows::{ is_ansi_enabled, CharInfoCache };
 
 
 #[derive(Clone)]
@@ -15,12 +17,12 @@ pub enum ScreenCache {
 
 impl ScreenCache {
     pub fn new() -> ScreenCache {
-        if is_ansi_enabled() {
-            ScreenCache::Ansi(CellInfoCache::new())
-        } else {
-            #[cfg(windows)] 
-            ScreenCache::Win32(CharInfoCache::new())
+        #[cfg(windows)] {
+            if !is_ansi_enabled() {
+                return ScreenCache::Win32(CharInfoCache::new());
+            }
         }
+        return ScreenCache::Ansi(CellInfoCache::new());
     }
 
     // Win32 Only - function to cache the entire screen into `CharInfo` buffer.
@@ -97,7 +99,7 @@ impl CacheUpdater for ScreenCache {
             ScreenCache::Win32(b) => b._sync_size(w, h),
         }
     }
-    
+
     fn _sync_pos(&mut self, col: i16, row: i16) {
         match self {
             ScreenCache::Ansi(a) => a._sync_pos(col, row),
@@ -105,7 +107,7 @@ impl CacheUpdater for ScreenCache {
             ScreenCache::Win32(b) => b._sync_pos(col, row),
         }
     }
-    
+
     fn _sync_up(&mut self, n: i16) {
         match self {
             ScreenCache::Ansi(a) => a._sync_up(n),
@@ -113,7 +115,7 @@ impl CacheUpdater for ScreenCache {
             ScreenCache::Win32(b) => b._sync_up(n),
         }
     }
-    
+
     fn _sync_down(&mut self, n: i16) {
         match self {
             ScreenCache::Ansi(a) => a._sync_down(n),
@@ -121,7 +123,7 @@ impl CacheUpdater for ScreenCache {
             ScreenCache::Win32(b) => b._sync_down(n),
         }
     }
-    
+
     fn _sync_left(&mut self, n: i16) {
         match self {
             ScreenCache::Ansi(a) => a._sync_left(n),
@@ -129,7 +131,7 @@ impl CacheUpdater for ScreenCache {
             ScreenCache::Win32(b) => b._sync_left(n),
         }
     }
-    
+
     fn _sync_right(&mut self, n: i16) {
         match self {
             ScreenCache::Ansi(a) => a._sync_right(n),
@@ -137,7 +139,7 @@ impl CacheUpdater for ScreenCache {
             ScreenCache::Win32(b) => b._sync_right(n),
         }
     }
-    
+
     fn _sync_style(&mut self, style: Style) {
         match self {
             ScreenCache::Ansi(a) => a._sync_style(style),
@@ -161,7 +163,7 @@ impl CacheUpdater for ScreenCache {
             ScreenCache::Win32(b) => b._reset_styles(),
         }
     }
-    
+
     fn _flush_buffer(&self) {
         match self {
             ScreenCache::Ansi(a) => a._flush_buffer(),

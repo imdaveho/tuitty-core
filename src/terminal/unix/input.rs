@@ -1,6 +1,7 @@
 // Unix specific functions that wrap the Reader type and parses user input.
 
 use std::{
+    os::unix::io::AsRawFd,
     fs, str::from_utf8, sync::atomic::Ordering,
     io::{ Read, BufReader, Error, ErrorKind, Result },
 };
@@ -48,7 +49,7 @@ pub fn read_async() -> AsyncReader {
     AsyncReader::new(Box::new(move |event_tx, kill_switch| {
         let systty = BufReader::new(
             fs::OpenOptions::new().read(true).write(true)
-            .open("/dev/tty").expect("Error opening /dev/tty"));
+                .open("/dev/tty").expect("Error opening /dev/tty"));
         for b in systty.bytes() {
             let ch = b.expect("Error reading byte from /dev/tty");
             if event_tx.send(ch).is_err() {
@@ -66,7 +67,7 @@ pub fn read_until_async(delimiter: u8) -> AsyncReader {
     AsyncReader::new(Box::new(move |event_tx, kill_switch| {
         let systty = BufReader::new(
             fs::OpenOptions::new().read(true).write(true)
-            .open("/dev/tty").expect("Error opening /dev/tty"));
+                .open("/dev/tty").expect("Error opening /dev/tty"));
         for b in systty.bytes() {
             let ch = b.expect("Error reading byte from /dev/tty");
             let eos = ch == delimiter;
@@ -81,10 +82,8 @@ pub fn read_until_async(delimiter: u8) -> AsyncReader {
 
 
 pub fn read_sync() -> SyncReader {
-    SyncReader {
-        source: Box::from(BufReader::new(
-            fs::OpenOptions::new().read(true).write(true)
-            .open("/dev/tty").expect("Error opening /dev/tty"))),
-        leftover: None,
-    }
+    let systty = BufReader::new(
+        fs::OpenOptions::new().read(true).write(true)
+            .open("/dev/tty").expect("Error opening /dev/tty"));
+    SyncReader::new(Box::from(systty))
 }

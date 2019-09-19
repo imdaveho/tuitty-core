@@ -9,10 +9,12 @@ pub use info::CharInfoCache;
 mod reader;
 pub use reader::{ SyncReader, AsyncReader };
 
+mod runtime;
+pub use runtime::{is_ansi_enabled, is_wincon_enabled };
+
 use super::wincon::{ output, Handle };
 use super::{ CommonTerminal, Clear, Color, Style, Style::* };
 
-use crate::common::runtime;
 use crate::common::{
     meta::Metadata, enums::Direction,
     traits::*, cache::CacheUpdater,
@@ -36,7 +38,7 @@ impl WindowsConsole {
             stash: Vec::with_capacity(5),
             common: CommonTerminal::new(),
             original_mode: {
-                if !runtime::is_wincon_enabled() {
+                if !is_wincon_enabled() {
                     Handle::conout().expect("Error fetching $CONOUT")
                         .get_mode().expect("Error fetching mode from $CONOUT")
                 } else { output::get_mode()
@@ -55,7 +57,7 @@ impl WindowsConsole {
     // (imdaveho) NOTE: Windows-only helper function to check when to
     // leverage the alternate screen buffer handle.
     fn enable_alt(&mut self) {
-        if !runtime::is_ansi_enabled() {
+        if !is_ansi_enabled() {
             // Before switching, cache the current screen.
             self.state.cache._cache_buffer();
             // Set the alternate screen back to defaults.
@@ -70,11 +72,11 @@ impl WindowsConsole {
         self.to_main();
         self.alternate.close()
             .expect("Error closing the alternate Console buffer");
-            
-        let stdout = if runtime::is_wincon_enabled() {
+
+        let stdout = if is_wincon_enabled() {
             Handle::stdout().expect("Error fetching $STDOUT")
         } else { Handle::conout().expect("Error fetching $CONOUT") };
-        
+
         stdout.set_mode(&self.original_mode)
             .expect("Error reseting the Console mode to default");
         self.common.show_cursor();
@@ -98,12 +100,12 @@ impl TerminalCursor for WindowsConsole {
         self.common.down(1);
         self.state.cache._sync_down(1);
     }
-    
+
     fn left(&mut self) {
         self.common.left(1);
         self.state.cache._sync_left(1);
     }
-    
+
     fn right(&mut self) {
         self.common.right(1);
         self.state.cache._sync_right(1);
@@ -200,7 +202,7 @@ impl TerminalFormatter for WindowsConsole {
     fn set_fg(&mut self, color: Color) {
         self.set_style(Fg(color));
     }
-    
+
     fn set_bg(&mut self, color: Color) {
         self.set_style(Bg(color));
     }
@@ -260,14 +262,14 @@ impl TerminalInput for WindowsConsole {
     fn read_until_async(&self, delimiter: u8) -> AsyncReader {
         input::read_until_async(delimiter)
     }
-} 
+}
 
 impl TerminalSwitcher for WindowsConsole {
     fn switch(&mut self) {
         // In order to support multiple "screens", this function creates a new
         // Metadata entry which stores any screen specific changes that a User
         // might want to be restored when switching between screens.
-        if self.index == 0 { 
+        if self.index == 0 {
             self.enable_alt();
             self.common.clear(Clear::All);
         } else {
@@ -277,7 +279,7 @@ impl TerminalSwitcher for WindowsConsole {
             // std::thread::sleep(std::time::Duration::from_millis(2000));
             // self.state.cache._sync_pos(col, row);
             // If this wasn't a switch to the alternate screen (ie. the current
-            // screen is already the alternate screen), then we need to clear 
+            // screen is already the alternate screen), then we need to clear
             // it without modifying the cellbuffer.
             self.common.clear(Clear::All);
         }

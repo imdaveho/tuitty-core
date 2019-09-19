@@ -5,7 +5,7 @@ use std::time::Duration;
 mod terminal;
 mod common;
 use common::{
-    traits::{ 
+    traits::{
         TerminalCursor, TerminalFormatter, TerminalInput,
         TerminalModifier, TerminalSwitcher, TerminalWriter
     }, enums::{ Color, Effect },
@@ -61,34 +61,39 @@ fn pos_raw() -> Result<(i16, i16)> {
 fn main() {
 
     let mut t = terminal::Terminal::init();
-    // t.switch();
-    
-    // t.printf("Hello, World");
-    // thread::sleep(Duration::from_millis(1500));
-    // t.goto(5, 6);
-    // t.flush();
-    // thread::sleep(Duration::from_millis(1500));
-    // t.set_fg(Color::Blue);
-    // t.set_fx(Effect::Dim | Effect::Underline);
-    // t.printf("Hello, Again");
-    // t.reset_styles();
-    // thread::sleep(Duration::from_millis(1500));
+    t.switch();
 
-    // t.switch();
-    // t.printf("Did the cursor reset?");
-    // thread::sleep(Duration::from_millis(1500));
-    // t.goto(8, 10);
-    // t.flush();
-    // thread::sleep(Duration::from_millis(1500));
-    // t.printf("Where am I now?");
-    // thread::sleep(Duration::from_millis(1500));
-    // t.switch_to(1);
-    // thread::sleep(Duration::from_millis(2500));
-    t.raw();
-    let (col, row) = pos_raw().unwrap();
-    t.printf(&format!("{}, {}", col, row));
-    t.cook();
+    t.printf("Hello, World");
+    thread::sleep(Duration::from_millis(1500));
+    t.goto(5, 6);
+    t.flush();
+    thread::sleep(Duration::from_millis(1500));
+    t.set_fg(Color::Blue);
+    t.set_fx(Effect::Dim | Effect::Underline);
+    t.printf("Hello, Again");
+    t.reset_styles();
+    thread::sleep(Duration::from_millis(1500));
 
+    t.switch();
+    t.printf("Did the cursor reset?");
+    thread::sleep(Duration::from_millis(1500));
+    t.goto(8, 10);
+    t.flush();
+    thread::sleep(Duration::from_millis(1500));
+    t.printf("Where am I now?");
+    thread::sleep(Duration::from_millis(1500));
+    t.switch_to(1);
+    thread::sleep(Duration::from_millis(2500));
+
+    // let mut t = terminal::Terminal::init();
+    // t.raw();
+    // let (col, row) = pos_raw().unwrap();
+    // t.cook();
+    // t.switch();
+    // t.goto(5, 5);
+    // t.set_fg(Color::Yellow);
+    // t.printf(&format!("{}, {}", col, row));
+    // thread::sleep(Duration::from_millis(2000));
 
     // let mut t = tty::Tty::init();
     // let a = t.is_ansi();
@@ -107,7 +112,7 @@ fn main() {
     // t.prints("23");
     // t.flush();
     // thread::sleep(Duration::from_millis(1000));
-    
+
 
     // let chars = "hello, world".chars();
     // let length = "hello, world".len();
@@ -151,11 +156,11 @@ fn main() {
     // // t.prints(&format!("{}", spaces));
 
     // thread::sleep(Duration::from_millis(2000));
-    
-    
+
+
 
     // // TESTING WINCON SCREEN-CACHE
-    
+
     // use winapi::um::{
     //     wincon::{
     //         SetConsoleTextAttribute,
@@ -186,7 +191,7 @@ fn main() {
     //         panic!("Error setting sA_pos")
     //     }
     // }
-        
+
     // let sA_words = "A good choice of font for your coding can make a huge difference and improve your productivity, \
     // so take a look at the fonts in this post that can make your text editor or terminal emulator look little bit nicer. \
     // Andale® Mono — is a monospaced sans-serif typeface designed by Steve Matteson for terminal emulation and software \
@@ -293,17 +298,17 @@ fn main() {
     //             panic!("Something went wrong writing in altern")
     //         }
     // }
-    
+
     // thread::sleep(Duration::from_millis(2000));
 
     // // SWITCH TO SCREEN A =====================================================================
-    
+
     // // Tty does not create another handle but clears the current one,
     // // therefore we will "restore" it with WriteConsoleOutputW
     // // sA.show().unwrap();
 
     // // CLEAR =====================================================================
-        
+
     // unsafe {
     //     if FillConsoleOutputCharacterA(
     //         sA.0, ' ' as i8, (86 * 30), clr_coord, &mut written) == 0 {
@@ -372,7 +377,7 @@ fn main() {
 
     // // let stdout = tty::Handle::stdout().unwrap();
     // stdout.show().unwrap();
-    
+
     // sA.close().unwrap();
     // // Tty does not create another handle but clears the current one:
     // // sB.close().unwrap();
@@ -386,6 +391,6 @@ fn main() {
     // let pos = tty::cursor::ansi::pos_raw();
 
     // println!("{:?}", pos);
-    
+
     // thread::sleep(Duration::from_millis(1000));
 }

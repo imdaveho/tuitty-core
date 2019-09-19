@@ -1,6 +1,10 @@
+// TODO:
+
 use crate::common::enums::{ Clear, Direction, Style, Color };
+
 #[cfg(unix)]
 use crate::terminal::unix::{ SyncReader, AsyncReader };
+
 #[cfg(windows)]
 use crate::terminal::windows::{ SyncReader, AsyncReader };
 
@@ -67,13 +71,13 @@ pub trait TerminalFormatter {
 pub trait CommonWriter {
     fn prints(&self, content: &str);
     fn flush(&self);
-    fn printf(&self, content: &str); 
+    fn printf(&self, content: &str);
 }
 
 pub trait TerminalWriter {
     fn prints(&mut self, content: &str);
     fn flush(&mut self);
-    fn printf(&mut self, content: &str); 
+    fn printf(&mut self, content: &str);
 }
 
 pub trait TerminalInput {

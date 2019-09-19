@@ -1,4 +1,5 @@
 // #![allow(missing_docs, non_upper_case_globals, non_snake_case)]
+#![allow(non_upper_case_globals)]
 
 use core::ops::Add;
 use charwidth as cw;

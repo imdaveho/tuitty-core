@@ -10,12 +10,14 @@ use std::io::{ stdin, stdout, Result, BufRead, Write };
 
 pub fn pos() -> Result<(i16, i16)> {
     // Store the current Termios settings.
-    let mode = super::get_mode();
+    let mode = super::raw::get_mode()
+        .expect("Error fetching Termios for current cursor pos");
     // (imdaveho) NOTE: Enable raw mode regardless of whether or not
     // raw mode has been previously set. This ensures that there will
     // not be any issues getting the cursor position. This will revert
     // back to the current Termios settings stored above.
-    super::enable_raw();
+    super::raw::enable_raw()
+        .expect("Error enabling raw mode for current cursor pos");
     // Where is the cursor?
     // Use `ESC [ 6 n`.
     let mut stdout = stdout();
@@ -55,8 +57,9 @@ pub fn pos() -> Result<(i16, i16)> {
         })
         .parse::<usize>()
         .unwrap();
-    // Revert back to Termios settings at the start.    
-    super::set_mode(&mode);
+    // Revert back to Termios settings at the start.
+    super::raw::set_mode(&mode)
+        .expect("Error setting Termios back after current cursor pos");
 
     Ok(((cols - 1) as i16, (rows - 1) as i16))
 }

@@ -2,15 +2,15 @@
 
 mod cursor;
 mod output;
-mod screen;
+pub mod screen;
 mod style;
 mod mouse;
 
 mod cell;
 pub use cell::CellInfoCache;
 
-use crate::common::traits::{ 
-    CommonCursor, CommonWriter, 
+use crate::common::traits::{
+    CommonCursor, CommonWriter,
     CommonFormatter, CommonModifier
 };
 use crate::common::enums::{ Clear, Style, Color };
@@ -21,7 +21,7 @@ pub struct AnsiTerminal();
 impl AnsiTerminal {
     pub fn new() -> AnsiTerminal {
         AnsiTerminal()
-    }    
+    }
 }
 
 impl CommonCursor for AnsiTerminal {
@@ -34,17 +34,17 @@ impl CommonCursor for AnsiTerminal {
         if n < 0 { return }
         output::prints(&cursor::move_up(n));
     }
-    
+
     fn down(&self, n: i16) {
         if n < 0 { return }
         output::prints(&cursor::move_down(n));
     }
-    
+
     fn left(&self, n: i16) {
         if n < 0 { return }
         output::prints(&cursor::move_left(n));
     }
-    
+
     fn right(&self, n: i16) {
         if n < 0 { return }
         output::prints(&cursor::move_right(n));
@@ -52,13 +52,15 @@ impl CommonCursor for AnsiTerminal {
 
     // (imdaveho) NOTE: Just a bit of OS specific logic.
     fn pos(&self) -> (i16, i16) {
-        #[cfg(windows)] {
-        crate::terminal::wincon::cursor::pos()
-            .expect("Error reading cursor position (Handle related)")}
-
         #[cfg(unix)] {
-        crate::terminal::unix::pos()
-            .expect("Error reading cursor position (I/O related)")}
+            crate::terminal::unix::pos()
+                .expect("Error reading cursor position (I/O related)")
+        }
+
+        #[cfg(windows)] {
+            crate::terminal::wincon::cursor::pos()
+                .expect("Error reading cursor position (Handle related)")
+        }
     }
 }
 

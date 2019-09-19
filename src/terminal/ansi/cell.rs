@@ -26,10 +26,10 @@ pub struct CellInfoCache {
 
 impl CellInfoCache {
     pub fn new() -> CellInfoCache {
-        #[cfg(unix)]
-        let (w, h) = crate::terminal::unix::size();
-        #[cfg(windows)]
-        let (w, h) = crate::terminal::wincon::screen::size();
+        let (w, h) = {
+            #[cfg(unix)] { crate::terminal::unix::size() }
+            #[cfg(windows)] { crate::terminal::wincon::screen::size() }
+        };
 
         let capacity = (w * h) as usize;
         CellInfoCache {
@@ -77,7 +77,7 @@ impl CellInfoCache {
             }
         }
     }
-    
+
     pub fn _cache_content(&mut self, content: &str) {
         let length = UnicodeWidthStr::width(content);
         let charbuf = content.chars();

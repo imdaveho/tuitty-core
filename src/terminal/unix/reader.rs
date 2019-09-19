@@ -1,13 +1,14 @@
 // Unix specific Reader types to handle user input from stdin.
 
 use std::{
+    fs, io::{ Read, BufReader },
     thread, sync::{
         atomic::{AtomicBool, Ordering},
         Arc, mpsc::{Receiver, Sender, channel},
     },
 };
 use super::parser::parse_event;
-use crate::common::enums::{InputEvent, MouseEvent, MouseButton, KeyEvent};
+use crate::common::enums::{InputEvent, KeyEvent};
 
 
 pub struct AsyncReader {
@@ -67,8 +68,17 @@ impl Drop for AsyncReader {
 
 
 pub struct SyncReader {
-    source: Box<std::fs::File>,
+    source: Box<BufReader<fs::File>>,
     leftover: Option<u8>,
+}
+
+impl SyncReader {
+    pub fn new(src: Box<BufReader<fs::File>>) -> SyncReader {
+        SyncReader {
+            source: src,
+            leftover: None,
+        }
+    }
 }
 
 impl Iterator for SyncReader {

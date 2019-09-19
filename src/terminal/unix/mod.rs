@@ -14,7 +14,6 @@ mod reader;
 pub use reader::{ SyncReader, AsyncReader };
 
 use libc::termios as Termios;
-use super::ansi::{ enable_alt, disable_alt };
 use super::{ CommonTerminal, Clear, Color, Style, Style::* };
 
 use crate::common::{
@@ -23,7 +22,7 @@ use crate::common::{
 };
 
 
-struct UnixTerminal {
+pub struct UnixTerminal {
     index: usize,
     state: Metadata,
     stash: Vec<Metadata>,
@@ -37,7 +36,8 @@ impl UnixTerminal {
             index: 0,
             state: Metadata::new(),
             stash: Vec::with_capacity(5),
-            original_mode: get_mode()
+            common: CommonTerminal::new(),
+            original_mode: raw::get_mode()
                 .expect("Error fetching Termios"),
         }
     }
@@ -63,22 +63,22 @@ impl TerminalCursor for UnixTerminal {
     }
 
     fn up(&mut self) {
-        self.common.up();
+        self.common.up(1);
         self.state.cache._sync_up(1);
     }
 
     fn down(&mut self) {
-        self.common.down();
+        self.common.down(1);
         self.state.cache._sync_down(1);
     }
-    
+
     fn left(&mut self) {
-        self.common.left();
+        self.common.left(1);
         self.state.cache._sync_left(1);
     }
-    
+
     fn right(&mut self) {
-        self.common.right();
+        self.common.right(1);
         self.state.cache._sync_right(1);
     }
 
@@ -121,12 +121,12 @@ impl TerminalCursor for UnixTerminal {
 
 impl TerminalModifier for UnixTerminal {
     fn raw(&mut self) {
-        enable_raw().expect("Error enabling raw mode");
+        raw::enable_raw().expect("Error enabling raw mode");
         self.state._raw();
     }
 
     fn cook(&mut self) {
-        set_mode(&self.original_mode).expect("Error disabling raw mode");
+        raw::set_mode(&self.original_mode).expect("Error disabling raw mode");
         self.state._cook();
     }
 
@@ -154,7 +154,7 @@ impl TerminalModifier for UnixTerminal {
 impl TerminalFormatter for UnixTerminal {
     fn clear(&mut self, method: Clear) {
         self.common.clear(method);
-        self.state.cache._clear(method);
+        self.state.cache._clear_buffer(method);
         match method {
             Clear::All => self.goto(0, 0),
             Clear::CurrentLn => {
@@ -173,7 +173,7 @@ impl TerminalFormatter for UnixTerminal {
     fn set_fg(&mut self, color: Color) {
         self.set_style(Fg(color));
     }
-    
+
     fn set_bg(&mut self, color: Color) {
         self.set_style(Bg(color));
     }
@@ -184,7 +184,7 @@ impl TerminalFormatter for UnixTerminal {
 
     fn set_styles(&mut self, fg: Color, bg: Color, fx: u32) {
         self.common.set_styles(fg, bg, fx);
-        self.state.cache._set_styles(fg, bg, fx);
+        self.state.cache._sync_styles(fg, bg, fx);
     }
 
     fn reset_styles(&mut self) {
@@ -195,7 +195,7 @@ impl TerminalFormatter for UnixTerminal {
     fn screen_pos(&self) -> (i16, i16) {
         self.state.cache._screen_pos()
     }
-    
+
     fn screen_size(&self) -> (i16, i16) {
         self.state.cache._screen_size()
     }
@@ -207,8 +207,9 @@ impl TerminalWriter for UnixTerminal {
         self.common.prints(content);
     }
 
-    fn flush(&self) {
+    fn flush(&mut self) {
         self.common.flush();
+        // TODO: update cursor pos in cache on write or flush?
     }
 
     fn printf(&mut self, content: &str) {
@@ -230,7 +231,7 @@ impl TerminalInput for UnixTerminal {
         input::read_async()
     }
 
-    fn read_until_sync(&self, delimiter: u8) -> AsyncReader {
+    fn read_until_async(&self, delimiter: u8) -> AsyncReader {
         input::read_until_async(delimiter)
     }
 }
@@ -284,7 +285,7 @@ impl TerminalSwitcher for UnixTerminal {
         }
         // After updating the stash, clone the Metadata at the switch_to index.
         self.state = self.stash[index].clone();
-        
+
         // Enable/Disable alternate screen based on current and target indices.
         if index == 0 {
             // Disable if you are reverting back to main.
@@ -309,9 +310,9 @@ impl TerminalSwitcher for UnixTerminal {
         self.index = index;
 
         let (raw, mouse, show) = (
-            self.state._is_raw(),
-            self.state._is_mouse(),
-            self.state._is_cursor());
+            self.state._is_raw_on(),
+            self.state._is_mouse_on(),
+            self.state._is_cursor_on());
 
         // Restore settings based on metadata.
         if raw { self.raw() } else { self.cook() }

@@ -27,7 +27,7 @@ pub fn clear(clr: Clear) -> Result<()> {
 
     let (mut col, mut row) = info.cursor_pos();
     let (w, h) = info.buffer_size();
-    
+
     // Inputs to FillConsoleOutput.
     let conout = Handle::conout()?;
     let ch = ' ' as i8;
@@ -141,13 +141,13 @@ pub fn resize(w: i16, h: i16) -> Result<()> {
     }
 
     let resize_error = Error::new(
-        ErrorKind::Other, 
+        ErrorKind::Other,
         "Something went wrong when setting screen buffer size.");
 
     unsafe {
         if resize_buffer {
             let new_coord = COORD {X: new_w, Y: new_h};
-    
+
             if SetConsoleScreenBufferSize(handle.0, new_coord) == 0 {
                 return Err(resize_error)
             }

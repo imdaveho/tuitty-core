@@ -1,24 +1,27 @@
-// TODO: 
+// TODO:
 
 use crate::common::{
-    runtime::is_ansi_enabled,
-    traits::{ 
-        CommonCursor, CommonModifier, 
-        CommonFormatter, CommonWriter 
+    traits::{
+        CommonCursor, CommonModifier,
+        CommonFormatter, CommonWriter
     },
     enums::{ Clear, Style, Color },
 };
 
 pub mod ansi;
+
 #[cfg(unix)]
 pub mod unix;
+
 #[cfg(windows)]
 pub mod wincon;
+
 #[cfg(windows)]
 pub mod windows;
 
 #[cfg(unix)]
 pub use unix::UnixTerminal as Terminal;
+
 #[cfg(windows)]
 pub use windows::WindowsConsole as Terminal;
 
@@ -31,12 +34,12 @@ enum CommonTerminal {
 
 impl CommonTerminal {
     pub fn new() -> CommonTerminal {
-        if is_ansi_enabled() {
-            CommonTerminal::Ansi(ansi::AnsiTerminal::new())
-        } else {
-            #[cfg(windows)] 
-            CommonTerminal::Win32(wincon::Win32Console::new())
+        #[cfg(windows)] {
+            if !windows::is_ansi_enabled() {
+                return CommonTerminal::Win32(wincon::Win32Console::new());
+            }
         }
+        return CommonTerminal::Ansi(ansi::AnsiTerminal::new());
     }
 }
 
