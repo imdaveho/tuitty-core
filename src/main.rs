@@ -60,32 +60,35 @@ fn pos_raw() -> Result<(i16, i16)> {
 
 fn main() {
 
-    let mut t = terminal::Terminal::init();
-    t.switch();
-
-    t.printf("Hello, World");
-    thread::sleep(Duration::from_millis(1500));
-    t.goto(5, 6);
-    t.flush();
-    thread::sleep(Duration::from_millis(1500));
-    t.set_fg(Color::Blue);
-    t.set_fx(Effect::Dim | Effect::Underline);
-    t.printf("Hello, Again");
-    t.reset_styles();
-    thread::sleep(Duration::from_millis(1500));
-
-    t.switch();
-    t.printf("Did the cursor reset?");
-    thread::sleep(Duration::from_millis(1500));
-    t.goto(8, 10);
-    t.flush();
-    thread::sleep(Duration::from_millis(1500));
-    t.printf("Where am I now?");
-    thread::sleep(Duration::from_millis(1500));
-    t.switch_to(1);
-    thread::sleep(Duration::from_millis(2500));
-
     // let mut t = terminal::Terminal::init();
+    // t.switch();
+
+    // t.printf("Hello, World");
+    // thread::sleep(Duration::from_millis(1500));
+    // t.goto(5, 6);
+    // t.flush();
+    // thread::sleep(Duration::from_millis(1500));
+    // t.set_fg(Color::Yellow);
+    // t.set_fx(Effect::Dim | Effect::Underline);
+    // t.printf("Hello, Again");
+    // t.reset_styles();
+    // thread::sleep(Duration::from_millis(1500));
+
+    // t.switch();
+    // t.printf("Did the cursor reset?");
+    // thread::sleep(Duration::from_millis(1500));
+    // t.goto(8, 10);
+    // t.flush();
+    // thread::sleep(Duration::from_millis(1500));
+    // t.printf("Where am I now?");
+    // thread::sleep(Duration::from_millis(1500));
+    // t.switch_to(1);
+    // thread::sleep(Duration::from_millis(2500));
+
+    let mut t = terminal::Terminal::init();
+    t.goto(10, 20);
+    let (col, row) = t.pos();
+    t.printf(&format!("{}, {}", col, row));
     // t.raw();
     // let (col, row) = pos_raw().unwrap();
     // t.cook();

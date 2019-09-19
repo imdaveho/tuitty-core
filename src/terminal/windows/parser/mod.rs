@@ -170,7 +170,7 @@ fn parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
         // (0x1B) => vec![b'\x1B']
         VK_ESCAPE => KeyEvent::Esc,
         // (0x0D) => vec![b'\n']
-        VK_RETURN => KeyEvent::Char('\n'),
+        VK_RETURN => KeyEvent::Enter,
         // For F1 - F12, match the key_codes with the byte value
         // format!("\x1BO{}", __)
         // 0x70..=0x73 => b'P'..=b'S' (F1 - F4)

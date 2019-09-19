@@ -43,7 +43,7 @@ where I: Iterator<Item = u8> {
             }
         } // End: ESC character
         // Match: Newline OR Carriage Return
-        b'\n' | b'\r' => InputEvent::Keyboard(KeyEvent::Char('\n')),
+        b'\n' => InputEvent::Keyboard(KeyEvent::Enter),
         // Match: TAB
         b'\t' => InputEvent::Keyboard(KeyEvent::Char('\t')),
         // Match: BACKSPACE

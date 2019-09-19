@@ -145,6 +145,7 @@ pub enum MouseButton {
 
 pub enum KeyEvent {
     Backspace,
+    Enter,
     Left,
     Right,
     Up,

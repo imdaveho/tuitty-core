@@ -4,8 +4,8 @@ use std::{
         Arc, mpsc::{Receiver, Sender, channel},
     },
 };
-use super::parser::{read_single_event, read_input_events};
-use crate::common::enums::{InputEvent, MouseEvent, MouseButton, KeyEvent};
+use super::parser::read_single_event;
+use crate::common::enums::InputEvent;
 
 
 pub struct AsyncReader {

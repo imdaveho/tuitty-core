@@ -39,6 +39,13 @@ impl WindowsConsole {
             common: CommonTerminal::new(),
             original_mode: {
                 if !is_wincon_enabled() {
+                    // (imdaveho) NOTE: This simply bypasses the panic! of not
+                    // being able to fetch $STDOUT. It may not have the default
+                    // modes and ConsoleInfo one would expect.
+                    // TODO: Consider removing this. The fix is to use `winpty`
+                    // or a terminal application that implements ConPTY:
+                    // https://tinyurl.com/y275hnfc (ConPTY intro blog post)
+                    // https://tinyurl.com/y3f7cqjj (CreatePseudoConsole)
                     Handle::conout().expect("Error fetching $CONOUT")
                         .get_mode().expect("Error fetching mode from $CONOUT")
                 } else { output::get_mode()
@@ -275,9 +282,6 @@ impl TerminalSwitcher for WindowsConsole {
         } else {
             // Before "switching", cache the current screen and cursor pos.
             self.state.cache._cache_buffer();
-            // let (col, row) = self.common.pos();
-            // std::thread::sleep(std::time::Duration::from_millis(2000));
-            // self.state.cache._sync_pos(col, row);
             // If this wasn't a switch to the alternate screen (ie. the current
             // screen is already the alternate screen), then we need to clear
             // it without modifying the cellbuffer.

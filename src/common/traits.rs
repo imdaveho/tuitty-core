@@ -75,6 +75,7 @@ pub trait CommonWriter {
 }
 
 pub trait TerminalWriter {
+    // TODO: sync_pos after writing the content internally
     fn prints(&mut self, content: &str);
     fn flush(&mut self);
     fn printf(&mut self, content: &str);
