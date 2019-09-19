@@ -4,8 +4,91 @@ use std::thread;
 use std::time::Duration;
 mod terminal;
 mod common;
+use common::{
+    traits::{ 
+        TerminalCursor, TerminalFormatter, TerminalInput,
+        TerminalModifier, TerminalSwitcher, TerminalWriter
+    }, enums::{ Color, Effect },
+};
+
+use std::io::{ stdin, stdout, Result, BufRead, Write };
+
+
+fn pos_raw() -> Result<(i16, i16)> {
+    // Where is the cursor?
+    // Use `ESC [ 6 n`.
+    let mut stdout = stdout();
+    let stdin = stdin();
+
+    // Write command
+    stdout.write_all(b"\x1B[6n")?;
+    stdout.flush()?;
+
+    stdin.lock().read_until(b'[', &mut vec![])?;
+
+    let mut rows = vec![];
+    stdin.lock().read_until(b';', &mut rows).unwrap();
+
+    let mut cols = vec![];
+    stdin.lock().read_until(b'R', &mut cols).unwrap();
+
+    // remove delimiter
+    rows.pop();
+    cols.pop();
+
+    let rows = rows
+        .into_iter()
+        .map(|b| (b as char))
+        .fold(String::new(), |mut acc, n| {
+            acc.push(n);
+            acc
+        })
+        .parse::<usize>()
+        .unwrap();
+    let cols = cols
+        .into_iter()
+        .map(|b| (b as char))
+        .fold(String::new(), |mut acc, n| {
+            acc.push(n);
+            acc
+        })
+        .parse::<usize>()
+        .unwrap();
+
+    Ok(((cols - 1) as i16, (rows - 1) as i16))
+}
 
 fn main() {
+
+    let mut t = terminal::Terminal::init();
+    // t.switch();
+    
+    // t.printf("Hello, World");
+    // thread::sleep(Duration::from_millis(1500));
+    // t.goto(5, 6);
+    // t.flush();
+    // thread::sleep(Duration::from_millis(1500));
+    // t.set_fg(Color::Blue);
+    // t.set_fx(Effect::Dim | Effect::Underline);
+    // t.printf("Hello, Again");
+    // t.reset_styles();
+    // thread::sleep(Duration::from_millis(1500));
+
+    // t.switch();
+    // t.printf("Did the cursor reset?");
+    // thread::sleep(Duration::from_millis(1500));
+    // t.goto(8, 10);
+    // t.flush();
+    // thread::sleep(Duration::from_millis(1500));
+    // t.printf("Where am I now?");
+    // thread::sleep(Duration::from_millis(1500));
+    // t.switch_to(1);
+    // thread::sleep(Duration::from_millis(2500));
+    t.raw();
+    let (col, row) = pos_raw().unwrap();
+    t.printf(&format!("{}, {}", col, row));
+    t.cook();
+
 
     // let mut t = tty::Tty::init();
     // let a = t.is_ansi();

@@ -17,10 +17,11 @@ pub mod wincon;
 #[cfg(windows)]
 pub mod windows;
 
-// #[cfg(unix)]
-// pub use unix::UnixTerminal as Terminal;
-// #[cfg(windows)]
-// pub use windows::WindowsConsole as Terminal;
+#[cfg(unix)]
+pub use unix::UnixTerminal as Terminal;
+#[cfg(windows)]
+pub use windows::WindowsConsole as Terminal;
+
 
 enum CommonTerminal {
     Ansi(ansi::AnsiTerminal),

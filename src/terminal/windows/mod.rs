@@ -271,9 +271,14 @@ impl TerminalSwitcher for WindowsConsole {
             self.enable_alt();
             self.common.clear(Clear::All);
         } else {
+            // Before "switching", cache the current screen and cursor pos.
+            self.state.cache._cache_buffer();
+            // let (col, row) = self.common.pos();
+            // std::thread::sleep(std::time::Duration::from_millis(2000));
+            // self.state.cache._sync_pos(col, row);
             // If this wasn't a switch to the alternate screen (ie. the current
-            // screen is already the alternate screen), then we need to clear it
-            // without modifying the cellbuffer.
+            // screen is already the alternate screen), then we need to clear 
+            // it without modifying the cellbuffer.
             self.common.clear(Clear::All);
         }
         // Push current self.state `Metadata` to stash and increment the index.
