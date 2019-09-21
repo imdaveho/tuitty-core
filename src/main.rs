@@ -38,14 +38,21 @@ fn main() {
 
     let mut t = terminal::Terminal::init();
     t.switch();
-    t.goto(80, 29);
+    // t.goto(80, 29);
     t.set_fg(Color::Yellow);
-    t.printf("hello");
+    // t.printf("hello");
+    let (w, h) = t.screen_size();
+    t.printf(&format!("{}, {}", w, h));
     thread::sleep(Duration::from_millis(1500));
-    t.to_main();
+    t.resize(86, 30);
+    t.flush();
+    let (w, h) = t.screen_size();
+    t.printf(&format!("{}, {}", w, h));
     thread::sleep(Duration::from_millis(1500));
-    t.switch_to(1);
-    thread::sleep(Duration::from_millis(1500));
+    // t.to_main();
+    // thread::sleep(Duration::from_millis(1500));
+    // t.switch_to(1);
+    // thread::sleep(Duration::from_millis(1500));
 
 
     // // let newln_test = "1";

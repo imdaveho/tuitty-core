@@ -146,7 +146,7 @@ pub fn resize(w: i16, h: i16) -> Result<()> {
 
     unsafe {
         if resize_buffer {
-            let new_coord = COORD {X: new_w, Y: new_h};
+            let new_coord = COORD {X: new_w - 1, Y: new_h - 1};
 
             if SetConsoleScreenBufferSize(handle.0, new_coord) == 0 {
                 return Err(resize_error)
@@ -155,8 +155,8 @@ pub fn resize(w: i16, h: i16) -> Result<()> {
 
         if SetConsoleWindowInfo(handle.0, 1, &SMALL_RECT {
             Left: left,
-            Right: left + w,
-            Bottom: top + h,
+            Right: left + w - 1,
+            Bottom: top + h - 1,
             Top: top
         }) == 0 {
             return Err(resize_error);
@@ -164,7 +164,7 @@ pub fn resize(w: i16, h: i16) -> Result<()> {
 
         // If we resized the buffer, un-resize it.
         if resize_buffer {
-            let buf_coord = COORD {X: buf_w, Y: buf_h};
+            let buf_coord = COORD {X: buf_w - 1, Y: buf_h - 1};
             if SetConsoleScreenBufferSize(handle.0, buf_coord) == 0 {
                 return Err(resize_error)
             }
