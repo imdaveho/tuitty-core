@@ -6,6 +6,9 @@ pub mod screen;
 mod style;
 mod mouse;
 
+#[cfg(test)]
+mod tests;
+
 mod cell;
 pub use cell::CellInfoCache;
 

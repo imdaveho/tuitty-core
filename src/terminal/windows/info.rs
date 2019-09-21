@@ -13,6 +13,7 @@ use crate::common::{
 
 #[derive(Clone)]
 pub struct CharInfoCache {
+    tab_width: u8,
     screen_pos: (i16, i16),
     screen_size: (i16, i16),
     style: (Color, Color, u32),
@@ -24,6 +25,7 @@ impl CharInfoCache {
         let (w, h) = crate::terminal::wincon::screen::size();
         let capacity = (w * h) as usize;
         CharInfoCache {
+            tab_width: 4,
             screen_pos: (0, 0),
             screen_size: (w, h),
             style: (Color::Reset, Color::Reset, Effect::Reset as u32),
@@ -57,6 +59,10 @@ impl CharInfoCache {
 }
 
 impl CacheUpdater for CharInfoCache {
+    fn _tab_width(&mut self, w: u8) {
+        self.tab_width = w;
+    }
+
     fn _screen_size(&self) -> (i16, i16) {
         self.screen_size
     }
@@ -101,6 +107,7 @@ impl CacheUpdater for CharInfoCache {
             // self.screen_pos.0 = 0
             // (imdaveho) NOTE: Cursor wrapping draft.
             // TODO: confirm behavior on Windows.
+            // TODO: n > capacity handling
             let w = self.screen_size.0;
             let rows = n / w;
             let rest = n % w;
@@ -123,6 +130,7 @@ impl CacheUpdater for CharInfoCache {
             // self.screen_pos.0 = w;
             // (imdaveho) NOTE: Cursor wrapping draft.
             // TODO: confirm behavior on Windows.
+            // TODO: n > capacity handling
             let rows = n / w;
             let rest = n % w;
             self._sync_down(rows);

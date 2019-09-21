@@ -154,6 +154,7 @@ pub enum KeyEvent {
     End,
     PageUp,
     PageDown,
+    Tab,
     BackTab,
     Delete,
     Insert,

@@ -115,7 +115,7 @@ pub mod charwidth {
     }
 
     // character width table. Based on Markus Kuhn's free wcwidth() implementation,
-    //     http://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c
+    // http://www.cl.cam.ac.uk/~mgk25/ucs/wcwidth.c
     const charwidth_table: &'static [(char, char, u8, u8)] = &[
         ('\u{a1}', '\u{a1}', 1, 2), ('\u{a4}', '\u{a4}', 1, 2), ('\u{a7}', '\u{a8}', 1, 2),
         ('\u{aa}', '\u{aa}', 1, 2), ('\u{ae}', '\u{ae}', 1, 2), ('\u{b0}', '\u{b4}', 1, 2),

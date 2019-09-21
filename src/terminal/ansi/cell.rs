@@ -1,5 +1,7 @@
 // ANSI specific screen cache buffer implmentation.
 
+use std::collections::VecDeque;
+
 use super::output;
 use super::style;
 use crate::common::{
@@ -13,15 +15,19 @@ use crate::common::{
 pub struct CellInfo {
     rune: char,
     style: (Color, Color, u32),
-    width: isize,
+    width: usize,
 }
 
 #[derive(Clone)]
 pub struct CellInfoCache {
+    tab_width: u8,
     screen_pos: (i16, i16),
     screen_size: (i16, i16),
     style: (Color, Color, u32),
-    buffer: Vec<Option<CellInfo>>,
+    #[cfg(not(test))]
+    buffer: VecDeque<Option<CellInfo>>,
+    #[cfg(test)]
+    pub buffer: VecDeque<Option<CellInfo>>,
 }
 
 impl CellInfoCache {
@@ -30,13 +36,13 @@ impl CellInfoCache {
             #[cfg(unix)] { crate::terminal::unix::size() }
             #[cfg(windows)] { crate::terminal::wincon::screen::size() }
         };
-
         let capacity = (w * h) as usize;
         CellInfoCache {
+            tab_width: 4,
             screen_pos: (0, 0),
             screen_size: (w, h),
             style: (Color::Reset, Color::Reset, Effect::Reset as u32),
-            buffer: vec![None; capacity],
+            buffer: vec![None; capacity].into(),
         }
     }
 
@@ -45,7 +51,7 @@ impl CellInfoCache {
             Clear::All => {
                 let (w, h) = self.screen_size;
                 let capacity = (w * h) as usize;
-                self.buffer = vec![None; capacity];
+                self.buffer = vec![None; capacity].into();
             }
             Clear::NewLn => {
                 let (w, (col, row)) = (self.screen_size.0, self.screen_pos);
@@ -79,63 +85,229 @@ impl CellInfoCache {
     }
 
     pub fn _cache_content(&mut self, content: &str) {
-        let length = UnicodeWidthStr::width(content);
         let charbuf = content.chars();
-        let (w, h) = self.screen_size;
-        let (col, row) = self.screen_pos;
-        let here = ((row * w) + col) as usize;
-        let there = here + length;
-        let (new_col, new_row) = (there % w as usize, (there / w as usize));
-
+        let (w, h) = (
+            self.screen_size.0 as usize,
+            self.screen_size.1 as usize);
+        let (col, row) = (
+            self.screen_pos.0 as usize,
+            self.screen_pos.1 as usize);
+        // Keep this buffer at most as large as the amount of cells present on screen
         // (imdaveho) NOTE: Remember that buffer indices are 0-based, which
         // means that index 0 (col: 0, row: 0) is actually capacity: 1.
-        let capacity = (w * h) as usize;
-        // If length == capacity, the cursor will overflow by 1, so subtract it.
-        // TODO: Truncate the first n rows, and print the overflow n rows. Needs
-        // to handle control characters in loop...
-        // let capacity = meta.buffer_size();
-        if length > capacity - 1 { return };
-
-        let mut iteration = 0;
+        let capacity = w * h;
+        let mut index = (row * w) + col;
+        let mut length = 0;
         for ch in charbuf {
-            match UnicodeWidthChar::width(ch) {
-                Some(width) => {
-                    // (imdaveho) NOTE: The only control character that returns
-                    // Some() is the null byte. If for some reason, there is a
-                    // null byte passed within the &str parameter, we should
-                    // simple ignore it and not update the backbuf.
-                    if ch == '\x00' { continue } ;
-
-                    self.buffer[here + iteration] = Some(CellInfo {
-                        rune: ch,
-                        width: width as isize,
-                        style: self.style,
-                    });
-                    iteration += 1;
+            // Check capacity.
+            match self.buffer.get(index) {
+                Some(_) => {
+                    // In-bounds
+                    // Match on `ch`.
+                    match UnicodeWidthChar::width(ch) {
+                        Some(width) => {
+                            if ch == '\x00' { continue }
+                            self.buffer[index] = Some(
+                                CellInfo {
+                                    rune: ch,
+                                    width: width,
+                                    style: self.style,
+                                });
+                            index += 1; length += width;
+                        }
+                        None => { 
+                            match ch {
+                                '\x1B' => {
+                                    self.buffer[index] = Some(
+                                        CellInfo {
+                                            rune: '^',
+                                            width: 1,
+                                            style: self.style,
+                                        });
+                                    index += 1; length += 1;
+                                }
+                                '\n' => {
+                                    let spaces = w - (index % w);
+                                    for _ in 0..spaces {
+                                        match self.buffer.get(index) {
+                                            Some(_) => {
+                                                self.buffer[index] = Some(
+                                                    CellInfo {
+                                                        rune: ' ',
+                                                        width: 1,
+                                                        style: self.style,
+                                                    });
+                                                length += 1;
+                                            }
+                                            None => {
+                                                self.buffer.rotate_left(w);
+                                                index = capacity - w;
+                                                for i in index..capacity {
+                                                    self.buffer[i] = None;
+                                                }
+                                                self.buffer[index] = Some(
+                                                    CellInfo {
+                                                        rune: ' ',
+                                                        width: 1,
+                                                        style: self.style,
+                                                    });
+                                                length += 1;
+                                            }
+                                        }
+                                        index += 1;
+                                    }
+                                }
+                                '\t' => {
+                                    for _ in 0..self.tab_width as usize {
+                                        match self.buffer.get(index) {
+                                            Some(_) => {
+                                                self.buffer[index] = Some(
+                                                    CellInfo {
+                                                        rune: ' ',
+                                                        width: 1,
+                                                        style: self.style,
+                                                    });
+                                                length += 1;
+                                            }
+                                            None => {
+                                                self.buffer.rotate_left(w);
+                                                index = capacity - w;
+                                                for i in index..capacity {
+                                                    self.buffer[i] = None;
+                                                }
+                                                self.buffer[index] = Some(
+                                                    CellInfo {
+                                                        rune: ' ',
+                                                        width: 1,
+                                                        style: self.style,
+                                                    });
+                                                length += 1;
+                                            }
+                                        }
+                                        index += 1;
+                                    }
+                                }
+                                '\r' => index = (index / w) * w,
+                                _ => continue,
+                            }
+                        }
+                    }
                 }
                 None => {
-                    // (imdaveho) note: this is an escape sequence or a `char`
-                    // with ambiguous length defaulting to `::width()` == 1 or
-                    // `::width_cjk()` == 2.
-
-                    // (imdaveho) todo: this would only happen if the
-                    // user is trying to manually write an escape sequence.
-                    // attempt to interpret what the escape sequence is, and
-                    // update meta.cell_style with the details of the sequence.
-                    // difficulty: medium/hard -
-                    // * create a byte vector that fills with an ansi esc seq
-                    // * when you hit a printable char, take the byte vector,
-                    //   and map it to a cell style (medium) or specific
-                    //   ansii function (hard).
-                    ()
+                    // Out-of-bounds
+                    // Rotate the VecDeque buffer. (Truncate).
+                    self.buffer.rotate_left(w);
+                    index = capacity - w;
+                    for i in index..capacity {
+                        self.buffer[i] = None;
+                    }
+                    // Match on `ch`. (Identical to Some(_) case).
+                    match UnicodeWidthChar::width(ch) {
+                        Some(width) => {
+                            if ch == '\x00' { continue }
+                            self.buffer[index] = Some(
+                                CellInfo {
+                                    rune: ch,
+                                    width: width,
+                                    style: self.style,
+                                });
+                            index += 1; length += width;
+                        }
+                        None => { 
+                            match ch {
+                                '\x1B' => {
+                                    self.buffer[index] = Some(
+                                        CellInfo {
+                                            rune: '^',
+                                            width: 1,
+                                            style: self.style,
+                                        });
+                                    index += 1; length += 1;
+                                }
+                                '\n' => {
+                                    let spaces = w - (index % w);
+                                    for _ in 0..spaces {
+                                        match self.buffer.get(index) {
+                                            Some(_) => {
+                                                self.buffer[index] = Some(
+                                                    CellInfo {
+                                                        rune: ' ',
+                                                        width: 1,
+                                                        style: self.style,
+                                                    });
+                                                length += 1;
+                                            }
+                                            None => {
+                                                self.buffer.rotate_left(w);
+                                                index = capacity - w;
+                                                for i in index..capacity {
+                                                    self.buffer[i] = None;
+                                                }
+                                                self.buffer[index] = Some(
+                                                    CellInfo {
+                                                        rune: ' ',
+                                                        width: 1,
+                                                        style: self.style,
+                                                    });
+                                                length += 1;
+                                            }
+                                        }
+                                        index += 1;
+                                    }
+                                }
+                                '\t' => {
+                                    for _ in 0..self.tab_width as usize {
+                                        match self.buffer.get(index) {
+                                            Some(_) => {
+                                                self.buffer[index] = Some(
+                                                    CellInfo {
+                                                        rune: ' ',
+                                                        width: 1,
+                                                        style: self.style,
+                                                    });
+                                                length += 1;
+                                            }
+                                            None => {
+                                                self.buffer.rotate_left(w);
+                                                index = capacity - w;
+                                                for i in index..capacity {
+                                                    self.buffer[i] = None;
+                                                }
+                                                self.buffer[index] = Some(
+                                                    CellInfo {
+                                                        rune: ' ',
+                                                        width: 1,
+                                                        style: self.style,
+                                                    });
+                                                length += 1;
+                                            }
+                                        }
+                                        index += 1;
+                                    }
+                                }
+                                '\r' => index = (index / w) * w,
+                                _ => continue,
+                            }
+                        }
+                    }
                 }
             }
         }
-        self.screen_pos = (new_col as i16, new_row as i16);
+        let there = ((row * w) + col) + length;
+        let (new_col, new_row) = (there % w, there / w);
+        if new_row > h - 1 {
+            self.screen_pos = ((new_col as i16), (h - 1) as i16)
+        } else {
+            self.screen_pos = (new_col as i16, new_row as i16);
+        }
     }
 }
 
 impl CacheUpdater for CellInfoCache {
+    fn _tab_width(&mut self, w: u8) {
+        self.tab_width = w;
+    }
+
     fn _screen_size(&self) -> (i16, i16) {
         self.screen_size
     }
@@ -179,6 +351,7 @@ impl CacheUpdater for CellInfoCache {
         } else {
             // self.screen_pos.0 = 0
             // (imdaveho) NOTE: Cursor wrapping draft.
+            // TODO: n > capacity handling
             let w = self.screen_size.0;
             let rows = n / w;
             let rest = n % w;
@@ -200,6 +373,7 @@ impl CacheUpdater for CellInfoCache {
         } else {
             // self.screen_pos.0 = w;
             // (imdaveho) NOTE: Cursor wrapping draft.
+            // TODO: n > capacity handling
             let rows = n / w;
             let rest = n % w;
             self._sync_down(rows);
@@ -229,9 +403,9 @@ impl CacheUpdater for CellInfoCache {
 
     fn _flush_buffer(&self) {
         let (w, h) = self.screen_size;
-        let capacity = (w * h) as isize;
+        let capacity = (w * h) as usize;
         // TODO: stress test the content.len capacity here.
-        let mut contents = String::with_capacity((capacity * 2) as usize);
+        let mut contents = String::with_capacity((capacity * 2) as usize );
         let default = (Color::Reset, Color::Reset, Effect::Reset as u32);
         let mut previous = (Color::Reset, Color::Reset, Effect::Reset as u32);
         // Reset everything from the previous screens once at the start.
@@ -239,10 +413,10 @@ impl CacheUpdater for CellInfoCache {
         for cell in &self.buffer {
             // (imdaveho) NOTE: stackoverflow.com/questions/
             // 23975391/how-to-convert-a-string-into-a-static-str
-            let cellspace = UnicodeWidthStr::width(&*contents) as isize;
+            let cellspace = UnicodeWidthStr::width(&*contents);
             match cell {
                 Some(cl) => {
-                    if capacity - (cellspace + cl.width) < 0 { break }
+                    // if (cellspace + cl.width) > capacity { break }
                     if cl.style != previous && cl.style == default {
                         // Reset not just when the current style differs a bit
                         // from the previous, but every field is different and
@@ -270,7 +444,7 @@ impl CacheUpdater for CellInfoCache {
                 }
 
                 None => {
-                    if capacity - (cellspace + 1) < 0 { break }
+                    if (cellspace + 1) > capacity { break }
                     if previous == default { contents.push(' '); }
                     else {
                         contents.push_str(&style::reset());

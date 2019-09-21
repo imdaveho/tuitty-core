@@ -282,7 +282,7 @@ fn parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
                         // "\x1B[Z".as_bytes().to_vec();
                         KeyEvent::BackTab
                     } else {
-                        KeyEvent::Char(ch)
+                        KeyEvent::Tab
                     }
                 } else {
                     // 0x000A | 0x0105 | 0x0005 => {

@@ -9,56 +9,83 @@ use common::{
         TerminalCursor, TerminalFormatter, TerminalInput,
         TerminalModifier, TerminalSwitcher, TerminalWriter
     }, enums::{ Color, Effect },
+    wcwidth::*,
 };
 
 use std::io::{ stdin, stdout, Result, BufRead, Write };
 
 
-fn pos_raw() -> Result<(i16, i16)> {
-    // Where is the cursor?
-    // Use `ESC [ 6 n`.
-    let mut stdout = stdout();
-    let stdin = stdin();
-
-    // Write command
-    stdout.write_all(b"\x1B[6n")?;
-    stdout.flush()?;
-
-    stdin.lock().read_until(b'[', &mut vec![])?;
-
-    let mut rows = vec![];
-    stdin.lock().read_until(b';', &mut rows).unwrap();
-
-    let mut cols = vec![];
-    stdin.lock().read_until(b'R', &mut cols).unwrap();
-
-    // remove delimiter
-    rows.pop();
-    cols.pop();
-
-    let rows = rows
-        .into_iter()
-        .map(|b| (b as char))
-        .fold(String::new(), |mut acc, n| {
-            acc.push(n);
-            acc
-        })
-        .parse::<usize>()
-        .unwrap();
-    let cols = cols
-        .into_iter()
-        .map(|b| (b as char))
-        .fold(String::new(), |mut acc, n| {
-            acc.push(n);
-            acc
-        })
-        .parse::<usize>()
-        .unwrap();
-
-    Ok(((cols - 1) as i16, (rows - 1) as i16))
-}
-
 fn main() {
+
+    // let facepalm = "🤦\u{200d}\u{fe0f}";
+    // let facepalm = "\x1B\n\r\t\\\x41\x00🤦‍♀️\x1B[38;5;0m☆";
+    // let width = facepalm.width();
+    // let length = facepalm.len();
+    // let count = facepalm.chars().count();
+    // println!("w: {}, l: {}, c: {}", width, length, count);
+    // let charbuf = facepalm.chars();
+    // for (i, c) in charbuf.enumerate() {
+    //     match c.width() {
+    //         Some(w) => {
+    //             println!("i: {} - c: {:?}, w: {}", i, c, w);
+    //         }
+    //         None => {
+    //             println!("i: {} - c: {:?}, w: None", i, c);
+    //         }
+    //     }
+    // }
+
+
+    let mut t = terminal::Terminal::init();
+    t.switch();
+    t.goto(80, 29);
+    t.set_fg(Color::Yellow);
+    t.printf("hello");
+    thread::sleep(Duration::from_millis(1500));
+    t.to_main();
+    thread::sleep(Duration::from_millis(1500));
+    t.switch_to(1);
+    thread::sleep(Duration::from_millis(1500));
+
+
+    // // let newln_test = "1";
+    // let newln_test = "^                                                                                           [38;5;9m大";
+    // t.printf(newln_test);
+
+    // let mut iteration = 0;
+    // for mut ch in charbuf {
+    //     // if ch == '\x00' { continue }
+    //     // if ch == '\x1B' { ch = '^'; }
+    //     match ch {
+    //         '\x00' => continue,
+    //         '\x1B' => ch = '^',
+    //         '\n' => (),
+    //         '\t' => (),
+    //         '\r' => (),
+    //         _ => (),
+    //     };
+
+    //     match UnicodeWidthChar::width_cjk(ch) {
+    //         Some(w) => {
+    //             println!{"ch: {}, w: {}", ch, w};
+    //             iteration += 1;
+    //         }
+    //         None => println!("None"),
+    //     }
+    // }
+
+    // println!("{}", iteration);
+
+    
+    // TESTING OVERWRITE BEHAVIOR
+    // let mut t = terminal::Terminal::init();
+
+    // t.goto(0,0);
+    // t.prints("Hello, world");
+    // t.left();
+    // t.left();
+    // t.prints("Over?");
+    // t.flush();
 
     // let mut t = terminal::Terminal::init();
     // t.switch();
@@ -85,10 +112,12 @@ fn main() {
     // t.switch_to(1);
     // thread::sleep(Duration::from_millis(2500));
 
-    let mut t = terminal::Terminal::init();
-    t.goto(10, 20);
-    let (col, row) = t.pos();
-    t.printf(&format!("{}, {}", col, row));
+    // let mut t = terminal::Terminal::init();
+    // t.goto(10, 20);
+    // let (col, row) = t.pos();
+    // t.printf(&format!("{}, {}", col, row));
+
+
     // t.raw();
     // let (col, row) = pos_raw().unwrap();
     // t.cook();
