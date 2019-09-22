@@ -111,7 +111,7 @@ fn test_ansi_style() {
 fn test_ansi_cache() {
     use crate::common::{
         cache::CacheUpdater,
-        wcwidth::UnicodeWidthStr,
+        unicode::wcwidth::UnicodeWidthStr,
     };
 
     let mut cache = super::cell::CellInfoCache::new();
@@ -129,7 +129,7 @@ fn test_ansi_cache() {
     cache._sync_pos(test_col, test_row);
     assert_eq!(cache._screen_pos(), (test_col, test_row));
 
-    let start = ((test_col * test_w) + test_col) as usize;
+    let start = ((test_row * test_w) + test_col) as usize;
     let stops = (start + content_width) as usize;
     cache._cache_content(content);
 
@@ -140,7 +140,7 @@ fn test_ansi_cache() {
             None => count_none_until += 1,
         }
     }
-    assert_eq!(count_none_until, test_len - start);
+    assert_eq!(count_none_until, start);
 
     // let mut iterations = 0;
     // for cell in &cache.buffer[start..]

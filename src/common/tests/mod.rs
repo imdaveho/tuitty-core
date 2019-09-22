@@ -1,28 +1,28 @@
 #[test]
 fn test_unicode_width() {
     let ascii = "AZaz09@&=?";
-    assert_eq!(super::wcwidth::UnicodeWidthStr::width(ascii), 10);
+    assert_eq!(super::unicode::wcwidth::UnicodeWidthStr::width(ascii), 10);
 
     let nippon = "だちぷへぺほぼぽまぢ";
-    assert_eq!(super::wcwidth::UnicodeWidthStr::width(nippon), 20);
+    assert_eq!(super::unicode::wcwidth::UnicodeWidthStr::width(nippon), 20);
 
     let hangul = "ㅁㅂㅃㅄㅅㅆㅇㅈㅉㅊ";
-    assert_eq!(super::wcwidth::UnicodeWidthStr::width(hangul), 20);
+    assert_eq!(super::unicode::wcwidth::UnicodeWidthStr::width(hangul), 20);
     
     
     let putong = "㓐㓒㓓㓕㓗㓘㓙㓚㓝㓞";
-    assert_eq!(super::wcwidth::UnicodeWidthStr::width(putong), 20);
+    assert_eq!(super::unicode::wcwidth::UnicodeWidthStr::width(putong), 20);
 
     let unicode_single = "⓴█│┘▶⚜";
-    assert_eq!(super::wcwidth::UnicodeWidthStr::width(unicode_single), 6);
+    assert_eq!(super::unicode::wcwidth::UnicodeWidthStr::width(unicode_single), 6);
 
     let unicode_double = "❌⚡😂🔍㊙🐘🙇🙋🤦";
-    assert_eq!(super::wcwidth::UnicodeWidthStr::width(unicode_double), 18);
+    assert_eq!(super::unicode::wcwidth::UnicodeWidthStr::width(unicode_double), 18);
 
     let facepalm = "🤦\u{200d}\u{fe0f}";
     let facepalm_zero_width = '\u{200d}';
-    assert_eq!(super::wcwidth::UnicodeWidthStr::width(facepalm), 2);
-    assert_eq!(super::wcwidth::UnicodeWidthChar::width(facepalm_zero_width), Some(0));
+    assert_eq!(super::unicode::wcwidth::UnicodeWidthStr::width(facepalm), 2);
+    assert_eq!(super::unicode::wcwidth::UnicodeWidthChar::width(facepalm_zero_width), Some(0));
 
     let fem_facepalm = "🤦‍♀️";
     let fem_facepalm_literal = "\u{1F926}\u{200d}\u{2640}\u{fe0f}";

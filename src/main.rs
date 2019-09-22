@@ -1,5 +1,8 @@
 // extern crate tuitty;
 
+// extern crate unicode_segmentation;
+// use unicode_segmentation::UnicodeSegmentation;
+
 use std::thread;
 use std::time::Duration;
 mod terminal;
@@ -9,7 +12,7 @@ use common::{
         TerminalCursor, TerminalFormatter, TerminalInput,
         TerminalModifier, TerminalSwitcher, TerminalWriter
     }, enums::{ Color, Effect },
-    wcwidth::*,
+    unicode::{UnicodeSegmentation, wcwidth::*}
 };
 
 use std::io::{ stdin, stdout, Result, BufRead, Write };
@@ -18,7 +21,16 @@ use std::io::{ stdin, stdout, Result, BufRead, Write };
 fn main() {
 
     // let facepalm = "🤦\u{200d}\u{fe0f}";
-    // let facepalm = "\x1B\n\r\t\\\x41\x00🤦‍♀️\x1B[38;5;0m☆";
+    // let facepalm = "\x1B\n\t\\\x41\x00🤦‍♀️\x1B[38;5;9m☆👨‍👩‍👧👧🏿";
+    // let facepalm = "🤦‍♀️";
+    // let facepalm = "🤦♀";
+    // let facepalm = "क्‍ष";
+    // let facepalm = "क्ष";
+    // let facepalm = "寬\u{2060}帶";
+    // let facepalm = "👨‍👩‍👧";
+    // let facepalm = "é";
+    // let facepalm = "👧🏿";
+    // let facepalm = "🤦🏾‍♂️♀️";
     // let width = facepalm.width();
     // let length = facepalm.len();
     // let count = facepalm.chars().count();
@@ -27,28 +39,101 @@ fn main() {
     // for (i, c) in charbuf.enumerate() {
     //     match c.width() {
     //         Some(w) => {
-    //             println!("i: {} - c: {:?}, w: {}", i, c, w);
+    //             println!("i: {} - c: {:?}, w: {}, is_ascii: {}", i, c, w, c.is_ascii());
     //         }
     //         None => {
-    //             println!("i: {} - c: {:?}, w: None", i, c);
+    //             println!("i: {} - c: {:?}, w: None, is_ascii: {}", i, c, c.is_ascii());
     //         }
     //     }
     // }
 
+    // let groups = facepalm.split_word_bounds().collect::<Vec<&str>>();
+    // println!("{:?}", groups);
+    let content = "H👱🏾‍♂️e👨‍🚀llo क्‍ष fa\x00mily \x00👨‍👩‍👧! My 👧🏿 name \x1B[38;5;9mis Naomi 🤦‍♀️ and I'm 寬\u{2060}帶 old.";
+    let groupe = UnicodeSegmentation::graphemes(content, true).collect::<Vec<&str>>();
+    println!("{:?}", groupe);
 
-    let mut t = terminal::Terminal::init();
-    t.switch();
+    println!("{:?}", '\x00'.is_ascii());
+
+    // let charbuf = content.chars();
+
+    // let mut compare = Vec::with_capacity(10);
+
+    // for c in charbuf {
+    //     if c.is_ascii() {
+    //         println!("ch: {}", c);
+    //     } else {
+
+    //     }
+    // }
+
+    // let mut combo = Vec::with_capacity(10);
+    // let mut clean_after_loop = true;
+    // for mut c in groupe {
+    //     if clean_after_loop {
+    //         combo.clear()
+    //     }
+    //     let mut cr = c.chars().peekable();
+    //     let mut joined = false;
+    //     // let w = cr.fold(0, |agg, x| {
+    //     //     let n = x.width().unwrap_or(1);
+    //     //     if n == 0 { joined = true };
+    //     //     if x == '\u{200d}' { 
+    //     //         // println!("ZWJ!")
+    //     //         if cr.peek().is_none() {
+    //     //             println!("Last!");
+    //     //         } 
+    //     //     }
+    //     //     agg + n
+    //     // });
+    //     let mut n = 0;
+    //     while let Some(x) = cr.next() {
+    //         combo.push(x);
+    //         let w = x.width().unwrap_or(1);
+    //         if w == 0 { joined = true };
+    //         if cr.peek().is_none() {
+    //             if !clean_after_loop {
+    //                 let s = combo.iter().collect::<String>();
+    //                 println!("{:?}", s);
+    //             }
+    //             if x == '\u{200d}' {
+    //                 println!("Last!");
+    //                 clean_after_loop = false;
+    //             } else {
+    //                 clean_after_loop = true;
+    //             }
+    //         }
+    //         n += w;
+    //     }
+    //     if n > 2 || joined {
+    //         println!("compound: {:?}", c)
+    //     } else if n == 2 && !joined {
+    //         println!("double: {:?}", c)
+    //     } else {
+    //         println!("single: {:?}", c)
+    //     }
+    // }
+
+
+    // let mut t = terminal::Terminal::init();
+    // t.printf(facepalm);
+    // thread::sleep(Duration::from_millis(1500));
+    // t.printf("\r");
+    // thread::sleep(Duration::from_millis(1500));
+    // t.printf("a;skdjf;aksdjf;aksjd;fakjsd;kfj");
+    // thread::sleep(Duration::from_millis(2500));
+    // t.switch();
     // t.goto(80, 29);
-    t.set_fg(Color::Yellow);
+    // t.set_fg(Color::Yellow);
     // t.printf("hello");
-    let (w, h) = t.screen_size();
-    t.printf(&format!("{}, {}", w, h));
-    thread::sleep(Duration::from_millis(1500));
-    t.resize(86, 30);
-    t.flush();
-    let (w, h) = t.screen_size();
-    t.printf(&format!("{}, {}", w, h));
-    thread::sleep(Duration::from_millis(1500));
+    // let (w, h) = t.screen_size();
+    // t.printf(&format!("{}, {}", w, h));
+    // thread::sleep(Duration::from_millis(1500));
+    // t.resize(86, 30);
+    // t.flush();
+    // let (w, h) = t.screen_size();
+    // t.printf(&format!("{}, {}", w, h));
+    // thread::sleep(Duration::from_millis(1500));
     // t.to_main();
     // thread::sleep(Duration::from_millis(1500));
     // t.switch_to(1);

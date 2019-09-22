@@ -12,10 +12,6 @@ use winapi::um::wincon::{
     GetLargestConsoleWindowSize, COORD, SMALL_RECT,
     SetConsoleScreenBufferSize, SetConsoleWindowInfo,
     FillConsoleOutputCharacterA, FillConsoleOutputAttribute,
-    COMMON_LVB_LEADING_BYTE as LB, COMMON_LVB_TRAILING_BYTE as TB,
-    COMMON_LVB_GRID_HORIZONTAL as TH, COMMON_LVB_GRID_LVERTICAL as LV,
-    COMMON_LVB_GRID_RVERTICAL as RV, COMMON_LVB_REVERSE_VIDEO as REV,
-    COMMON_LVB_UNDERSCORE as UN,
 };
 use super::handle::{Handle, ConsoleInfo};
 use crate::common::enums::Clear;

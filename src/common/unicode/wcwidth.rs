@@ -4,8 +4,8 @@
 use core::ops::Add;
 use charwidth as cw;
 
-// (imdaveho) NOTE: Commented out #[inline] in the module. Since this file isn't
-// trying to be distributed and only used in this library.
+// (imdaveho) NOTE: Commented out #[inline] in the module.
+// Not sure how it affects performance etc.
 
 /// Methods for determining displayed width of Unicode characters.
 pub trait UnicodeWidthChar {

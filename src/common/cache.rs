@@ -50,7 +50,7 @@ impl ScreenCache {
         match self {
             ScreenCache::Ansi(a) => a._cache_content(content),
             #[cfg(windows)]
-            ScreenCache::Win32(b) => (),
+            ScreenCache::Win32(_) => (),
         }
     }
 }

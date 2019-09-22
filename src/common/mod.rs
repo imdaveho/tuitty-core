@@ -3,8 +3,8 @@
 pub mod enums;
 pub mod meta;
 pub mod cache;
-pub mod wcwidth;
 pub mod traits;
+pub mod unicode;
 
 
 #[cfg(test)]

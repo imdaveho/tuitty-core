@@ -1,29 +1,42 @@
 // ANSI specific screen cache buffer implmentation.
 
-use std::collections::VecDeque;
+use std::{
+    iter, mem,
+    collections::VecDeque,
+};
 
 use super::output;
 use super::style;
 use crate::common::{
     cache::CacheUpdater,
     enums::{ Clear, Color, Effect, Style },
-    wcwidth::{ UnicodeWidthStr, UnicodeWidthChar },
+    unicode::{UnicodeSegmentation, wcwidth::*},
 };
 
 
 #[derive(Clone)]
-pub struct CellInfo {
-    rune: char,
-    style: (Color, Color, u32),
-    width: usize,
+enum Rune {
+    Single(char),
+    Double(char),
+    Compound(Vec<char>),
+    Null,
 }
+
+
+#[derive(Clone)]
+pub struct CellInfo {
+    rune: Rune,
+    width: usize,
+    style: (Color, Color, u32),
+}
+
 
 #[derive(Clone)]
 pub struct CellInfoCache {
     tab_width: u8,
+    style: (Color, Color, u32),
     screen_pos: (i16, i16),
     screen_size: (i16, i16),
-    style: (Color, Color, u32),
     #[cfg(not(test))]
     buffer: VecDeque<Option<CellInfo>>,
     #[cfg(test)]
@@ -85,222 +98,184 @@ impl CellInfoCache {
     }
 
     pub fn _cache_content(&mut self, content: &str) {
-        let charbuf = content.chars();
         let (w, h) = (
             self.screen_size.0 as usize,
             self.screen_size.1 as usize);
         let (col, row) = (
             self.screen_pos.0 as usize,
             self.screen_pos.1 as usize);
-        // Keep this buffer at most as large as the amount of cells present on screen
-        // (imdaveho) NOTE: Remember that buffer indices are 0-based, which
-        // means that index 0 (col: 0, row: 0) is actually capacity: 1.
+        // (imdaveho) NOTE: Remember that buffer indices are 0-based, 
+        // which means that index[0] is actually cell[1] (col: 0, row: 0).
         let capacity = w * h;
         let mut index = (row * w) + col;
-        let mut length = 0;
-        for ch in charbuf {
-            // Check capacity.
-            match self.buffer.get(index) {
-                Some(_) => {
-                    // In-bounds
-                    // Match on `ch`.
-                    match UnicodeWidthChar::width(ch) {
-                        Some(width) => {
-                            if ch == '\x00' { continue }
-                            self.buffer[index] = Some(
-                                CellInfo {
-                                    rune: ch,
-                                    width: width,
-                                    style: self.style,
-                                });
-                            index += 1; length += width;
+        let segments: Vec<&str> = UnicodeSegmentation
+            ::graphemes(content, true).collect();
+        for ch in segments {
+            // Check capacity and truncate to keep at capacity.
+            if self.buffer.get(index).is_none() {
+                self.buffer.rotate_left(w);
+                index = capacity - w;
+                for i in index..capacity {
+                    self.buffer[i] = None;
+                }
+            }
+            // Ascii segments are single width characters.
+            if ch.is_ascii() {
+                let mut c = ch.chars().next().unwrap_or('\x00');
+                if c == '\x00' { continue }
+                if c == '\x1B' { c = '^' }
+                if c == '\r' { index = (index / w) * w; continue }
+                self.buffer[index] = Some(CellInfo {
+                    rune: Rune::Single(c),
+                    width: 1,
+                    style: self.style,
+                });
+                index += 1;
+                continue
+            }
+            // Unicode: CJK, Emoji, and other.
+            let chbuf = ch.chars().first_last();
+            for (is_first, is_last, c) in chbuf {
+                let w = UnicodeWidthChar::width(c).unwrap_or(1);
+                // This can only be a single Unicode character.
+                // Or a single character continuation from a joiner.
+                if is_first && is_last {
+                    if let Some(info) = &mut self.buffer[index] {
+                        if let Rune::Compound(chseq) = &mut info.rune {
+                            // Existing compound sequence that ended in a ZWJ.
+                            chseq.push(c);
                         }
-                        None => { 
-                            match ch {
-                                '\x1B' => {
-                                    self.buffer[index] = Some(
-                                        CellInfo {
-                                            rune: '^',
-                                            width: 1,
-                                            style: self.style,
-                                        });
-                                    index += 1; length += 1;
-                                }
-                                '\n' => {
-                                    let spaces = w - (index % w);
-                                    for _ in 0..spaces {
-                                        match self.buffer.get(index) {
-                                            Some(_) => {
-                                                self.buffer[index] = Some(
-                                                    CellInfo {
-                                                        rune: ' ',
-                                                        width: 1,
-                                                        style: self.style,
-                                                    });
-                                                length += 1;
-                                            }
-                                            None => {
-                                                self.buffer.rotate_left(w);
-                                                index = capacity - w;
-                                                for i in index..capacity {
-                                                    self.buffer[i] = None;
-                                                }
-                                                self.buffer[index] = Some(
-                                                    CellInfo {
-                                                        rune: ' ',
-                                                        width: 1,
-                                                        style: self.style,
-                                                    });
-                                                length += 1;
-                                            }
-                                        }
-                                        index += 1;
-                                    }
-                                }
-                                '\t' => {
-                                    for _ in 0..self.tab_width as usize {
-                                        match self.buffer.get(index) {
-                                            Some(_) => {
-                                                self.buffer[index] = Some(
-                                                    CellInfo {
-                                                        rune: ' ',
-                                                        width: 1,
-                                                        style: self.style,
-                                                    });
-                                                length += 1;
-                                            }
-                                            None => {
-                                                self.buffer.rotate_left(w);
-                                                index = capacity - w;
-                                                for i in index..capacity {
-                                                    self.buffer[i] = None;
-                                                }
-                                                self.buffer[index] = Some(
-                                                    CellInfo {
-                                                        rune: ' ',
-                                                        width: 1,
-                                                        style: self.style,
-                                                    });
-                                                length += 1;
-                                            }
-                                        }
-                                        index += 1;
-                                    }
-                                }
-                                '\r' => index = (index / w) * w,
-                                _ => continue,
-                            }
-                        }
+                    }
+                    if w == 1 {
+                        self.buffer[index] = Some(CellInfo {
+                            rune: Rune::Single(c),
+                            width: 1,
+                            style: self.style,
+                        });
+                        index += 1;
+                    }
+                    if w == 2 {
+                        self.buffer[index] = Some(CellInfo {
+                            rune: Rune::Double(c),
+                            width: 2,
+                            style: self.style,
+                        });
+                        index += 1;
+                        self.buffer[index] = Some(CellInfo {
+                            rune: Rune::Null,
+                            width: 0,
+                            style: self.style,
+                        });
+                        index += 1;
                     }
                 }
-                None => {
-                    // Out-of-bounds
-                    // Rotate the VecDeque buffer. (Truncate).
-                    self.buffer.rotate_left(w);
-                    index = capacity - w;
-                    for i in index..capacity {
-                        self.buffer[i] = None;
-                    }
-                    // Match on `ch`. (Identical to Some(_) case).
-                    match UnicodeWidthChar::width(ch) {
-                        Some(width) => {
-                            if ch == '\x00' { continue }
-                            self.buffer[index] = Some(
-                                CellInfo {
-                                    rune: ch,
-                                    width: width,
-                                    style: self.style,
-                                });
-                            index += 1; length += width;
+                // This will have to be a compound Unicode character.
+                if is_first && !is_last {
+                    // Start of the compound character.
+                    if let Some(info) = &mut self.buffer[index] {
+                        if let Rune::Compound(chseq) = &mut info.rune {
+                            // Existing compound sequence that ended in a ZWJ.
+                            chseq.push(c);
+                        } else {
+                            // Overwrite existing element with start of this
+                            // compound character.
+                            let mut chseq = Vec::with_capacity(8);
+                            chseq.push(c);
+                            self.buffer[index] = Some(CellInfo {
+                                rune: Rune::Compound(chseq),
+                                width: w,
+                                style: self.style,
+                            });
                         }
-                        None => { 
-                            match ch {
-                                '\x1B' => {
-                                    self.buffer[index] = Some(
-                                        CellInfo {
-                                            rune: '^',
-                                            width: 1,
-                                            style: self.style,
-                                        });
-                                    index += 1; length += 1;
-                                }
-                                '\n' => {
-                                    let spaces = w - (index % w);
-                                    for _ in 0..spaces {
-                                        match self.buffer.get(index) {
-                                            Some(_) => {
-                                                self.buffer[index] = Some(
-                                                    CellInfo {
-                                                        rune: ' ',
-                                                        width: 1,
-                                                        style: self.style,
-                                                    });
-                                                length += 1;
-                                            }
-                                            None => {
-                                                self.buffer.rotate_left(w);
-                                                index = capacity - w;
-                                                for i in index..capacity {
-                                                    self.buffer[i] = None;
-                                                }
-                                                self.buffer[index] = Some(
-                                                    CellInfo {
-                                                        rune: ' ',
-                                                        width: 1,
-                                                        style: self.style,
-                                                    });
-                                                length += 1;
-                                            }
-                                        }
-                                        index += 1;
-                                    }
-                                }
-                                '\t' => {
-                                    for _ in 0..self.tab_width as usize {
-                                        match self.buffer.get(index) {
-                                            Some(_) => {
-                                                self.buffer[index] = Some(
-                                                    CellInfo {
-                                                        rune: ' ',
-                                                        width: 1,
-                                                        style: self.style,
-                                                    });
-                                                length += 1;
-                                            }
-                                            None => {
-                                                self.buffer.rotate_left(w);
-                                                index = capacity - w;
-                                                for i in index..capacity {
-                                                    self.buffer[i] = None;
-                                                }
-                                                self.buffer[index] = Some(
-                                                    CellInfo {
-                                                        rune: ' ',
-                                                        width: 1,
-                                                        style: self.style,
-                                                    });
-                                                length += 1;
-                                            }
-                                        }
-                                        index += 1;
-                                    }
-                                }
-                                '\r' => index = (index / w) * w,
-                                _ => continue,
-                            }
+                    } else {
+                        // Brand new start of the compound character.
+                        let mut chseq = Vec::with_capacity(8);
+                        chseq.push(c);
+                        self.buffer[index] = Some(CellInfo {
+                            rune: Rune::Compound(chseq),
+                            width: w,
+                            style: self.style,
+                        });
+                    }
+                } else if !is_first && !is_last {
+                    // Middle of the compound character.
+                    if let Some(info) = &mut self.buffer[index] {
+                        if let Rune::Compound(chseq) = &mut info.rune {
+                            chseq.push(c);
                         }
                     }
+                } else {
+                    // End of the compound character.
+                    // !is_first && is_last
+                    if let Some(info) = &mut self.buffer[index] {
+                        if let Rune::Compound(chseq) = &mut info.rune {
+                            chseq.push(c);
+                        }
+                    }
+                    if c != '\u{200d}' {
+                        // The next segment is not connected to this one.
+                        index += 1;
+                        self.buffer[index] = Some(CellInfo {
+                            rune: Rune::Null,
+                            width: 0,
+                            style: self.style,
+                        });
+                        index += 1;
+                    }
+                    // If the last character was a joining character, we
+                    // keep the index as is, and insert upon the next loop.
                 }
             }
         }
-        let there = ((row * w) + col) + length;
-        let (new_col, new_row) = (there % w, there / w);
-        if new_row > h - 1 {
-            self.screen_pos = ((new_col as i16), (h - 1) as i16)
-        } else {
-            self.screen_pos = (new_col as i16, new_row as i16);
-        }
+        // Calculate where the new cursor position should be.
+        self.screen_pos = ((index % w) as i16, (index / w) as i16);
     }
+        // let mut charbuf = content.chars().peekable();
+        // while let Some(mut ch) = charbuf.next() {
+        //     // Check capacity and truncate to keep at capacity.
+        //     if self.buffer.get(index).is_none() {
+        //         self.buffer.rotate_left(w);
+        //         index = capacity - w;
+        //         for i in index..capacity {
+        //             self.buffer[i] = None;
+        //         }
+        //     }
+        //     // Handle chars and update buffer.
+        //     if ch.is_ascii() {
+        //         match UnicodeWidthChar::width(ch) {
+        //             Some(_) => if ch == '\x00' { continue },
+        //             None => {
+        //                 match ch {
+        //                     '\x1B' => ch = '^',
+        //                     '\r' => index = (index / w) * w,
+        //                     _ => ()
+        //                 }
+        //             }
+        //         }
+        //         self.buffer[index] = Some(CellInfo {
+        //             rune: Rune::Single(ch),
+        //             width: 1,
+        //             style: self.style,
+        //         });
+        //         index += 1;
+        //         continue
+        //     }
+        //     // Unicode: CJK, Emoji, and other.
+        
+        
+        //     let mut curr_width = 1;
+        //     if let Some(w) = UnicodeWidthChar::width(ch) {
+        //         curr_width = w
+        //     }
+
+        //     let mut peek_width = 1;
+        //     if let Some(p) = charbuf.peek() {
+        //         if let Some(w) = UnicodeWidthChar::width(*p) {
+        //             peek_width = w
+        //         }
+        //     }
+
+        //     // Scenarios
 }
 
 impl CacheUpdater for CellInfoCache {
@@ -402,49 +377,63 @@ impl CacheUpdater for CellInfoCache {
     }
 
     fn _flush_buffer(&self) {
-        let (w, h) = self.screen_size;
-        let capacity = (w * h) as usize;
-        // TODO: stress test the content.len capacity here.
-        let mut contents = String::with_capacity((capacity * 2) as usize );
+        let (w, h) = (
+            self.screen_size.0 as usize,
+            self.screen_size.1 as usize);
+        let capacity = w * h;
         let default = (Color::Reset, Color::Reset, Effect::Reset as u32);
+        // TODO: stress test the content.len capacity here.
+        let mut contents = String::with_capacity(capacity * 3);
         let mut previous = (Color::Reset, Color::Reset, Effect::Reset as u32);
         // Reset everything from the previous screens once at the start.
         contents.push_str(&style::reset());
+
         for cell in &self.buffer {
-            // (imdaveho) NOTE: stackoverflow.com/questions/
-            // 23975391/how-to-convert-a-string-into-a-static-str
-            let cellspace = UnicodeWidthStr::width(&*contents);
             match cell {
-                Some(cl) => {
-                    // if (cellspace + cl.width) > capacity { break }
-                    if cl.style != previous && cl.style == default {
+                Some(cel) => {
+                    // Restore styles.
+                    if cel.style != previous && cel.style == default {
                         // Reset not just when the current style differs a bit
                         // from the previous, but every field is different and
                         // is a {Color|Effect}::Reset value.
                         contents.push_str(&style::reset())
                     } else {
                         // Else, go through each and update them.
-                        if cl.style.0 != previous.0 {
+                        if cel.style.0 != previous.0 {
                             contents.push_str(
-                                &style::set_style(Style::Fg(cl.style.0)))
+                                &style::set_style(Style::Fg(cel.style.0)))
                         }
 
-                        if cl.style.1 != previous.1 {
+                        if cel.style.1 != previous.1 {
                             contents.push_str(
-                                &style::set_style(Style::Bg(cl.style.1)))
+                                &style::set_style(Style::Bg(cel.style.1)))
                         }
 
-                        if cl.style.2 != previous.2 {
+                        if cel.style.2 != previous.2 {
                             contents.push_str(
-                                &style::set_style(Style::Fx(cl.style.2)))
+                                &style::set_style(Style::Fx(cel.style.2)))
                         }
                     }
-                    contents.push(cl.rune);
-                    previous = cl.style;
-                }
-
+                    previous = cel.style;
+                    // Insert contents.
+                    match &cel.rune {
+                        Rune::Single(c) => match c {
+                            '\t' => for _ in 0..self.tab_width {
+                                contents.push(' ')
+                            },
+                            // '\n' => (),
+                            _ => contents.push(*c),
+                        },
+                        Rune::Double(c) => contents.push(*c),
+                        Rune::Null => (),
+                        Rune::Compound(v) => {
+                            for c in v {
+                                contents.push(*c)
+                            }
+                        }
+                    }
+                },
                 None => {
-                    if (cellspace + 1) > capacity { break }
                     if previous == default { contents.push(' '); }
                     else {
                         contents.push_str(&style::reset());
@@ -455,5 +444,71 @@ impl CacheUpdater for CellInfoCache {
             }
         }
         output::printf(&contents);
+        //     // (imdaveho) NOTE: stackoverflow.com/questions/
+        //     // 23975391/how-to-convert-a-string-into-a-static-str
+        //     let cellspace = UnicodeWidthStr::width(&*contents);
+        //     match cell {
+        //         Some(cl) => {
+        //             // if (cellspace + cl.width) > capacity { break }
+        //             if cl.style != previous && cl.style == default {
+        //                 // Reset not just when the current style differs a bit
+        //                 // from the previous, but every field is different and
+        //                 // is a {Color|Effect}::Reset value.
+        //                 contents.push_str(&style::reset())
+        //             } else {
+        //                 // Else, go through each and update them.
+        //                 if cl.style.0 != previous.0 {
+        //                     contents.push_str(
+        //                         &style::set_style(Style::Fg(cl.style.0)))
+        //                 }
+
+        //                 if cl.style.1 != previous.1 {
+        //                     contents.push_str(
+        //                         &style::set_style(Style::Bg(cl.style.1)))
+        //                 }
+
+        //                 if cl.style.2 != previous.2 {
+        //                     contents.push_str(
+        //                         &style::set_style(Style::Fx(cl.style.2)))
+        //                 }
+        //             }
+        //             contents.push(cl.rune);
+        //             previous = cl.style;
+        //         }
+
+        //         None => {
+        //             if (cellspace + 1) > capacity { break }
+        //             if previous == default { contents.push(' '); }
+        //             else {
+        //                 contents.push_str(&style::reset());
+        //                 contents.push(' ');
+        //                 previous = default;
+        //             }
+        //         }
+        //     }
+        // }
+        // output::printf(&contents);
+    }
+}
+
+
+trait FirstLastIterator: Iterator + Sized {
+    fn first_last(self) -> FirstLast<Self>;
+}
+
+impl<I> FirstLastIterator for I where I: Iterator {
+    fn first_last(self) -> FirstLast<Self> {
+        FirstLast(true, self.peekable())
+    }
+}
+
+pub struct FirstLast<I>(bool, iter::Peekable<I>) where I: Iterator;
+
+impl<I> Iterator for FirstLast<I> where I: Iterator {
+    type Item = (bool, bool, I::Item);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let first = mem::replace(&mut self.0, false);
+        self.1.next().map(|item| (first, self.1.peek().is_none(), item))
     }
 }
