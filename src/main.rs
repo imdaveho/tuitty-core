@@ -17,6 +17,9 @@ use common::{
 
 use std::io::{ stdin, stdout, Result, BufRead, Write };
 
+#[cfg(windows)]
+use terminal::wincon::Handle;
+
 
 fn main() {
 
@@ -49,11 +52,14 @@ fn main() {
 
     // let groups = facepalm.split_word_bounds().collect::<Vec<&str>>();
     // println!("{:?}", groups);
-    let content = "H👱🏾‍♂️e👨‍🚀llo क्‍ष fa\x00mily \x00👨‍👩‍👧! My 👧🏿 name \x1B[38;5;9mis Naomi 🤦‍♀️ and I'm 寬\u{2060}帶 old.";
+    // let content = "H👱🏾‍♂️e👨‍🚀llo क्‍ष fa\x00mily \x00👨‍👩‍👧! My 👧🏿 name \x1B[38;5;9mis Naomi 🤦‍♀️ and I'm 寬\u{2060}帶 old.";
+    // let content = "the\x00 \x1B[38;5;9m빨리\x1B[39m 褐色 🦊 jumps over the 大懒 🐕.";
+    // let content = "👨‍👩‍👧A👨‍🚀A🤦‍♀️A";
+    let content = "👨‍🚀";
     let groupe = UnicodeSegmentation::graphemes(content, true).collect::<Vec<&str>>();
     println!("{:?}", groupe);
 
-    println!("{:?}", '\x00'.is_ascii());
+    // println!("{:?}", '\x00'.is_ascii());
 
     // let charbuf = content.chars();
 
@@ -115,29 +121,42 @@ fn main() {
     // }
 
 
-    // let mut t = terminal::Terminal::init();
+    let mut t = terminal::Terminal::init();
     // t.printf(facepalm);
     // thread::sleep(Duration::from_millis(1500));
     // t.printf("\r");
     // thread::sleep(Duration::from_millis(1500));
     // t.printf("a;skdjf;aksdjf;aksjd;fakjsd;kfj");
     // thread::sleep(Duration::from_millis(2500));
-    // t.switch();
-    // t.goto(80, 29);
-    // t.set_fg(Color::Yellow);
+    t.switch();
+    t.hide_cursor();
+    t.goto(80, 29);
+    t.set_fg(Color::Yellow);
+    let content = "the\x00 \x1B[38;5;9m빨리\x1B[39m 褐色 🦊 jumps over the 大懒 🐕.";
+    t.printf(content);
     // t.printf("hello");
     // let (w, h) = t.screen_size();
     // t.printf(&format!("{}, {}", w, h));
-    // thread::sleep(Duration::from_millis(1500));
+    thread::sleep(Duration::from_millis(2000));
     // t.resize(86, 30);
     // t.flush();
     // let (w, h) = t.screen_size();
     // t.printf(&format!("{}, {}", w, h));
     // thread::sleep(Duration::from_millis(1500));
-    // t.to_main();
-    // thread::sleep(Duration::from_millis(1500));
-    // t.switch_to(1);
-    // thread::sleep(Duration::from_millis(1500));
+    t.switch();
+    t.hide_cursor();
+    thread::sleep(Duration::from_millis(2000));
+    t.switch_to(1);
+    t.hide_cursor();
+    thread::sleep(Duration::from_millis(2000));
+    t.switch_to(2);
+    t.printf("Hello 2");
+    t.hide_cursor();
+    thread::sleep(Duration::from_millis(2000));
+    t.switch_to(0);
+    thread::sleep(Duration::from_millis(2000));
+    t.switch_to(2);
+    thread::sleep(Duration::from_millis(2000));
 
 
     // // let newln_test = "1";

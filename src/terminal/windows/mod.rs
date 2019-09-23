@@ -65,8 +65,6 @@ impl WindowsConsole {
     // leverage the alternate screen buffer handle.
     fn enable_alt(&mut self) {
         if !is_ansi_enabled() {
-            // Before switching, cache the current screen.
-            self.state.cache._cache_buffer();
             // Set the alternate screen back to defaults.
             self.alternate.set_mode(&self.original_mode)
                 .expect("Error setting alternate screen back to defaults");
@@ -280,8 +278,11 @@ impl TerminalSwitcher for WindowsConsole {
             self.enable_alt();
             self.common.clear(Clear::All);
         } else {
-            // Before "switching", cache the current screen and cursor pos.
+            // Before "switching", cache the current screen.
             self.state.cache._cache_buffer();
+            // (imdaveho) TODO: Handle below with updating pos on printf
+            // (unless unicode screws that 
+            // self.pos();
             // If this wasn't a switch to the alternate screen (ie. the current
             // screen is already the alternate screen), then we need to clear
             // it without modifying the cellbuffer.
@@ -310,6 +311,28 @@ impl TerminalSwitcher for WindowsConsole {
         // If the id and the current id are the same, well, there is nothing to
         // do, you're already on the active screen buffer.
         if index == self.index { return }
+        // Enable/Disable alternate screen based on current and target indices.
+        // (similar to `switch`)
+        if index == 0 {
+            // Before switching, cache the current screen.
+            self.state.cache._cache_buffer();
+            // Disable if you are reverting back to main.
+            self.common.disable_alt();
+        } else {
+            if self.index == 0 {
+                // Enable if you are already on main switching to an
+                // alternate screen.
+                self.enable_alt();
+                self.common.clear(Clear::All);
+            } else {
+                // Before switching, cache the current screen.
+                self.state.cache._cache_buffer();
+                // (imdaveho) TODO: Handle below with updating pos on printf
+                // (unless unicode screws that up)
+                // self.pos();
+                self.common.clear(Clear::All);
+            }
+        }
         // The below is to handle cases where `switch()` created a `Metadata`
         // state that has not yet been pushed to self.stash. If it has already
         // been pushed, update the stash at the current `self.index` before
@@ -321,17 +344,11 @@ impl TerminalSwitcher for WindowsConsole {
         }
         // After updating the stash, clone the Metadata at the switch_to index.
         self.state = self.stash[index].clone();
-        // Enable/Disable alternate screen based on current and target indices.
-        if index == 0 {
-            // Disable if you are reverting back to main.
-            self.common.disable_alt();
-        } else {
-            if self.index == 0 {
-                // Enable if you are already on main switching to an
-                // alternate screen.
-                self.enable_alt();
-            }
-            self.common.clear(Clear::All);
+        // Update `self.index` to the function argument `index`
+        self.index = index;
+
+        // Restore the buffer from the screen cache of the new state Metadata.
+        if index != 0 {
             self.common.goto(0, 0);
             // Restore screen contents.
             self.state.cache._flush_buffer();
@@ -339,12 +356,6 @@ impl TerminalSwitcher for WindowsConsole {
             let (col, row) = self.state.cache._screen_pos();
             self.common.goto(col, row);
         }
-        // Update `self.index` to the function argument `index`
-        // (imdaveho) TODO: Confirm if main screen will have native buffer logs,
-        // thereby not needing to restore content manually via library. Also,
-        // because there is going to be output that is not from `tty` which is
-        // not possible to save in the backbuf.
-        self.index = index;
 
         let (raw, mouse, show) = (
             self.state._is_raw_on(),

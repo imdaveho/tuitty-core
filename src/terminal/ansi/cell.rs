@@ -14,7 +14,7 @@ use crate::common::{
 };
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Rune {
     Single(char),
     Double(char),
@@ -23,7 +23,7 @@ enum Rune {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CellInfo {
     rune: Rune,
     width: usize,
@@ -141,44 +141,51 @@ impl CellInfoCache {
                 // Or a single character continuation from a joiner.
                 if is_first && is_last {
                     if let Some(info) = &mut self.buffer[index] {
+                        // Continuation of previous sequence.
                         if let Rune::Compound(chseq) = &mut info.rune {
-                            // Existing compound sequence that ended in a ZWJ.
                             chseq.push(c);
+                            // Since char is first and last, wrap it up.
+                            index += 1;
+                            self.buffer[index] = Some(CellInfo {
+                                rune: Rune::Null,
+                                width: 0,
+                                style: self.style,
+                            });
+                            index += 1;
+                        }
+                    } else {
+                        if w == 1 {
+                            self.buffer[index] = Some(CellInfo {
+                                rune: Rune::Single(c),
+                                width: 1,
+                                style: self.style,
+                            });
+                            index += 1;
+                        }
+                        if w == 2 {
+                            self.buffer[index] = Some(CellInfo {
+                                rune: Rune::Double(c),
+                                width: 2,
+                                style: self.style,
+                            });
+                            index += 1;
+                            self.buffer[index] = Some(CellInfo {
+                                rune: Rune::Null,
+                                width: 0,
+                                style: self.style,
+                            });
+                            index += 1;
                         }
                     }
-                    if w == 1 {
-                        self.buffer[index] = Some(CellInfo {
-                            rune: Rune::Single(c),
-                            width: 1,
-                            style: self.style,
-                        });
-                        index += 1;
-                    }
-                    if w == 2 {
-                        self.buffer[index] = Some(CellInfo {
-                            rune: Rune::Double(c),
-                            width: 2,
-                            style: self.style,
-                        });
-                        index += 1;
-                        self.buffer[index] = Some(CellInfo {
-                            rune: Rune::Null,
-                            width: 0,
-                            style: self.style,
-                        });
-                        index += 1;
-                    }
-                }
-                // This will have to be a compound Unicode character.
-                if is_first && !is_last {
+                } else if is_first && !is_last {
+                    // This will have to be a compound Unicode character.
                     // Start of the compound character.
                     if let Some(info) = &mut self.buffer[index] {
                         if let Rune::Compound(chseq) = &mut info.rune {
                             // Existing compound sequence that ended in a ZWJ.
                             chseq.push(c);
                         } else {
-                            // Overwrite existing element with start of this
-                            // compound character.
+                            // Overwriting.
                             let mut chseq = Vec::with_capacity(8);
                             chseq.push(c);
                             self.buffer[index] = Some(CellInfo {
@@ -188,7 +195,7 @@ impl CellInfoCache {
                             });
                         }
                     } else {
-                        // Brand new start of the compound character.
+                        // Starting new.
                         let mut chseq = Vec::with_capacity(8);
                         chseq.push(c);
                         self.buffer[index] = Some(CellInfo {
@@ -510,5 +517,83 @@ impl<I> Iterator for FirstLast<I> where I: Iterator {
     fn next(&mut self) -> Option<Self::Item> {
         let first = mem::replace(&mut self.0, false);
         self.1.next().map(|item| (first, self.1.peek().is_none(), item))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_cache_content_ansii() {
+        use super::CellInfoCache;
+
+        let ascii = "AA";
+        let mut cache = CellInfoCache::new();
+        cache._cache_content(ascii);
+        let mut cache_copy = Vec::with_capacity(5);
+        for i in 0..5 {
+            if let Some(info) = &cache.buffer[i] {
+                match info.rune {
+                    super::Rune::Single(c) => cache_copy.push(c.to_string()),
+                    super::Rune::Null => cache_copy.push(String::from("_")),
+                    _ => cache_copy.push(String::from("Other")),
+                }
+            } else {
+                cache_copy.push(String::from("None"));
+            }
+        }
+        println!("{:?}", cache_copy);
+        std::thread::sleep(std::time::Duration::from_millis(10000));
+    }
+
+    #[test]
+    fn test_cache_content_cjk() {
+        use super::CellInfoCache;
+
+        let cjk = "色A";
+        let mut cache = CellInfoCache::new();
+        cache._cache_content(cjk);
+        let mut cache_copy = Vec::with_capacity(5);
+        for i in 0..5 {
+            if let Some(info) = &cache.buffer[i] {
+                match info.rune {
+                    super::Rune::Single(c) => cache_copy.push(c.to_string()),
+                    super::Rune::Double(c) => cache_copy.push(c.to_string()),
+                    super::Rune::Null => cache_copy.push(String::from("_")),
+                    _ => cache_copy.push(String::from("Other")),
+                }
+            } else {
+                cache_copy.push(String::from("None"));
+            }
+        }
+        println!("{:?}", cache_copy);
+    }
+
+    #[test]
+    fn test_cache_content_compound() {
+        use super::CellInfoCache;
+
+        // let compound = "👨‍👩‍👧A👨‍🚀A🤦‍♀️A";
+        let compound = "👨‍🚀";
+        let mut cache = CellInfoCache::new();
+        cache._cache_content(compound);
+        let mut cache_copy = Vec::with_capacity(5);
+        for i in 0..15 {
+            if let Some(info) = &cache.buffer[i] {
+                match &info.rune {
+                    super::Rune::Single(c) => cache_copy.push(c.to_string()),
+                    super::Rune::Double(c) => cache_copy.push(c.to_string()),
+                    super::Rune::Compound(v) => {
+                        println!("Compound!");
+                        for c in v {
+                            cache_copy.push(c.to_string())
+                        }
+                    },
+                    super::Rune::Null => cache_copy.push(String::from("_")),
+                }
+            } else {
+                cache_copy.push(String::from("None"));
+            }
+        }
+        println!("{:?}", cache_copy);
     }
 }

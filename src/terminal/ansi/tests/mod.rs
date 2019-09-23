@@ -111,9 +111,12 @@ fn test_ansi_style() {
 fn test_ansi_cache() {
     use crate::common::{
         cache::CacheUpdater,
-        unicode::wcwidth::UnicodeWidthStr,
+        unicode::{
+            wcwidth::UnicodeWidthStr,
+            UnicodeSegmentation,
+        },
     };
-
+    
     let mut cache = super::cell::CellInfoCache::new();
     let content = "the\x00 \x1B[38;5;9m빨리\x1B[39m 褐色 🦊 jumps over the 大懒 🐕.";
     let content_width = UnicodeWidthStr::width(content);
@@ -130,7 +133,7 @@ fn test_ansi_cache() {
     assert_eq!(cache._screen_pos(), (test_col, test_row));
 
     let start = ((test_row * test_w) + test_col) as usize;
-    let stops = (start + content_width) as usize;
+    // let stops = (start + content_width) as usize;
     cache._cache_content(content);
 
     let mut count_none_until = 0;
@@ -142,6 +145,47 @@ fn test_ansi_cache() {
     }
     assert_eq!(count_none_until, start);
 
-    // let mut iterations = 0;
-    // for cell in &cache.buffer[start..]
+    // assert_eq!('t', match &cache.buffer[start] {
+    //     Some(info) => match info.rune {
+    //         Rune::Single(c) => c,
+    //         _ => '!',
+    //     },
+    //     None => '!',
+    // });
+
+    // assert_ne!('.', match &cache.buffer[stops] {
+    //     Some(info) => match info.rune {
+    //         Rune::Single(c) => c,
+    //         _ => '!',
+    //     },
+    //     None => '!',
+    // });
+
+    // // 3 0-width, 8 2-width (16), 36 1-width letters and spaces.
+    // assert_eq!(52, content_width);
+
+    // let segments = UnicodeSegmentation
+    //     ::graphemes(content, true).collect::<Vec<&str>>();
+    // // 47 Unicode characters
+    // assert_eq!(47, segments.len());
+
+    // // From 52:
+    // // Less 1 null  byte; (51)
+    // // Plus 2 escape chars => '^' (53)
+    // // let content = "the\x00 \x1B[38;5;9m빨리\x1B[39m 褐色 🦊 jumps over the 大懒 🐕.";
+    // // cleaned: "the ^[38;5;9m빨\리\^[39m 褐\色\ 🦊\ jumps over the 大\懒\ 🐕\."
+    // // assert_eq!('.', match &cache.buffer[start + 54] {
+    // //     Some(info) => match info.rune {
+    // //         Rune::Single(c) => c,
+    // //         _ => '!',
+    // //     },
+    // //     None => '!',
+    // // });
+    // let mut testv = Vec::with_capacity(100);
+    // for i in start..674 {
+    //     testv.push(cache.buffer[i].clone());
+    // }
+
+    // println!("{:?}", testv);
+    // std::thread::sleep(std::time::Duration::from_millis(10000));
 }
