@@ -30,10 +30,7 @@ pub trait UnicodeWidthChar {
 }
 
 impl UnicodeWidthChar for char {
-    // #[inline]
     fn width(self) -> Option<usize> { cw::width(self, false) }
-
-    // #[inline]
     fn width_cjk(self) -> Option<usize> { cw::width(self, true) }
 }
 
@@ -61,12 +58,10 @@ pub trait UnicodeWidthStr {
 }
 
 impl UnicodeWidthStr for str {
-    // #[inline]
     fn width(&self) -> usize {
         self.chars().map(|c| cw::width(c, false).unwrap_or(0)).fold(0, Add::add)
     }
 
-    // #[inline]
     fn width_cjk(&self) -> usize {
         self.chars().map(|c| cw::width(c, true).unwrap_or(0)).fold(0, Add::add)
     }
@@ -88,7 +83,6 @@ mod charwidth {
     use core::option::Option::{self, Some, None};
     use core::result::Result::{Ok, Err};
 
-    // #[inline]
     fn bsearch_range_value_table(c: char, is_cjk: bool, r: &'static [(char, char, u8, u8)]) -> u8 {
         use core::cmp::Ordering::{Equal, Less, Greater};
         match r.binary_search_by(|&(lo, hi, _, _)| {
@@ -104,7 +98,6 @@ mod charwidth {
         }
     }
 
-    // #[inline]
     pub fn width(c: char, is_cjk: bool) -> Option<usize> {
         match c as usize {
             _c @ 0 => Some(0),          // null is zero width
