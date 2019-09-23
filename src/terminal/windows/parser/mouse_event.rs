@@ -3,7 +3,7 @@ use winapi::um::wincon::MOUSE_EVENT_RECORD;
 use super::{ ControlKeyState, EventFlags };
 
 
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub struct MouseEventRecord {
     pub mouse_position: (i16, i16),
     pub button_state: ButtonState,
@@ -32,7 +32,7 @@ impl From<MOUSE_EVENT_RECORD> for MouseEventRecord {
 //
 // https://docs.microsoft.com/en-us/windows/console/mouse-event-record-str
 // #members
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum ButtonState {
     Release = 0x0000,
     // The leftmost mouse button.

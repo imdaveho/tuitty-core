@@ -59,8 +59,8 @@ impl CharInfoCache {
 }
 
 impl CacheUpdater for CharInfoCache {
-    fn _tab_width(&mut self, w: u8) {
-        self.tab_width = w;
+    fn _tab_width(&self) -> u8 {
+        self.tab_width
     }
 
     fn _screen_size(&self) -> (i16, i16) {
@@ -69,6 +69,10 @@ impl CacheUpdater for CharInfoCache {
 
     fn _screen_pos(&self) -> (i16, i16) {
         self.screen_pos
+    }
+    
+    fn _sync_tab(&mut self, w: u8) {
+        self.tab_width = w;
     }
 
     fn _sync_size(&mut self, w: i16, h: i16) {

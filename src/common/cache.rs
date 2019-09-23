@@ -56,9 +56,10 @@ impl ScreenCache {
 }
 
 pub trait CacheUpdater {
-    fn _tab_width(&mut self, w: u8);
+    fn _tab_width(&self) -> u8;
     fn _screen_size(&self) -> (i16, i16);
     fn _screen_pos(&self) -> (i16, i16);
+    fn _sync_tab(&mut self, w: u8);
     fn _sync_size(&mut self, w: i16, h: i16);
     fn _sync_pos(&mut self, col: i16, row: i16);
     fn _sync_up(&mut self, n: i16);
@@ -77,11 +78,11 @@ pub trait CacheUpdater {
 }
 
 impl CacheUpdater for ScreenCache {
-    fn _tab_width(&mut self, w: u8) {
+    fn _tab_width(&self) -> u8 {
         match self {
-            ScreenCache::Ansi(a) => a._tab_width(w),
+            ScreenCache::Ansi(a) => a._tab_width(),
             #[cfg(windows)]
-            ScreenCache::Win32(b) => b._tab_width(w),
+            ScreenCache::Win32(b) => b._tab_width(),
         }
     }
 
@@ -98,6 +99,14 @@ impl CacheUpdater for ScreenCache {
             ScreenCache::Ansi(a) => a._screen_pos(),
             #[cfg(windows)]
             ScreenCache::Win32(b) => b._screen_pos(),
+        }
+    }
+
+    fn _sync_tab(&mut self, w: u8) {
+        match self {
+            ScreenCache::Ansi(a) => a._sync_tab(w),
+            #[cfg(windows)]
+            ScreenCache::Win32(b) => b._sync_tab(w),
         }
     }
 

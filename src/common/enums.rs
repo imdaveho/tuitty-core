@@ -35,7 +35,7 @@ pub enum Style {
 }
 
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Color {
     Reset,
     Black,

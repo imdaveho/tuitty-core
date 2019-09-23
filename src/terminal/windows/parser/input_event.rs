@@ -10,7 +10,7 @@ use winapi::um::wincon::{
 // A handle to the type of input event and the event record in the Event member.
 //
 // https://docs.microsoft.com/en-us/windows/console/input-record-str#members
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum InputEventType {
     // The `KEY_EVENT_RECORD` structure with information about a keyboard event.
     KeyEvent = KEY_EVENT as isize,
@@ -66,7 +66,7 @@ impl From<INPUT_RECORD> for InputRecord {
 }
 
 
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub struct ControlKeyState(pub u32);
 
 impl ControlKeyState {
@@ -82,7 +82,7 @@ impl ControlKeyState {
 //
 // https://docs.microsoft.com/en-us/windows/console/mouse-event-record-str
 // #members
-#[derive(PartialEq, Debug, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone)]
 pub enum EventFlags {
     PressOrRelease = 0x0000,
     // The second click (button press) of a double-click occurred. The first
