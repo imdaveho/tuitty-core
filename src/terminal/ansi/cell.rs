@@ -237,52 +237,6 @@ impl CellInfoCache {
         // Calculate where the new cursor position should be.
         self.screen_pos = ((index % w) as i16, (index / w) as i16);
     }
-        // let mut charbuf = content.chars().peekable();
-        // while let Some(mut ch) = charbuf.next() {
-        //     // Check capacity and truncate to keep at capacity.
-        //     if self.buffer.get(index).is_none() {
-        //         self.buffer.rotate_left(w);
-        //         index = capacity - w;
-        //         for i in index..capacity {
-        //             self.buffer[i] = None;
-        //         }
-        //     }
-        //     // Handle chars and update buffer.
-        //     if ch.is_ascii() {
-        //         match UnicodeWidthChar::width(ch) {
-        //             Some(_) => if ch == '\x00' { continue },
-        //             None => {
-        //                 match ch {
-        //                     '\x1B' => ch = '^',
-        //                     '\r' => index = (index / w) * w,
-        //                     _ => ()
-        //                 }
-        //             }
-        //         }
-        //         self.buffer[index] = Some(CellInfo {
-        //             rune: Rune::Single(ch),
-        //             width: 1,
-        //             style: self.style,
-        //         });
-        //         index += 1;
-        //         continue
-        //     }
-        //     // Unicode: CJK, Emoji, and other.
-        
-        
-        //     let mut curr_width = 1;
-        //     if let Some(w) = UnicodeWidthChar::width(ch) {
-        //         curr_width = w
-        //     }
-
-        //     let mut peek_width = 1;
-        //     if let Some(p) = charbuf.peek() {
-        //         if let Some(w) = UnicodeWidthChar::width(*p) {
-        //             peek_width = w
-        //         }
-        //     }
-
-        //     // Scenarios
 }
 
 impl CacheUpdater for CellInfoCache {
