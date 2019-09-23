@@ -483,16 +483,16 @@ mod tests {
         let ascii = "AA";
         let mut cache = CellInfoCache::new();
         cache._cache_content(ascii);
-        let mut cache_copy = Vec::with_capacity(5);
-        for i in 0..5 {
+        let mut cache_copy = vec![String::from("."); 2];
+        for i in 0..2 {
             if let Some(info) = &cache.buffer[i] {
                 match info.rune {
-                    super::Rune::Single(c) => cache_copy.push(c.to_string()),
-                    super::Rune::Null => cache_copy.push(String::from("_")),
-                    _ => cache_copy.push(String::from("Other")),
+                    super::Rune::Single(c) => cache_copy[i] = c.to_string(),
+                    super::Rune::Null => cache_copy[i] = String::from("_"),
+                    _ => cache_copy[i] = String::from("Other"),
                 }
             } else {
-                cache_copy.push(String::from("None"));
+                cache_copy[i] = String::from("None");
             }
         }
         println!("{:?}", cache_copy);
@@ -506,17 +506,17 @@ mod tests {
         let cjk = "色A";
         let mut cache = CellInfoCache::new();
         cache._cache_content(cjk);
-        let mut cache_copy = Vec::with_capacity(5);
-        for i in 0..5 {
+        let mut cache_copy = vec![String::from("."); 3];
+        for i in 0..3 {
             if let Some(info) = &cache.buffer[i] {
                 match info.rune {
-                    super::Rune::Single(c) => cache_copy.push(c.to_string()),
-                    super::Rune::Double(c) => cache_copy.push(c.to_string()),
-                    super::Rune::Null => cache_copy.push(String::from("_")),
-                    _ => cache_copy.push(String::from("Other")),
+                    super::Rune::Single(c) => cache_copy[i] = c.to_string(),
+                    super::Rune::Double(c) => cache_copy[i] = c.to_string(),
+                    super::Rune::Null => cache_copy[i] = String::from("_"),
+                    _ => cache_copy[i] = String::from("Other"),
                 }
             } else {
-                cache_copy.push(String::from("None"));
+                cache_copy[i] = String::from("None");
             }
         }
         println!("{:?}", cache_copy);
@@ -526,26 +526,27 @@ mod tests {
     fn test_cache_content_compound() {
         use super::CellInfoCache;
 
-        // let compound = "👨‍👩‍👧A👨‍🚀A🤦‍♀️A";
-        let compound = "👨‍🚀";
+        let compound = "👨‍👩‍👧A👨‍🚀A🤦‍♀️A";
+        // let compound = "🤦‍♀️A";
         let mut cache = CellInfoCache::new();
         cache._cache_content(compound);
-        let mut cache_copy = Vec::with_capacity(5);
-        for i in 0..15 {
+        let mut cache_copy = vec![String::from("."); 9];
+        for i in 0..9 {
             if let Some(info) = &cache.buffer[i] {
                 match &info.rune {
-                    super::Rune::Single(c) => cache_copy.push(c.to_string()),
-                    super::Rune::Double(c) => cache_copy.push(c.to_string()),
+                    super::Rune::Single(c) => cache_copy[i] = c.to_string(),
+                    super::Rune::Double(c) => cache_copy[i] = c.to_string(),
                     super::Rune::Compound(v) => {
-                        println!("Compound!");
+                        let mut s = String::new();
                         for c in v {
-                            cache_copy.push(c.to_string())
+                            s.push(*c);                       
                         }
+                        cache_copy[i] = s;
                     },
-                    super::Rune::Null => cache_copy.push(String::from("_")),
+                    super::Rune::Null => cache_copy[i] = String::from("_"),
                 }
             } else {
-                cache_copy.push(String::from("None"));
+                cache_copy[i] = String::from("None");
             }
         }
         println!("{:?}", cache_copy);
