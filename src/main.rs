@@ -55,7 +55,8 @@ fn main() {
     // let content = "H👱🏾‍♂️e👨‍🚀llo क्‍ष fa\x00mily \x00👨‍👩‍👧! My 👧🏿 name \x1B[38;5;9mis Naomi 🤦‍♀️ and I'm 寬\u{2060}帶 old.";
     // let content = "the\x00 \x1B[38;5;9m빨리\x1B[39m 褐色 🦊 jumps over the 大懒 🐕.";
     // let content = "👨‍👩‍👧A👨‍🚀A🤦‍♀️A";
-    let content = "👨‍🚀";
+    // let content = "👨‍🚀";
+    let content = "👨‍👩‍👧|👨‍🚀|🤦‍♀️|褐色|क्‍ष|👧🏿|☆|\u{200d}\u{fe0f}|寬\u{2060}帶|fa\x00mily|";
     let groupe = UnicodeGraphemes::graphemes(content, true).collect::<Vec<&str>>();
     println!("{:?}", groupe);
 

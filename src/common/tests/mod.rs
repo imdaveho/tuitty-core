@@ -30,6 +30,27 @@ fn test_unicode_width() {
 }
 
 #[test]
+fn test_unicode_grapheme() {
+    use super::unicode::grapheme::UnicodeGraphemes;
+    let content = "👨‍👩‍👧|👨‍🚀|🤦‍♀️|褐色|क्‍ष|👧🏿|☆|\u{200d}\u{fe0f}|寬\u{2060}帶|fa\x00mily|";
+    let cluster = content.graphemes(true).collect::<Vec<&str>>();
+    // Visual grapheme clusters:
+    let mut counter = Vec::with_capacity(10);
+    counter.push(["👨\u{200d}👩\u{200d}👧", "|"].len());
+    counter.push(["👨\u{200d}", "🚀", "|"].len());
+    counter.push(["🤦\u{200d}", "♀\u{fe0f}", "|"].len());
+    counter.push(["褐", "色", "|"].len());
+    counter.push(["क\u{94d}\u{200d}", "ष", "|"].len());
+    counter.push(["👧+🏿", "|"].len());
+    counter.push(["☆"].len());
+    counter.push(["|\u{200d}\u{fe0f}", "|"].len());
+    counter.push(["寬", "\u{2060}", "帶", "|"].len());
+    counter.push(["f", "a", "\u{0}", "m", "i", "l", "y", "|"].len());
+    
+    assert_eq!(cluster.len(), counter.iter().fold(0, |agg, n| agg + n));
+}
+
+#[test]
 fn test_effect_bitwise_traits() {
     use super::enums::Effect;
     assert_eq!(1, 0b0001);
