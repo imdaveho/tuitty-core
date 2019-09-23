@@ -7,6 +7,7 @@ use charwidth as cw;
 // (imdaveho) NOTE: Commented out #[inline] in the module.
 // Not sure how it affects performance etc.
 
+
 /// Methods for determining displayed width of Unicode characters.
 pub trait UnicodeWidthChar {
     /// Returns the character's displayed width in columns, or `None` if the
@@ -83,7 +84,7 @@ impl UnicodeWidthStr for str {
 // (imdaveho) NOTE: Commented out.
 // pub const UNICODE_VERSION: (u64, u64, u64) = (12, 1, 0);
 
-pub mod charwidth {
+mod charwidth {
     use core::option::Option::{self, Some, None};
     use core::result::Result::{Ok, Err};
 

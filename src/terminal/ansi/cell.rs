@@ -10,7 +10,7 @@ use super::style;
 use crate::common::{
     cache::CacheUpdater,
     enums::{ Clear, Color, Effect, Style },
-    unicode::{UnicodeSegmentation, wcwidth::*},
+    unicode::{grapheme::*, wcwidth::*},
 };
 
 
@@ -108,7 +108,7 @@ impl CellInfoCache {
         // which means that index[0] is actually cell[1] (col: 0, row: 0).
         let capacity = w * h;
         let mut index = (row * w) + col;
-        let segments: Vec<&str> = UnicodeSegmentation
+        let segments: Vec<&str> = UnicodeGraphemes
             ::graphemes(content, true).collect();
         for ch in segments {
             // Check capacity and truncate to keep at capacity.

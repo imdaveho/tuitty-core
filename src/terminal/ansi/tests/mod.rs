@@ -113,7 +113,7 @@ fn test_ansi_cache() {
         cache::CacheUpdater,
         unicode::{
             wcwidth::UnicodeWidthStr,
-            UnicodeSegmentation,
+            grapheme::UnicodeGraphemes,
         },
     };
     

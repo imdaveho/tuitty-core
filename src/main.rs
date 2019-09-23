@@ -12,7 +12,7 @@ use common::{
         TerminalCursor, TerminalFormatter, TerminalInput,
         TerminalModifier, TerminalSwitcher, TerminalWriter
     }, enums::{ Color, Effect },
-    unicode::{UnicodeSegmentation, wcwidth::*}
+    unicode::{ grapheme::*, wcwidth::* }
 };
 
 use std::io::{ stdin, stdout, Result, BufRead, Write };
@@ -56,7 +56,7 @@ fn main() {
     // let content = "the\x00 \x1B[38;5;9m빨리\x1B[39m 褐色 🦊 jumps over the 大懒 🐕.";
     // let content = "👨‍👩‍👧A👨‍🚀A🤦‍♀️A";
     let content = "👨‍🚀";
-    let groupe = UnicodeSegmentation::graphemes(content, true).collect::<Vec<&str>>();
+    let groupe = UnicodeGraphemes::graphemes(content, true).collect::<Vec<&str>>();
     println!("{:?}", groupe);
 
     // println!("{:?}", '\x00'.is_ascii());
