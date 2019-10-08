@@ -14,16 +14,14 @@
 
 use std::mem;
 use std::io::{Error, Result};
-use libc::{c_int, termios as Termios};
+use libc::termios as Termios;
+use libc::{cfmakeraw, tcgetattr, tcsetattr, STDIN_FILENO, TCSANOW};
 
 
 pub fn get_mode() -> Result<Termios> {
-    extern "C" {
-        pub fn tcgetattr(fd: c_int, termpt: *mut Termios) -> c_int;
-    }
     unsafe {
         let mut termios = mem::zeroed();
-        if tcgetattr(0, &mut termios) == -1 {
+        if tcgetattr(STDIN_FILENO, &mut termios) == -1 {
             Err(Error::last_os_error())
         } else {
             Ok(termios)
@@ -33,10 +31,6 @@ pub fn get_mode() -> Result<Termios> {
 
 /// This function enables raw mode in the current screen.
 pub fn enable_raw() -> Result<()> {
-    extern "C" {
-        pub fn cfmakeraw(termpt: *mut Termios);
-    }
-
     unsafe {
         // Get the current terminal attrs.
         let mut termios = get_mode()?;
@@ -52,10 +46,7 @@ pub fn enable_raw() -> Result<()> {
 }
 
 pub fn set_mode(termios: &Termios) -> Result<()> {
-    extern "C" {
-        pub fn tcsetattr(fd: c_int, opt: c_int, termp: *const Termios) -> c_int;
-    }
-    if unsafe { tcsetattr(0, 0, termios) } == -1 {
+    if unsafe { tcsetattr(STDIN_FILENO, TCSANOW, termios) } == -1 {
         Err(Error::last_os_error())
     } else {
         Ok(())
