@@ -121,8 +121,8 @@ impl BitAnd<Effect> for u32 {
 pub enum InputEvent {
     Keyboard(KeyEvent),
     Mouse(MouseEvent),
+    Unknown,
     // Unsupported(Vec<u8>),
-    // Unknown,
 }
 
 

@@ -4,7 +4,8 @@
 // use std::os::raw::c_char;
 
 // mod tty;
-// mod terminal;
+mod terminal;
+mod common;
 
 // use tty::{
 //     Tty, AsyncReader, SyncReader,

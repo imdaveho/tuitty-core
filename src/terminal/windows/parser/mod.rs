@@ -18,7 +18,7 @@ use winapi::um::{
     wincon::{
         INPUT_RECORD,
         LEFT_ALT_PRESSED, LEFT_CTRL_PRESSED, RIGHT_ALT_PRESSED,
-        RIGHT_CTRL_PRESSED, SHIFT_PRESSED, 
+        RIGHT_CTRL_PRESSED, SHIFT_PRESSED,
     },
     winuser::{
         VK_BACK, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END,
