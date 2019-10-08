@@ -312,8 +312,9 @@ fn parse_mouse_event(mevt: &MouseEventRecord) -> MouseEvent {
     // replicates that and mimicks the behavior; additionally, in xterm, mouse
     // move is only handled when a mouse button is held down (ie. mouse drag)
 
-    let xpos = mevt.mouse_position.0 + 1;
-    let ypos = mevt.mouse_position.1 + 1;
+    // Windows returns (0, 0) for upper/left
+    let xpos = mevt.mouse_position.0;
+    let ypos = mevt.mouse_position.1;
 
     match mevt.event_flags {
         EventFlags::PressOrRelease => {

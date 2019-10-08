@@ -83,6 +83,6 @@ impl Iterator for SyncReader {
     // This will return `None` in case of a failure and `Some(InputEvent) in
     // case of an occurred input event.`
     fn next(&mut self) -> Option<Self::Item> {
-        read_single_event().unwrap()
+        read_single_event().unwrap_or(None)
     }
 }

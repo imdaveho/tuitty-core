@@ -98,8 +98,9 @@ where I: Iterator<Item = u8> {
 
             let cb = next() as i8 - 32;
             // (1, 1) are the coords for upper left.
-            let cx = next().saturating_sub(32) as i16;
-            let cy = next().saturating_sub(32) as i16;
+            // Subtract 1 to keep it synced with cursor
+            let cx = next().saturating_sub(32) as i16 - 1;
+            let cy = next().saturating_sub(32) as i16 - 1;
 
             InputEvent::Mouse(match cb & 0b11 {
                 0 => {
@@ -137,8 +138,10 @@ where I: Iterator<Item = u8> {
             let nums = &mut str_buf.split(';');
 
             let cb = nums.next().unwrap().parse::<i16>().unwrap();
-            let cx = nums.next().unwrap().parse::<i16>().unwrap();
-            let cy = nums.next().unwrap().parse::<i16>().unwrap();
+            // (1, 1) are the coords for upper left.
+            // Subtract 1 to keep it synced with cursor
+            let cx = nums.next().unwrap().parse::<i16>().unwrap() - 1;
+            let cy = nums.next().unwrap().parse::<i16>().unwrap() - 1;
 
             let event = match cb {
                 0..=2 | 64..=65 => {

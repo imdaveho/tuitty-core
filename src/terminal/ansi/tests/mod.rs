@@ -141,7 +141,6 @@ fn test_ansi_cache() {
     assert_eq!(cache._screen_pos(), (test_col, test_row));
 
     let start = ((test_row * test_w) + test_col) as usize;
-    // let stops = (start + content_width) as usize;
     cache._cache_content(content);
 
     let mut count_none_until = 0;

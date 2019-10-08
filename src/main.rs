@@ -56,7 +56,7 @@ fn main() {
     // let content = "the\x00 \x1B[38;5;9m빨리\x1B[39m 褐色 🦊 jumps over the 大懒 🐕.";
     // let content = "👨‍👩‍👧A👨‍🚀A🤦‍♀️A";
     // let content = "👨‍🚀";
-    let content = "👨‍👩‍👧|👨‍🚀|🤦‍♀️|褐色|क्‍ष|👧🏿|☆|\u{200d}\u{fe0f}|寬\u{2060}帶|fa\x00mily|";
+    let content = "👨‍👩‍👧|👨‍🚀|🤦‍♀️|褐色|क्‍ष|👧🏿|☆|\u{200d}\u{fe0f}|寬\u{2060}帶|fa\x00mily|family|";
     let groupe = UnicodeGraphemes::graphemes(content, true).collect::<Vec<&str>>();
     println!("{:?}", groupe);
 
@@ -122,8 +122,8 @@ fn main() {
     // }
 
 
-    // let mut t = terminal::Terminal::init();
-    // // t.printf(facepalm);
+    let mut t = terminal::Terminal::init();
+    t.printf(content);
     // // thread::sleep(Duration::from_millis(1500));
     // // t.printf("\r");
     // // thread::sleep(Duration::from_millis(1500));
