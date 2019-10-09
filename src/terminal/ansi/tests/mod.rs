@@ -120,7 +120,7 @@ fn test_ansi_cache() {
 
     assert_eq!(content_width, 52);
     
-    let tuitty_width = "the".len() + "".len()
+    let tuitty_width = "the".len() + 0
         + " ^[38;5;9m".len() + 4
         + "^[39m ".len() + 4
         + " ".len() + 2

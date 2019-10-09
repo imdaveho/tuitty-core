@@ -409,50 +409,6 @@ impl CacheUpdater for CellInfoCache {
             }
         }
         output::printf(&contents);
-        //     // (imdaveho) NOTE: stackoverflow.com/questions/
-        //     // 23975391/how-to-convert-a-string-into-a-static-str
-        //     let cellspace = UnicodeWidthStr::width(&*contents);
-        //     match cell {
-        //         Some(cl) => {
-        //             // if (cellspace + cl.width) > capacity { break }
-        //             if cl.style != previous && cl.style == default {
-        //                 // Reset not just when the current style differs a bit
-        //                 // from the previous, but every field is different and
-        //                 // is a {Color|Effect}::Reset value.
-        //                 contents.push_str(&style::reset())
-        //             } else {
-        //                 // Else, go through each and update them.
-        //                 if cl.style.0 != previous.0 {
-        //                     contents.push_str(
-        //                         &style::set_style(Style::Fg(cl.style.0)))
-        //                 }
-
-        //                 if cl.style.1 != previous.1 {
-        //                     contents.push_str(
-        //                         &style::set_style(Style::Bg(cl.style.1)))
-        //                 }
-
-        //                 if cl.style.2 != previous.2 {
-        //                     contents.push_str(
-        //                         &style::set_style(Style::Fx(cl.style.2)))
-        //                 }
-        //             }
-        //             contents.push(cl.rune);
-        //             previous = cl.style;
-        //         }
-
-        //         None => {
-        //             if (cellspace + 1) > capacity { break }
-        //             if previous == default { contents.push(' '); }
-        //             else {
-        //                 contents.push_str(&style::reset());
-        //                 contents.push(' ');
-        //                 previous = default;
-        //             }
-        //         }
-        //     }
-        // }
-        // output::printf(&contents);
     }
 }
 

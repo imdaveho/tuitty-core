@@ -25,7 +25,7 @@ impl CharInfoCache {
         let (w, h) = crate::terminal::wincon::screen::size();
         let capacity = (w * h) as usize;
         CharInfoCache {
-            tab_width: 4,
+            tab_width: 4, // (imdaveho) NOTE: Has no effect on WinCon.
             screen_pos: (0, 0),
             screen_size: (w, h),
             style: (Color::Reset, Color::Reset, Effect::Reset as u32),

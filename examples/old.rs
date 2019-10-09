@@ -124,6 +124,11 @@ fn main() {
 
     let mut t = terminal::Terminal::init();
     t.printf(content);
+    let wsize = t.screen_size();
+    t.printf(&format!("\n{}, {}\n", wsize.0, wsize.1));
+    t.resize(86, 30);
+    let wsizea = t.screen_size();
+    t.printf(&format!("{}, {}", wsizea.0, wsizea.1));
     // // thread::sleep(Duration::from_millis(1500));
     // // t.printf("\r");
     // // thread::sleep(Duration::from_millis(1500));

@@ -1,10 +1,13 @@
 // Windows Console API specific functions.
 
 pub mod cursor;
-pub mod screen;
 pub mod output;
+pub mod screen;
 mod style;
 mod mouse;
+
+#[cfg(test)]
+mod tests;
 
 mod handle;
 pub use handle::Handle;
