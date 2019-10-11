@@ -6,6 +6,7 @@
 // mod tty;
 pub mod terminal;
 pub mod common;
+pub mod interface;
 
 // use tty::{
 //     Tty, AsyncReader, SyncReader,

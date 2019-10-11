@@ -39,9 +39,9 @@ pub fn read_single_event() -> Result<Option<InputEvent>> {
     let conin = Handle::conin()?;
 
     let mut buf_len: DWORD = 0;
-    if !(unsafe {
+    if unsafe {
         GetNumberOfConsoleInputEvents(conin.0, &mut buf_len)
-    } == 0) {
+    } == 0 {
         return Err(Error::last_os_error());
     }
 
@@ -53,9 +53,9 @@ pub fn read_single_event() -> Result<Option<InputEvent>> {
     let mut buf: Vec<INPUT_RECORD> = Vec::with_capacity(1);
     let mut size = 0;
 
-    if !(unsafe {
+    if unsafe {
         ReadConsoleInputW(conin.0, buf.as_mut_ptr(), 1, &mut size)
-    } == 0) {
+    } == 0 {
         return Err(Error::last_os_error());
     } else {
         unsafe {
@@ -97,9 +97,9 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
     let conin = Handle::conin()?;
 
     let mut buf_len: DWORD = 0;
-    if !(unsafe {
+    if unsafe {
         GetNumberOfConsoleInputEvents(conin.0, &mut buf_len)
-    } == 0) {
+    } == 0 {
         return Err(Error::last_os_error());
     }
     // Fast-skipping all the code below if there is nothing to read at all
@@ -110,9 +110,9 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
     let mut buf: Vec<INPUT_RECORD> = Vec::with_capacity(buf_len as usize);
     let mut size = 0;
 
-    if !(unsafe {
+    if unsafe {
         ReadConsoleInputW(conin.0, buf.as_mut_ptr(), buf_len, &mut size)
-    } == 0) {
+    } == 0 {
         return Err(Error::last_os_error());
     } else {
         unsafe {

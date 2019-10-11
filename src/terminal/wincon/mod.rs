@@ -9,6 +9,9 @@ mod mouse;
 #[cfg(test)]
 mod tests;
 
+mod info;
+pub use info::CharInfoCache;
+
 mod handle;
 pub use handle::Handle;
 
@@ -67,16 +70,6 @@ impl CommonCursor for Win32Console {
 impl CommonFormatter for Win32Console {
     fn clear(&self, method: Clear) {
         screen::clear(method);
-        // match method {
-        //     Clear::All => cursor::goto(0, 0)
-        //         .expect("Error setting the cursor position"),
-        //     Clear::CurrentLn => {
-        //         let (_, row) = self.pos();
-        //         cursor::goto(0, row)
-        //             .expect("Error setting the cursor position");
-        //     },
-        //     _ => (),
-        // }
     }
 
     fn resize(&self, w: i16, h: i16) {

@@ -12,6 +12,7 @@ use tuitty::common::{
 };
 
 use tuitty::terminal;
+use tuitty::interface;
 
 use std::io::{ stdin, stdout, Result, BufRead, Write };
 
@@ -29,4 +30,10 @@ fn main() {
     t.resize(86, 30);
     let wsizea = t.screen_size();
     t.printf(&format!("{}, {}", wsizea.0, wsizea.1));
+
+    t.switch();
+    t.raw();
+    interface::draw_sides(&mut t);
+
+    // thread::sleep(Duration::from_millis(5000));
 }

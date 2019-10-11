@@ -3,9 +3,6 @@
 mod input;
 mod parser;
 
-mod info;
-pub use info::CharInfoCache;
-
 mod reader;
 pub use reader::{ SyncReader, AsyncReader };
 
@@ -14,6 +11,7 @@ pub use runtime::{is_ansi_enabled, is_wincon_enabled };
 
 use super::wincon::{ output, Handle };
 use super::{ CommonTerminal, Clear, Color, Style, Style::* };
+pub use super::wincon::CharInfoCache;
 
 use crate::common::{
     meta::Metadata, enums::Direction,
