@@ -34,6 +34,11 @@ fn main() {
     t.switch();
     t.raw();
     interface::draw_sides(&mut t);
+    // t.cook();
+    // t.to_main();
 
+    // let stdout = Handle::stdout().expect("Error with Stdout");
+    // let mode = stdout.get_mode().expect("Error getting mode with Stdout");
+    // let mask = 0x0002 | 0x0002;
     // thread::sleep(Duration::from_millis(5000));
 }

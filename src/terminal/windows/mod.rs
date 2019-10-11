@@ -6,9 +6,6 @@ mod parser;
 mod reader;
 pub use reader::{ SyncReader, AsyncReader };
 
-mod runtime;
-pub use runtime::{is_ansi_enabled, is_wincon_enabled };
-
 use super::wincon::{ output, Handle };
 use super::{ CommonTerminal, Clear, Color, Style, Style::* };
 pub use super::wincon::CharInfoCache;
@@ -35,20 +32,8 @@ impl WindowsConsole {
             state: Metadata::new(),
             stash: Vec::with_capacity(5),
             common: CommonTerminal::new(),
-            original_mode: {
-                if !is_wincon_enabled() {
-                    // (imdaveho) NOTE: This simply bypasses the panic! of not
-                    // being able to fetch $STDOUT. It may not have the default
-                    // modes and ConsoleInfo one would expect.
-                    // TODO: Consider removing this. The fix is to use `winpty`
-                    // or a terminal application that implements ConPTY:
-                    // https://tinyurl.com/y275hnfc (ConPTY intro blog post)
-                    // https://tinyurl.com/y3f7cqjj (CreatePseudoConsole)
-                    Handle::conout().expect("Error fetching $CONOUT")
-                        .get_mode().expect("Error fetching mode from $CONOUT")
-                } else { output::get_mode()
-                .expect("Error fetching mode from $STDOUT") }
-            },
+            original_mode: output::get_mode()
+                .expect("Error fetching mode from $STDOUT"),
             alternate: Handle::buffer()
                 .expect("Error creating alternate Console buffer"),
         }
@@ -76,9 +61,7 @@ impl WindowsConsole {
         self.alternate.close()
             .expect("Error closing the alternate Console buffer");
 
-        let stdout = if is_wincon_enabled() {
-            Handle::stdout().expect("Error fetching $STDOUT")
-        } else { Handle::conout().expect("Error fetching $CONOUT") };
+        let stdout = Handle::stdout().expect("Error fetching $STDOUT");
 
         stdout.set_mode(&self.original_mode)
             .expect("Error reseting the Console mode to default");
@@ -371,5 +354,48 @@ impl TerminalSwitcher for WindowsConsole {
 impl Drop for WindowsConsole {
     fn drop(&mut self) {
         self.terminate();
+    }
+}
+
+pub fn is_ansi_enabled() -> bool {
+    const TERMS: [&'static str; 15] = [
+        "xterm",  // xterm, PuTTY, Mintty
+        "rxvt",   // RXVT
+        "eterm",  // Eterm
+        "screen", // GNU screen, tmux
+        "tmux",   // tmux
+        "vt100", "vt102", "vt220", "vt320",   // DEC VT series
+        "ansi",    // ANSI
+        "scoansi", // SCO ANSI
+        "cygwin",  // Cygwin, MinGW
+        "linux",   // Linux console
+        "konsole", // Konsole
+        "bvterm",  // Bitvise SSH Client
+    ];
+
+    let matched_terms = match std::env::var("TERM") {
+        Ok(val) => val != "dumb" || TERMS.contains(&val.as_str()),
+        Err(_) => false,
+    };
+
+    if matched_terms {
+        return true
+    } else {
+        #[cfg(windows)] {
+        let enable_vt = 0x0004;
+        let handle = match Handle::stdout() {
+            Ok(h) => h,
+            Err(_) => return false,
+        };
+        let mode = match handle.get_mode() {
+            Ok(m) => m,
+            Err(_) => return false,
+        };
+        match handle.set_mode(&(mode | enable_vt)) {
+            Ok(_) => return true,
+            Err(_) => return false,
+        }}
+        #[cfg(not(windows))]
+        return false
     }
 }
