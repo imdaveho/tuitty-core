@@ -74,11 +74,17 @@ impl<'t> AlertBox<'t> {
                             'N' | 'n' => return false,
                             _ => (),
                         },
+                        KeyEvent::Esc => return false,
                         _ => ()
                     },
-                    InputEvent::Mouse(m) => match m {
+                    InputEvent::Mouse(m) => {
+                        self.termref.goto(0, button_row + 1);
+                        self.termref.printf("Mouse!");
+                        match m {
                         MouseEvent::Press(b, col, row) => match b {
                             MouseButton::Left => {
+                                // self.termref.goto(0, button_row + 1);
+                                // self.termref.printf(&format!("x:{}, y:{}", col, row));
                                 if row == button_row {
                                     if col <= yfinish_col && col >= ystart_col {
                                         return true;
@@ -91,7 +97,7 @@ impl<'t> AlertBox<'t> {
                             _ => (),
                         },
                         _ => (),
-                    },
+                    }},
                     _ => ()
                 }
             }
