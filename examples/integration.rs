@@ -32,10 +32,16 @@ fn main() {
     t.printf(&format!("{}, {}", wsizea.0, wsizea.1));
 
     t.switch();
+    t.hide_cursor();
     t.raw();
-    interface::draw_sides(&mut t);
+    t.enable_mouse();
+    let mut alertbox = interface::AlertBox::new(&mut t,
+        "We should now be able to create functions that accept strings whether they are &str, String or event reference counted. We are also able to create structs that are able to have variables that are references. The lifetime of the struct is linked to those referenced variables to make sure that the struct does not outlive the referenced variable and caused bad things to happen in our program. We also have a initial und".to_string());
+    alertbox.render();
+    let res = alertbox.handle();
     // t.cook();
-    // t.to_main();
+    t.to_main();
+    t.printf(&format!("{}", res));
 
     // let stdout = Handle::stdout().expect("Error with Stdout");
     // let mode = stdout.get_mode().expect("Error getting mode with Stdout");
