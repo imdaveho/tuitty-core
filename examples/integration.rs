@@ -41,7 +41,7 @@ fn main() {
     let res = alertbox.handle();
     // t.cook();
     t.to_main();
-    t.printf(&format!("{}", res));
+    t.printf(&format!("\n{}", res));
 
     // let stdout = Handle::stdout().expect("Error with Stdout");
     // let mode = stdout.get_mode().expect("Error getting mode with Stdout");

@@ -282,7 +282,8 @@ fn parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
                         // "\x1B[Z".as_bytes().to_vec();
                         KeyEvent::BackTab
                     } else {
-                        KeyEvent::Tab
+                        // KeyEvent::Tab
+                        KeyEvent::Char(ch)
                     }
                 } else {
                     // 0x000A | 0x0105 | 0x0005 => {
@@ -297,7 +298,11 @@ fn parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
                     //     // and updating parse_utf8_char()
                     //     seq.push(b'\x00');
                     // }
-                    KeyEvent::Char(ch)
+                    if ch == '\t' {
+                        KeyEvent::Tab
+                    } else {
+                        KeyEvent::Char(ch)
+                    }
                 }
             } else {
                 KeyEvent::Null

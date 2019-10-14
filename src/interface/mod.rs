@@ -69,11 +69,14 @@ impl<'t> AlertBox<'t> {
             if let Some(evt) = input.next() {
                 match evt {
                     InputEvent::Keyboard(k) => match k {
-                        KeyEvent::Char(c) => match c {
+                        KeyEvent::Char(c) => {
+                            self.termref.goto(0, button_row - 1);
+                            self.termref.printf(&format!("c: {}", c));
+                            match c {
                             'Y' | 'y' => return true,
                             'N' | 'n' => return false,
                             _ => (),
-                        },
+                        }},
                         KeyEvent::Esc => return false,
                         _ => ()
                     },
@@ -102,7 +105,7 @@ impl<'t> AlertBox<'t> {
                     _ => ()
                 }
             }
-	std::thread::sleep(std::time::Duration::from_millis(20));
+	    std::thread::sleep(std::time::Duration::from_millis(20));
         }
     }
 
