@@ -83,8 +83,9 @@ impl<'t> AlertBox<'t> {
                         match m {
                         MouseEvent::Press(b, col, row) => match b {
                             MouseButton::Left => {
-                                // self.termref.goto(0, button_row + 1);
-                                // self.termref.printf(&format!("x:{}, y:{}", col, row));
+                                self.termref.goto(0, button_row + 2);
+                                self.termref.printf(&format!("x:{}, y:{}", col, row));
+
                                 if row == button_row {
                                     if col <= yfinish_col && col >= ystart_col {
                                         return true;
@@ -101,6 +102,7 @@ impl<'t> AlertBox<'t> {
                     _ => ()
                 }
             }
+	std::thread::sleep(std::time::Duration::from_millis(20));
         }
     }
 
