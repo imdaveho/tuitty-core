@@ -26,7 +26,7 @@ pub use unix::UnixTerminal as Terminal;
 pub use windows::WindowsConsole as Terminal;
 
 
-enum CommonTerminal {
+pub enum CommonTerminal {
     Ansi(ansi::AnsiTerminal),
     #[cfg(windows)]
     Win32(wincon::Win32Console)

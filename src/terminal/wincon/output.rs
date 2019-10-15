@@ -17,7 +17,7 @@ use std::io::{Error, Result};
 use winapi::{
     um::{
         consoleapi::WriteConsoleW,
-        wincon::{ 
+        wincon::{
             ENABLE_LINE_INPUT,
             ENABLE_WRAP_AT_EOL_OUTPUT
         }

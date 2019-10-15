@@ -251,7 +251,7 @@ impl CacheUpdater for CellInfoCache {
     fn _screen_pos(&self) -> (i16, i16) {
         self.screen_pos
     }
-    
+
     fn _sync_tab(&mut self, w: u8) {
         self.tab_width = w;
     }
@@ -499,7 +499,7 @@ mod tests {
                     super::Rune::Compound(v) => {
                         let mut s = String::new();
                         for c in v {
-                            s.push(*c);                       
+                            s.push(*c);
                         }
                         cache_copy[i] = s;
                     },

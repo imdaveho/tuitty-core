@@ -11,12 +11,12 @@ fn test_ansi_cursor() {
 
     let move_left_string = super::cursor::move_left(8);
     assert_eq!(move_left_string, "\x1B[8D");
-    
+
     let move_right_string = super::cursor::move_right(8);
     assert_eq!(move_right_string, "\x1B[8C");
 
     // (imdaveho) NOTE: Mark and load positions will be
-    // tested visually.
+    // tested visually. (see examples/integration.rs)
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn test_ansi_screen() {
     assert_eq!(disable_alt_string, "\x1B[?1049l");
 
     // (imdaveho) NOTE: Each of these including clear will
-    // be tested visually.
+    // be tested visually. (see examples/integration.rs)
 }
 
 #[test]
@@ -41,36 +41,36 @@ fn test_ansi_style() {
 
     use crate::common::enums::{ Style::*, Color::*, Effect };
     let colors = [
-        Black, DarkGrey, 
-        Red, DarkRed, 
+        Black, DarkGrey,
+        Red, DarkRed,
         Green, DarkGreen,
         Yellow, DarkYellow,
         Blue, DarkBlue,
         Magenta, DarkMagenta,
         Cyan, DarkCyan,
-        White, Grey, 
+        White, Grey,
         Reset
     ];
     let fg_color_strings = [
-        "\x1B[38;5;0m", "\x1B[38;5;8m", 
-        "\x1B[38;5;9m", "\x1B[38;5;1m", 
-        "\x1B[38;5;10m", "\x1B[38;5;2m", 
-        "\x1B[38;5;11m", "\x1B[38;5;3m", 
+        "\x1B[38;5;0m", "\x1B[38;5;8m",
+        "\x1B[38;5;9m", "\x1B[38;5;1m",
+        "\x1B[38;5;10m", "\x1B[38;5;2m",
+        "\x1B[38;5;11m", "\x1B[38;5;3m",
         "\x1B[38;5;12m", "\x1B[38;5;4m",
         "\x1B[38;5;13m", "\x1B[38;5;5m",
         "\x1B[38;5;14m", "\x1B[38;5;6m",
-        "\x1B[38;5;15m", "\x1B[38;5;7m", 
+        "\x1B[38;5;15m", "\x1B[38;5;7m",
         ""
     ];
     let bg_color_strings = [
-        "\x1B[48;5;0m", "\x1B[48;5;8m", 
-        "\x1B[48;5;9m", "\x1B[48;5;1m", 
-        "\x1B[48;5;10m", "\x1B[48;5;2m", 
-        "\x1B[48;5;11m", "\x1B[48;5;3m", 
+        "\x1B[48;5;0m", "\x1B[48;5;8m",
+        "\x1B[48;5;9m", "\x1B[48;5;1m",
+        "\x1B[48;5;10m", "\x1B[48;5;2m",
+        "\x1B[48;5;11m", "\x1B[48;5;3m",
         "\x1B[48;5;12m", "\x1B[48;5;4m",
         "\x1B[48;5;13m", "\x1B[48;5;5m",
         "\x1B[48;5;14m", "\x1B[48;5;6m",
-        "\x1B[48;5;15m", "\x1B[48;5;7m", 
+        "\x1B[48;5;15m", "\x1B[48;5;7m",
         ""
     ];
     // Test Foreground Strings
@@ -113,13 +113,14 @@ fn test_ansi_cache() {
         cache::CacheUpdater,
         unicode::wcwidth::UnicodeWidthStr,
     };
-    
+
     let mut cache = super::cell::CellInfoCache::new();
-    let content = "the\x00 \x1B[38;5;9m빨리\x1B[39m 褐色 🦊 jumps over the 大懒 🐕.";
+    let content = "the\x00 \x1B[38;5;9m빨리\x1B[39m \
+                   褐色 🦊 jumps over the 大懒 🐕.";
     let content_width = UnicodeWidthStr::width(content);
 
     assert_eq!(content_width, 52);
-    
+
     let tuitty_width = "the".len() + 0
         + " ^[38;5;9m".len() + 4
         + "^[39m ".len() + 4
@@ -128,7 +129,7 @@ fn test_ansi_cache() {
         + " ".len() + 2 + ".".len();
 
     assert_eq!(tuitty_width, 54);
-    
+
     let (test_w, test_h) = (40, 40);
     cache._sync_size(test_w, test_h);
     assert_eq!(cache._screen_size(), (test_w, test_h));
@@ -153,11 +154,13 @@ fn test_ansi_cache() {
     assert_eq!(count_none_until, start);
     assert!(cache.buffer[tuitty_width].is_none());
     assert_eq!(
-        ( (start + tuitty_width) as i16 % test_w, (start + tuitty_width) as i16 / test_w),
+        ((start + tuitty_width) as i16 % test_w,
+         (start + tuitty_width) as i16 / test_w),
         cache._screen_pos() );
-    
+
     cache._sync_tab(8);
     assert_eq!(cache._tab_width(), 8);
 
     // (imdaveho) NOTE: Movement and Styles will be tested visually.
+    // see (examples/integration.rs)
 }

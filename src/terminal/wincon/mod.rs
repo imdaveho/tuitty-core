@@ -15,8 +15,8 @@ pub use info::CharInfoCache;
 mod handle;
 pub use handle::Handle;
 
-use crate::common::traits::{ 
-    CommonCursor, CommonModifier, 
+use crate::common::traits::{
+    CommonCursor, CommonModifier,
     CommonFormatter, CommonWriter
 };
 use crate::common::enums::{ Clear, Style, Color };

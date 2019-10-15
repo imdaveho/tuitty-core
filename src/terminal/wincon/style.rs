@@ -47,7 +47,7 @@ impl ConsoleOutput {
         let updated: u16 = match style {
             Style::Fg(c) => {
                 let mut updated_fg = Foreground::from(c);
-                if updated_fg == RESET { 
+                if updated_fg == RESET {
                     updated_fg = Foreground(self.0 & 0x000f)
                 }
                 if updated_fg == IGNORE {

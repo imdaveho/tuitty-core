@@ -1,68 +1,55 @@
 //! TODO:
 
-use crate::terminal::Terminal;
+use crate::terminal::CommonTerminal;
 use crate::common::{
-    enums::{ InputEvent, KeyEvent, MouseEvent, MouseButton, Color },
-    traits::{ 
-        TerminalFormatter, TerminalInput, TerminalCursor, TerminalWriter
-    },
+    traits::*,
+    enums::{ InputEvent, KeyEvent, MouseEvent, MouseButton, Color, Style },
 };
 
+#[cfg(unix)]
+use crate::terminal::unix::{ AsyncReader, size };
 
-pub struct AlertBox<'t> {
-    width: i16,
-    height: i16,
-    voffset: i16,
+#[cfg(windows)]
+use crate::terminal::windows::AsyncReader;
+
+#[cfg(windows)]
+use crate::terminal::wincon::screen::size;
+
+
+pub struct AlertBox {
+    screen_size: (i16, i16),
+    width: i16, height: i16, voffset: i16,
     message: String,
-    termref: &'t mut Terminal,
-    glyphs: (
-        char, char, 
-        char, char, char, char,
-        char, char
-    ),
     dims: (i16, i16, i16, i16),
 }
 
-impl<'t> AlertBox<'t> {
-    pub fn new(t: &'t mut Terminal, msg: String) -> AlertBox {
-        let (sw, sh) = t.screen_size();
+impl AlertBox {
+    pub fn new() -> AlertBox {
+        let (sw, sh) = size();
         let (mw, mh) = (sw / 2, sh / 2);
-        let (w, h, vo) = (52, 8, 2);
-        let (top, bot) = (mh - h / 2 - vo, mh + h / 2 - vo);
-        let (left, right) = (mw - w / 2, mw + w / 2);
+        let (wide, high, vo) = (52, 8, 2);
+        let (top, bot) = (mh - high / 2 - vo, mh + high / 2 - vo);
+        let (left, right) = (mw - wide / 2, mw + wide / 2);
         AlertBox {
-            width: w,
-            height: h,
-            voffset: vo,
-            message: msg,
-            termref: t,
-            glyphs: (
-                '─', '│',
-                '┌', '┐', '└', '┘',
-                '├',  '┤'
-            ),
+            screen_size: (sw, sh),
+            width: wide, height: high, voffset: vo,
+            message: "".to_string(),
             dims: (top, bot, left, right),
         }
     }
 
     pub fn render(&mut self) {
-        self.draw_content();
-        self.draw_sides();
-        self.draw_corners();
-        self.draw_header();
-        self.draw_buttons();
-        self.termref.flush();
+        let tty = CommonTerminal::new();
+        self.draw_box(&tty);
+        self.draw_body(&tty);
+        tty.flush();
     }
 
-    pub fn handle(&mut self) -> bool {
-        let mut input = self.termref.read_async();
-
-        let midpt = self.termref.screen_size().0 / 2;
-        let ys = midpt - 8;
-        let yf = ys + 5;
-        let xs = midpt + 2;
-        let xf = xs + 5;
-        let btn_row = self.dims.1 - 2;
+    pub fn handle(&mut self, input: &mut AsyncReader) -> bool {
+        let midw = self.screen_size.0 / 2;
+        let yrange = (midw - 8, midw - 3);
+        let nrange = (midw + 2, midw + 7);
+        let btnrow = self.dims.1 - 2;
 
         loop {
             if let Some(evt) = input.next() {
@@ -73,17 +60,18 @@ impl<'t> AlertBox<'t> {
                             'N' | 'n' => return false,
                             _ => (),
                         },
-                        KeyEvent::Esc => return false,
+                        // (imdaveho) TODO: Handle the below (issue #2)
+                        // KeyEvent::Esc => return false,
                         _ => ()
                     },
                     InputEvent::Mouse(m) => match m {
                         MouseEvent::Press(b, col, row) => match b {
                             MouseButton::Left => {
-                                if row == btn_row {
-                                    if col <= yf && col >= ys {
+                                if row == btnrow {
+                                    if col <= yrange.1 && col >= yrange.0 {
                                         return true;
                                     }
-                                    if col <= xf && col >= xs {
+                                    if col <= nrange.1 && col >= nrange.0 {
                                         return false;
                                     }
                                 }
@@ -95,102 +83,112 @@ impl<'t> AlertBox<'t> {
                     _ => ()
                 }
             }
-	    // std::thread::sleep(std::time::Duration::from_millis(20));
+	          std::thread::sleep(std::time::Duration::from_millis(20));
         }
     }
 
-    fn draw_sides(&mut self) {
+    fn draw_box(&mut self, tty: &CommonTerminal) {
         let (top, bot, left, right) = self.dims;
-        let hstr = self.glyphs.0.to_string().repeat((right - left) as usize);
-        self.termref.goto(left, top);
-        self.termref.prints(&hstr);
-        self.termref.goto(left, bot);
-        self.termref.prints(&hstr);
-        for row in top..bot {
-            let vstr = &self.glyphs.1.to_string();
-            self.termref.goto(left, row);
-            self.termref.prints(vstr);
-            self.termref.goto(right, row);
-            self.termref.prints(vstr);
-        } 
+
+        // Draw corners.
+        tty.goto(left, top);
+        tty.prints("┌");
+        tty.goto(right, top);
+        tty.prints("┐");
+        tty.goto(left, bot);
+        tty.prints("└");
+        tty.goto(right, bot);
+        tty.prints("┘");
+
+        // Draw top and bot horiz lines.
+        let h_line = "─".repeat((self.width - 1) as usize);
+        tty.goto(left + 1, top);
+        tty.prints(&h_line);
+        tty.goto(left + 1, bot);
+        tty.prints(&h_line);
+
+        // Draw left and right vert lines.
+        for row in (top + 1)..bot {
+            let v_line = "│";
+            tty.goto(left, row);
+            tty.prints(v_line);
+            tty.goto(right, row);
+            tty.prints(v_line);
+        }
+
+        // Draw title bar.
+        tty.goto(left + 1, top + 1);
+        let title = "[!] Alert";
+        tty.prints("[");
+        tty.set_style(Style::Fg(Color::Yellow));
+        tty.prints("!");
+        tty.set_style(Style::Fg(Color::Reset));
+        let nbspc = self.width as usize - title.len() - 1;
+        tty.prints(&format!("] Alert{:>1$}", " ", nbspc));
+        tty.reset_styles();
+
+        // Draw bottom title bar.
+        tty.goto(left + 1, top + 2);
+        tty.prints(&h_line);
+        tty.goto(left, top + 2);
+        tty.prints("├");
+        tty.goto(right, top + 2);
+        tty.prints("┤");
     }
 
-    fn draw_corners(&mut self) {
-        let (top, bot, left, right) = self.dims;
-        self.termref.goto(left, top);
-        self.termref.prints(&self.glyphs.2.to_string());
-        self.termref.goto(right, top);
-        self.termref.prints(&self.glyphs.3.to_string());
-        self.termref.goto(left, bot);
-        self.termref.prints(&self.glyphs.4.to_string());
-        self.termref.goto(right, bot);
-        self.termref.prints(&self.glyphs.5.to_string());
+
+    pub fn set_content(&mut self, msg: &str) {
+        self.message = msg.to_string();
+        // (imdaveho) TODO: handle \n and \t
+        let box_width = (self.width - 4) as usize;
+        let msg_width = self.message.len();
+        if msg_width > box_width {
+            let countln = msg_width / box_width;
+            self.set_height(self.height + countln as i16);
+        }
     }
 
-    fn draw_header(&mut self) {
-        let (top, _, left, right) = self.dims;
-        self.termref.goto(left + 1, top + 1);
-        self.termref.prints("[");
-        self.termref.set_fg(Color::Yellow);
-        self.termref.prints("!");
-        self.termref.set_fg(Color::Reset);
-        let spaces = " ".repeat((right - left - 11) as usize);
-        let remainder = format!("] Notice{}", spaces);
-        self.termref.prints(&remainder);
-        self.termref.reset_styles();
-
-        let botline = self.glyphs.0.to_string().repeat((right - left - 1) as usize);
-        self.termref.goto(left + 1, top + 2);
-        self.termref.prints(&botline);
-        self.termref.goto(left, top + 2);
-        self.termref.prints(&self.glyphs.6.to_string());
-        self.termref.goto(right, top + 2);
-        self.termref.prints(&self.glyphs.7.to_string());
-    }
-
-    fn draw_content(&mut self) {
-        let (top, _, left, right) = self.dims;
-        let boxwidth = (right - left - 4) as usize;
-        let msglength = self.message.len();
-        if msglength > boxwidth {
-            let linecount = msglength / boxwidth;
-            self.set_height(self.height + linecount as i16);
-            let (top, bot, left, right) = self.dims;
-            let boxwidth = (right - left - 4) as usize;
+    fn draw_body(&mut self, tty: &CommonTerminal) {
+        // Render message.
+        let (top, bot, left, _) = self.dims;
+        let box_width = (self.width - 4) as usize;
+        let msg_width = self.message.len();
+        if msg_width > box_width {
+            let countln = msg_width / box_width;
             let mut start = 0;
-            for i in 0..linecount {
-                let finish = start + boxwidth;
+            for i in 0..countln {
+                let finish = start + box_width;
                 let row = top + 4 + i as i16;
                 if row == bot - 3 {
                     break
                 }
-                self.termref.goto(left + 2, row);
-                self.termref.prints(&self.message[start..=finish]);
+                tty.goto(left + 2, row);
+                tty.prints(&self.message[start..=finish]);
                 start = finish + 1;
             }
         } else {
-            self.termref.goto(left + 2, top + 4);
-            self.termref.prints(&self.message);
+            tty.goto(left + 2, top + 4);
+            tty.prints(&self.message);
         }
-    }
 
-    fn draw_buttons(&mut self) {
-        let midpt = self.termref.screen_size().0 / 2;
-        self.termref.goto(midpt - 8, self.dims.1 - 2);
-        self.termref.set_bg(Color::DarkCyan);
-        self.termref.set_fg(Color::Green);
-        self.termref.prints("[ Y ]");
-        self.termref.goto(midpt + 2, self.dims.1 - 2);
-        self.termref.set_bg(Color::Yellow);
-        self.termref.set_fg(Color::Red);
-        self.termref.prints("[ N ]");
-        self.termref.reset_styles();
+        // Draw buttons.
+        let midw = self.screen_size.0 / 2;
+        let bot = self.dims.1;
+        tty.goto(midw - 8, bot - 2);
+        tty.set_style(Style::Bg(Color::DarkBlue));
+        tty.set_style(Style::Fg(Color::Green));
+        tty.prints("[ Y ]");
+        tty.goto(midw + 2, bot - 2);
+        tty.set_style(Style::Bg(Color::DarkMagenta));
+        tty.set_style(Style::Fg(Color::Red));
+        tty.prints("[ N ]");
+        tty.reset_styles();
     }
 
     pub fn set_width(&mut self, w: i16) {
         let mut w = w;
         if w < 0 { w = w.abs(); }
-        let sw = self.termref.screen_size().0;
+        let sw = self.screen_size.0;
         let mw = sw / 2;
         let (left, right) = (mw - w / 2, mw + w / 2);
         self.width = w;
@@ -201,7 +199,7 @@ impl<'t> AlertBox<'t> {
     pub fn set_height(&mut self, h: i16) {
         let mut h = h;
         if h < 0 { h = h.abs(); }
-        let sh = self.termref.screen_size().1;
+        let sh = self.screen_size.1;
         let mh = sh / 2;
         let vo = self.voffset;
         let (top, bot) = (mh - h / 2 - vo, mh + h / 2 - vo);
@@ -213,12 +211,16 @@ impl<'t> AlertBox<'t> {
     pub fn set_offset(&mut self, vo: i16) {
         let mut vo = vo;
         if vo < 0 { vo = vo.abs(); }
-        let sh = self.termref.screen_size().1;
+        let sh = self.screen_size.1;
         let mh = sh / 2;
         let h = self.height;
         let (top, bot) = (mh - h / 2 - vo, mh + h / 2 - vo);
         self.voffset = vo;
         self.dims.0 = top;
         self.dims.1 = bot;
+    }
+
+    pub fn set_screensize(&mut self) {
+        self.screen_size = size();
     }
 }
