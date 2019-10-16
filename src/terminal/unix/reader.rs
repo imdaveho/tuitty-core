@@ -14,6 +14,7 @@ use crate::common::enums::{InputEvent, KeyEvent};
 pub struct AsyncReader {
     event_rx: Receiver<u8>,
     shutdown: Arc<AtomicBool>,
+    // joinhandle: Option<thread::JoinHandle<()>>,
 }
 
 impl AsyncReader {
@@ -23,21 +24,20 @@ impl AsyncReader {
     ) + Send>) -> AsyncReader {
         let shutdown_handle = Arc::new(AtomicBool::new(false));
 
+        // let handle;
         let (event_tx, event_rx) = channel();
         let thread_shutdown = shutdown_handle.clone();
-
+        // handle = thread::spawn(move || loop {
         thread::spawn(move || loop {
             func(&event_tx, &thread_shutdown);
+            return
         });
 
         AsyncReader {
             event_rx,
             shutdown: shutdown_handle,
+            // joinhandle: Some(handle),
         }
-    }
-
-    pub fn stop_reading(&mut self) {
-        self.shutdown.store(true, Ordering::SeqCst);
     }
 }
 
@@ -62,7 +62,9 @@ impl Iterator for AsyncReader {
 
 impl Drop for AsyncReader {
     fn drop(&mut self) {
-        self.stop_reading();
+        self.shutdown.store(true, Ordering::SeqCst);
+        // let handle = self.joinhandle.take().unwrap();
+        // let _ = handle.join();
     }
 }
 

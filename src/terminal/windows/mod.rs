@@ -233,19 +233,19 @@ impl TerminalWriter for WindowsConsole {
 }
 
 impl TerminalInput for WindowsConsole {
-    fn read_char(&self) -> char {
+    fn read_char() -> char {
         input::read_char().expect("Error reading a character from stdin")
     }
 
-    fn read_sync(&self) -> SyncReader {
+    fn read_sync() -> SyncReader {
         input::read_sync()
     }
 
-    fn read_async(&self) -> AsyncReader {
+    fn read_async() -> AsyncReader {
         input::read_async()
     }
 
-    fn read_until_async(&self, delimiter: u8) -> AsyncReader {
+    fn read_until_async(delimiter: u8) -> AsyncReader {
         input::read_until_async(delimiter)
     }
 }

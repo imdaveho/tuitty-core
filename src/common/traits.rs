@@ -82,10 +82,10 @@ pub trait TerminalWriter {
 }
 
 pub trait TerminalInput {
-    fn read_char(&self) -> char;
-    fn read_sync(&self) -> SyncReader;
-    fn read_async(&self) -> AsyncReader;
-    fn read_until_async(&self, delimiter: u8) -> AsyncReader;
+    fn read_char() -> char;
+    fn read_sync() -> SyncReader;
+    fn read_async() -> AsyncReader;
+    fn read_until_async(delimiter: u8) -> AsyncReader;
 }
 
 pub trait TerminalSwitcher {

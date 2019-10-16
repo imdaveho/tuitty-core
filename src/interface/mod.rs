@@ -3,6 +3,6 @@
 
 mod alert;
 
-pub use { 
-    alert::AlertBox 
+pub use {
+    alert::AlertBox,
 };

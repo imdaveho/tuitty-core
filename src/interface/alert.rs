@@ -1,16 +1,13 @@
 //! TODO:
 
-use crate::terminal::CommonTerminal;
+use crate::terminal::{ CommonTerminal, Terminal };
 use crate::common::{
     traits::*,
     enums::{ InputEvent, KeyEvent, MouseEvent, MouseButton, Color, Style },
 };
 
 #[cfg(unix)]
-use crate::terminal::unix::{ AsyncReader, size };
-
-#[cfg(windows)]
-use crate::terminal::windows::AsyncReader;
+use crate::terminal::unix::size;
 
 #[cfg(windows)]
 use crate::terminal::wincon::screen::size;
@@ -38,56 +35,67 @@ impl AlertBox {
         }
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&self) {
         let tty = CommonTerminal::new();
         self.draw_box(&tty);
         self.draw_body(&tty);
         tty.flush();
     }
 
-    pub fn handle(&mut self, input: &mut AsyncReader) -> bool {
+    pub fn handle(&self) -> bool {
         let midw = self.screen_size.0 / 2;
         let yrange = (midw - 8, midw - 3);
         let nrange = (midw + 2, midw + 7);
         let btnrow = self.dims.1 - 2;
 
+        let res: bool;
+        let mut input = Terminal::read_async();
         loop {
             if let Some(evt) = input.next() {
                 match evt {
                     InputEvent::Keyboard(k) => match k {
                         KeyEvent::Char(c) => match c {
-                            'Y' | 'y' => return true,
-                            'N' | 'n' => return false,
+                            'Y' | 'y' => {
+                                res = true;
+                                break
+                            },
+                            'N' | 'n' => {
+                                res = false;
+                                break
+                            },
                             _ => (),
                         },
                         // (imdaveho) TODO: Handle the below (issue #2)
-                        // KeyEvent::Esc => return false,
-                        _ => ()
+                        // KeyEvent::Esc => false,
+                        _ => (),
                     },
                     InputEvent::Mouse(m) => match m {
                         MouseEvent::Press(b, col, row) => match b {
                             MouseButton::Left => {
                                 if row == btnrow {
                                     if col <= yrange.1 && col >= yrange.0 {
-                                        return true;
+                                        res = true;
+                                        break
                                     }
+
                                     if col <= nrange.1 && col >= nrange.0 {
-                                        return false;
+                                        res = false;
+                                        break
                                     }
                                 }
-                            }
+                            },
                             _ => (),
                         },
                         _ => (),
                     },
-                    _ => ()
+                    _ => (),
                 }
             }
-	          std::thread::sleep(std::time::Duration::from_millis(20));
-        }
+        };
+        return res;
     }
 
-    fn draw_box(&mut self, tty: &CommonTerminal) {
+    fn draw_box(&self, tty: &CommonTerminal) {
         let (top, bot, left, right) = self.dims;
 
         // Draw corners.
@@ -148,7 +156,7 @@ impl AlertBox {
         }
     }
 
-    fn draw_body(&mut self, tty: &CommonTerminal) {
+    fn draw_body(&self, tty: &CommonTerminal) {
         // Render message.
         let (top, bot, left, _) = self.dims;
         let box_width = (self.width - 4) as usize;
