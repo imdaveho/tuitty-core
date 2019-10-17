@@ -135,15 +135,27 @@ impl CommandModifier for AnsiTerminal {
         output::printf(&screen::disable_alt());
     }
 
-    #[cfg(unix)]
     fn raw(&self) {
-        output::enable_raw().expect("Error enabling raw mode");
+        #[cfg(unix)] {
+            output::enable_raw().expect("Error enabling raw mode");
+        }
+
+        #[cfg(windows)] {
+            super::wincon::output::enable_raw()
+                .expect("Error enabling raw mode");
+        }
     }
 
-    #[cfg(unix)]
     fn cook(&self) {
-        output::set_mode(&self.original_mode)
-            .expect("Error disabling raw mode");
+        #[cfg(unix)] {
+            output::set_mode(&self.original_mode)
+                .expect("Error disabling raw mode");
+        }
+    
+        #[cfg(windows)] {
+            super::wincon::output::disable_raw()
+                .expect("Error disabling raw mode");
+        }
     }
 }
 

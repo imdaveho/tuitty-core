@@ -21,8 +21,9 @@ use crate::common::enums::{ Clear, Style, Color };
 
 pub struct Win32Console {
     style: style::ConsoleOutput,
+    original_mode: u32,
     alternate: Handle,
-};
+}
 
 impl Win32Console {
     pub fn new() -> Win32Console {
@@ -32,6 +33,7 @@ impl Win32Console {
                 .expect("Error fetching mode from $STDOUT"),
             alternate: Handle::buffer()
                 .expect("Error creating alternate Console buffer"),
+        }
     }
 }
 
@@ -144,11 +146,11 @@ impl CommandModifier for Win32Console {
         screen::disable_alt().expect("Error switching back to $STDOUT");
     }
 
-    fn raw(&mut self) {
+    fn raw(&self) {
         output::enable_raw().expect("Error enabling raw mode");
     }
 
-    fn cook(&mut self) {
+    fn cook(&self) {
         output::disable_raw().expect("Error disabling raw mode");
     }
 }
