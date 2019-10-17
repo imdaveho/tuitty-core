@@ -9,11 +9,10 @@ mod mouse;
 // #[cfg(test)]
 // mod tests;
 
-use crate::common::traits::{
-    CommandCursor, CommandWriter,
-    CommandFormatter, CommandModifier
+use crate::common::{
+    enums::{ Clear, Style, Color },
+    traits::{ CursorActor, ModeActor, ViewActor, OutputActor },
 };
-use crate::common::enums::{ Clear, Style, Color };
 
 #[cfg(unix)]
 use libc::termios as Termios;
@@ -39,7 +38,7 @@ impl AnsiTerminal {
     }
 }
 
-impl CommandCursor for AnsiTerminal {
+impl CursorActor for AnsiTerminal {
     fn goto(&self, col: i16, row: i16) {
         let (mut col, mut row) = (col, row);
         if col < 0 { col = col.abs() }
@@ -72,7 +71,7 @@ impl CommandCursor for AnsiTerminal {
     }
 }
 
-impl CommandFormatter for AnsiTerminal {
+impl ViewActor for AnsiTerminal {
     fn clear(&self, method: Clear) {
         output::prints(&screen::clear(method));
     }
@@ -110,7 +109,7 @@ impl CommandFormatter for AnsiTerminal {
     }
 }
 
-impl CommandModifier for AnsiTerminal {
+impl ModeActor for AnsiTerminal {
     fn hide_cursor(&self) {
         output::prints(&cursor::hide_cursor());
     }
@@ -159,7 +158,7 @@ impl CommandModifier for AnsiTerminal {
     }
 }
 
-impl CommandWriter for AnsiTerminal {
+impl OutputActor for AnsiTerminal {
     fn prints(&self, content: &str) {
         output::prints(content);
     }

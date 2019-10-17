@@ -12,11 +12,10 @@ mod mouse;
 mod handle;
 pub use handle::Handle;
 
-use crate::common::traits::{
-    CommandCursor, CommandModifier,
-    CommandFormatter, CommandWriter
+use crate::common::{
+    enums::{ Clear, Style, Color },
+    traits::{ CursorActor, ModeActor, ViewActor, OutputActor },
 };
-use crate::common::enums::{ Clear, Style, Color };
 
 
 pub struct Win32Console {
@@ -37,7 +36,7 @@ impl Win32Console {
     }
 }
 
-impl CommandCursor for Win32Console {
+impl CursorActor for Win32Console {
     fn goto(&self, col: i16, row: i16) {
         let (mut col, mut row) = (col, row);
         if col < 0 { col = col.abs() }
@@ -75,7 +74,7 @@ impl CommandCursor for Win32Console {
     }
 }
 
-impl CommandFormatter for Win32Console {
+impl ViewActor for Win32Console {
     fn clear(&self, method: Clear) {
         screen::clear(method);
     }
@@ -115,7 +114,7 @@ impl CommandFormatter for Win32Console {
     }
 }
 
-impl CommandModifier for Win32Console {
+impl ModeActor for Win32Console {
     fn hide_cursor(&self) {
         cursor::hide_cursor()
             .expect("Error setting cursor visibility to 0");
@@ -155,7 +154,7 @@ impl CommandModifier for Win32Console {
     }
 }
 
-impl CommandWriter for Win32Console {
+impl OutputActor for Win32Console {
     fn prints(&self, content: &str) {
         output::prints(content)
             .expect("Error writing to console");

@@ -4,7 +4,7 @@
 // #[cfg(windows)]
 // pub use windows::WindowsConsole as Terminal;
 
-pub mod commands;
+pub mod actions;
 
 // #[cfg(unix)]
 // mod unix;

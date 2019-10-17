@@ -7,17 +7,17 @@ mod terminal;
 
 pub mod common;
 pub use terminal::{
-    commands::Commands,
+    actions::Action,
 };
 
 
 #[no_mangle]
-pub extern fn commands_new() -> *const Commands {
-    Box::into_raw(Box::new(Commands::new()))
+pub extern fn new_actors() -> *const Action {
+    Box::into_raw(Box::new(Action::new()))
 }
 
 #[no_mangle]
-pub extern fn commands_free(ptr: *mut Commands) {
+pub extern fn free_actors(ptr: *mut Action) {
     unsafe {
         if ptr.is_null() { return }
         assert!(!ptr.is_null());

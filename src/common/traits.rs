@@ -3,17 +3,16 @@
 use crate::common::enums::{ Clear, Color };
 
 
-pub trait CommandCursor {
+pub trait CursorActor {
     fn goto(&self, col: i16, row: i16);
     fn up(&self, n: i16);
     fn down(&self, n: i16);
     fn left(&self, n: i16);
     fn right(&self, n: i16);
-    // (imdaveho) TODO: Convert into an InputEvent.
-    // fn pos() -> (i16, i16);
+    // (imdaveho) TODO: Convert pos into an InputEvent.
 }
 
-pub trait CommandModifier {
+pub trait ModeActor {
     fn hide_cursor(&self);
     fn show_cursor(&self);
     fn enable_mouse(&self);
@@ -24,7 +23,7 @@ pub trait CommandModifier {
     fn cook(&self);
 }
 
-pub trait CommandFormatter {
+pub trait ViewActor {
     fn clear(&self, method: Clear);
     fn size(&self) -> (i16, i16);
     fn resize(&self, w: i16, h: i16);
@@ -33,10 +32,9 @@ pub trait CommandFormatter {
     fn set_fx(&self, effects: u32);
     fn set_styles(&self, fg: Color, bg: Color, fx: u32);
     fn reset_styles(&self);
-    // fn set_style(&self, style: Style);
 }
 
-pub trait CommandWriter {
+pub trait OutputActor {
     fn prints(&self, content: &str);
     fn flush(&self);
     fn printf(&self, content: &str);
