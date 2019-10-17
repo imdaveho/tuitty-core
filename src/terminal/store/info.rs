@@ -70,7 +70,7 @@ impl CacheUpdater for CharInfoCache {
     fn _screen_pos(&self) -> (i16, i16) {
         self.screen_pos
     }
-    
+
     fn _sync_tab(&mut self, w: u8) {
         self.tab_width = w;
     }
@@ -80,7 +80,7 @@ impl CacheUpdater for CharInfoCache {
         self.buffer.resize((w * h) as usize, unsafe { zeroed() });
         // TODO: re-calc cursor position
     }
-    
+
     fn _sync_pos(&mut self, col: i16, row: i16) {
         self.screen_pos = (col, row)
     }

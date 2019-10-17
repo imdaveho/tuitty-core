@@ -2,7 +2,7 @@
 
 use super::enums::{ Style, Color, Clear };
 
-use crate::terminal::ansi::CellInfoCache;
+use crate::terminal::command::ansi::CellInfoCache;
 
 #[cfg(windows)]
 use crate::terminal::windows::{ is_ansi_enabled, CharInfoCache };

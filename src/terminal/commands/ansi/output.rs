@@ -1,5 +1,30 @@
-// Unix specific functions for enabling and disabling raw mode.
-//
+// ANSI specific methods to print to the terminal.
+
+use std::io::{stdout, BufWriter, Write};
+
+pub fn prints(content: &str) {
+    let output = stdout();
+    let lock = output.lock();
+    let mut outbuf = BufWriter::new(lock);
+    outbuf.write(content.as_bytes()).expect("I/O error on write");
+}
+
+pub fn flush() {
+    let output = stdout();
+    let lock = output.lock();
+    let mut outbuf = BufWriter::new(lock);
+    outbuf.flush().expect("I/O error on flush");
+}
+
+pub fn printf(content: &str) {
+    let output = stdout();
+    let lock = output.lock();
+    let mut outbuf = BufWriter::new(lock);
+    outbuf.write(content.as_bytes()).expect("I/O error on write");
+    outbuf.flush().expect("I/O error on flush");
+}
+
+
 // Normally the terminal uses line buffering. This means input will be sent
 // line by line. With raw mode, input is sent one byte at a time. Because of
 // this, all input needs to be outputted manually. Characters are not processed
@@ -12,12 +37,17 @@
 // but will be in the same position as it was in the previous line. It is up to
 // the user or program to move it to where they would like the cursor to be.
 
-use std::mem;
-use std::io::{Error, Result};
-use libc::termios as Termios;
-use libc::{cfmakeraw, tcgetattr, tcsetattr, STDIN_FILENO, TCSANOW};
+#[cfg(unix)]
+use std::{ mem, io::{ Error, Result } };
+
+#[cfg(unix)]
+use libc::{
+    cfmakeraw, tcgetattr, tcsetattr,
+    STDIN_FILENO, TCSANOW, termios as Termios
+};
 
 
+#[cfg(unix)]
 pub fn get_mode() -> Result<Termios> {
     unsafe {
         let mut termios = mem::zeroed();
@@ -30,6 +60,7 @@ pub fn get_mode() -> Result<Termios> {
 }
 
 /// This function enables raw mode in the current screen.
+#[cfg(unix)]
 pub fn enable_raw() -> Result<()> {
     unsafe {
         // Get the current terminal attrs.
@@ -45,6 +76,7 @@ pub fn enable_raw() -> Result<()> {
     }
 }
 
+#[cfg(unix)]
 pub fn set_mode(termios: &Termios) -> Result<()> {
     if unsafe { tcsetattr(STDIN_FILENO, TCSANOW, termios) } == -1 {
         Err(Error::last_os_error())

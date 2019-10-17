@@ -3,11 +3,32 @@
 // use std::ffi::CStr;
 // use std::os::raw::c_char;
 
-// mod tty;
-pub mod terminal;
-pub mod common;
-pub mod interface;
+mod terminal;
 
+pub mod common;
+pub use terminal::{
+    commands::Commands,
+};
+
+
+#[no_mangle]
+pub extern fn commands_new() -> *const Commands {
+    Box::into_raw(Box::new(Commands::new()))
+}
+
+#[no_mangle]
+pub extern fn commands_free(ptr: *mut Commands) {
+    unsafe {
+        if ptr.is_null() { return }
+        assert!(!ptr.is_null());
+        Box::from_raw(ptr);
+    }
+}
+
+
+// pub mod interface;
+
+// mod tty;
 // use tty::{
 //     Tty, AsyncReader, SyncReader,
 //     InputEvent, KeyEvent, MouseEvent, MouseButton
