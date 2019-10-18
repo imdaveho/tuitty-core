@@ -1,9 +1,9 @@
 // ANSI specific functions.
 
 mod cursor;
-mod output;
-mod screen;
-mod style;
+pub mod output;
+pub mod screen;
+pub mod style;
 mod mouse;
 
 // #[cfg(test)]

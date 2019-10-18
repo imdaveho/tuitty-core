@@ -173,10 +173,3 @@ pub enum KeyEvent {
     ShiftRight,
     ShiftLeft,
 }
-
-pub enum Direction {
-    Up(i16),
-    Down(i16),
-    Left(i16),
-    Right(i16),
-}
