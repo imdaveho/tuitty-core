@@ -22,7 +22,7 @@ pub struct CharInfoCache {
 
 impl CharInfoCache {
     pub fn new() -> CharInfoCache {
-        let (w, h) = crate::terminal::actions::wincon::screen::size();
+        let (w, h) = crate::terminal::actions::wincon::windows::size();
         let capacity = (w * h) as usize;
         CharInfoCache {
             screen_pos: (0, 0),

@@ -3,7 +3,6 @@
 pub mod enums;
 // pub mod meta;
 // pub mod cache;
-pub mod traits;
 pub mod unicode;
 
 

@@ -1,173 +1,191 @@
 // ANSI specific functions.
 
 mod cursor;
-pub mod output;
-pub mod screen;
-pub mod style;
+mod screen;
+mod style;
+mod output;
 mod mouse;
+
+#[cfg(unix)]
+pub mod unix {
+    pub use libc::termios as Termios;
+    pub use super::screen::size;
+}
+
+use crate::common::enums::{ Clear, Style, Color };
 
 // #[cfg(test)]
 // mod tests;
 
-use crate::common::{
-    enums::{ Clear, Style, Color },
-    traits::{ CursorActor, ModeActor, ViewActor, OutputActor },
-};
 
-#[cfg(unix)]
-use libc::termios as Termios;
+pub struct AnsiTerminal;
 
-
-pub struct AnsiTerminal {
+trait AnsiAction {
+    // CURSOR
+    fn goto(col: i16, row: i16);
+    fn up(n: i16);
+    fn down(n: i16);
+    fn left(n: i16);
+    fn right(n: i16);
+    fn hide_cursor();
+    fn show_cursor();
+    // SCREEN
+    fn clear(method: Clear);
+    fn size() -> (i16, i16);
+    fn resize(w: i16, h: i16);
+    fn enable_alt();
+    fn disable_alt();
+    // OUTPUT
+    fn prints(content: &str);
+    fn printf(content: &str);
+    fn flush();
+    fn raw();
     #[cfg(unix)]
-    original_mode: Termios,
+    fn cook(original_mode: unix::Termios); 
     #[cfg(windows)]
-    original_mode: u32,
+    fn cook();
+    fn enable_mouse();
+    fn disable_mouse();
+    // STYLE
+    fn set_fg(color: Color);
+    fn set_bg(color: Color);
+    fn set_fx(effects: u32);
+    fn set_styles(fg: Color, bg: Color, fx: u32);
+    fn reset_styles();
 }
 
-impl AnsiTerminal {
-    pub fn new() -> AnsiTerminal {
-        AnsiTerminal {
-            #[cfg(unix)]
-            original_mode: output::get_mode()
-                .expect("Error fetching Termios"),
-            #[cfg(windows)]
-            original_mode: super::wincon::output::get_mode()
-                .expect("Error fetching mode from $STDOUT"),
-        }
-    }
-}
-
-impl CursorActor for AnsiTerminal {
-    fn goto(&self, col: i16, row: i16) {
+impl AnsiAction for AnsiTerminal {
+    // CURSOR
+    fn goto(col: i16, row: i16) {
         let (mut col, mut row) = (col, row);
         if col < 0 { col = col.abs() }
         if row < 0 { row = row.abs() }
         output::prints(&cursor::goto(col, row));
     }
 
-    fn up(&self, n: i16) {
+    fn up(n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
         output::prints(&cursor::move_up(n));
     }
 
-    fn down(&self, n: i16) {
+    fn down(n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
         output::prints(&cursor::move_down(n));
     }
 
-    fn left(&self, n: i16) {
+    fn left(n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
         output::prints(&cursor::move_left(n));
     }
 
-    fn right(&self, n: i16) {
+    fn right(n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
         output::prints(&cursor::move_right(n));
     }
-}
 
-impl ViewActor for AnsiTerminal {
-    fn clear(&self, method: Clear) {
-        output::prints(&screen::clear(method));
-    }
-
-    fn size(&self) -> (i16, i16) {
-        #[cfg(unix)] { screen::size() }
-
-        #[cfg(windows)] {
-            super::wincon::screen::size()
-        }
-    }
-
-    fn resize(&self, w: i16, h: i16) {
-        output::printf(&screen::resize(w, h));
-    }
-
-    fn set_fg(&self, color: Color) {
-        output::prints(&style::set_style(Style::Fg(color)));
-    }
-
-    fn set_bg(&self, color: Color) {
-        output::prints(&style::set_style(Style::Bg(color)));
-    }
-
-    fn set_fx(&self, effects: u32) {
-        output::prints(&style::set_style(Style::Fx(effects)));
-    }
-
-    fn set_styles(&self, fg: Color, bg: Color, fx: u32) {
-        output::prints(&style::set_styles(fg, bg, fx));
-    }
-
-    fn reset_styles(&self) {
-        output::prints(&style::reset());
-    }
-}
-
-impl ModeActor for AnsiTerminal {
-    fn hide_cursor(&self) {
+    fn hide_cursor() {
         output::prints(&cursor::hide_cursor());
     }
 
-    fn show_cursor(&self) {
+    fn show_cursor() {
         output::prints(&cursor::show_cursor());
     }
 
-    fn enable_mouse(&self) {
-        output::prints(&mouse::enable_mouse_mode());
+    // SCREEN
+    fn clear(method: Clear) {
+        output::prints(&screen::clear(method));
     }
 
-    fn disable_mouse(&self) {
-        output::prints(&mouse::disable_mouse_mode());
+    fn size() -> (i16, i16) {
+        #[cfg(unix)] { 
+            self::unix::size() 
+        }
+
+        #[cfg(windows)] { 
+            super::wincon::windows::size()
+        }
     }
 
-    fn enable_alt(&self) {
+    fn resize(w: i16, h: i16) {
+        output::printf(&screen::resize(w, h));
+    }
+
+    fn enable_alt() {
         output::printf(&screen::enable_alt());
     }
 
-    fn disable_alt(&self) {
+    fn disable_alt() {
         output::printf(&screen::disable_alt());
     }
 
-    fn raw(&self) {
-        #[cfg(unix)] {
-            output::enable_raw().expect("Error enabling raw mode");
-        }
-
-        #[cfg(windows)] {
-            super::wincon::output::enable_raw()
-                .expect("Error enabling raw mode");
-        }
-    }
-
-    fn cook(&self) {
-        #[cfg(unix)] {
-            output::set_mode(&self.original_mode)
-                .expect("Error disabling raw mode");
-        }
-    
-        #[cfg(windows)] {
-            super::wincon::output::disable_raw()
-                .expect("Error disabling raw mode");
-        }
-    }
-}
-
-impl OutputActor for AnsiTerminal {
-    fn prints(&self, content: &str) {
+    // OUTPUT
+    fn prints(content: &str) {
         output::prints(content);
     }
 
-    fn printf(&self, content: &str) {
+    fn printf(content: &str) {
         output::printf(content);
     }
 
-    fn flush(&self) {
+    fn flush() {
         output::flush();
+    }
+
+    fn raw() {
+        #[cfg(unix)] {
+            self::unix::enable_raw()
+            .expect("Error enabling raw mode");
+        }
+
+        #[cfg(windows)] {
+            super::wincon::windows::enable_raw()
+                .expect("Error enabling raw mode")
+        }
+    }
+
+    #[cfg(unix)]
+    fn cook(original_mode: unix::Termios) {
+        self::unix::disable_raw(original_mode)
+            .expect("Error disabling raw mode");
+    }
+
+    #[cfg(windows)]
+    fn cook() {
+        super::wincon::windows::disable_raw()
+            .expect("Error disabling raw mode");
+    }
+
+    // MOUSE
+    fn enable_mouse() {
+        output::prints(&mouse::enable_mouse_mode());
+    }
+
+    fn disable_mouse() {
+        output::prints(&mouse::disable_mouse_mode());
+    }
+
+    // STYLE
+    fn set_fg(color: Color) {
+        output::prints(&style::set_style(Style::Fg(color)));
+    }
+
+    fn set_bg(color: Color) {
+        output::prints(&style::set_style(Style::Bg(color)));
+    }
+
+    fn set_fx(effects: u32) {
+        output::prints(&style::set_style(Style::Fx(effects)));
+    }
+
+    fn set_styles(fg: Color, bg: Color, fx: u32) {
+        output::prints(&style::set_styles(fg, bg, fx));
+    }
+
+    fn reset_styles() {
+        output::prints(&style::reset());
     }
 }

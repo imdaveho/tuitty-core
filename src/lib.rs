@@ -4,26 +4,26 @@
 // use std::os::raw::c_char;
 
 mod terminal;
-
 pub mod common;
-pub use terminal::{
-    actions::TerminalAction,
-};
+
+// pub use terminal::{
+//     actions::TerminalAction,
+// };
 
 
-#[no_mangle]
-pub extern fn actions() -> *const TerminalAction {
-    Box::into_raw(Box::new(TerminalAction::new()))
-}
+// #[no_mangle]
+// pub extern fn actions() -> *const TerminalAction {
+//     Box::into_raw(Box::new(TerminalAction::new()))
+// }
 
-#[no_mangle]
-pub extern fn free_actions(ptr: *mut TerminalAction) {
-    unsafe {
-        if ptr.is_null() { return }
-        assert!(!ptr.is_null());
-        Box::from_raw(ptr);
-    }
-}
+// #[no_mangle]
+// pub extern fn free_actions(ptr: *mut TerminalAction) {
+//     unsafe {
+//         if ptr.is_null() { return }
+//         assert!(!ptr.is_null());
+//         Box::from_raw(ptr);
+//     }
+// }
 
 
 // pub mod interface;

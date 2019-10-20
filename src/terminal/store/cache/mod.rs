@@ -8,10 +8,8 @@ mod ansi;
 mod wincon;
 
 // use crate::common::enums::{ Style, Color, Clear };
-use crate::common::enums::Clear;
-
-#[cfg(windows)]
-use crate::terminal::actions::wincon::is_ansi_enabled;
+// use crate::common::enums::Clear;
+use crate::terminal::actions::is_ansi_enabled;
 
 
 // (imdaveho) TODO: `\t` handling for ANSI

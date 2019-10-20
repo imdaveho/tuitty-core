@@ -15,111 +15,97 @@ pub const RESET: u16 = 0xFFFF;
 pub const IGNORE: u16 = 0xFFF0;
 
 
-pub struct ConsoleOutput(u16);
-
-impl ConsoleOutput {
-    pub fn new() -> ConsoleOutput {
-        ConsoleOutput(
-            ConsoleInfo::of(
-                &Handle::conout()
-                .expect("Error fetching $CONOUT"))
-            .expect("Error fetching ConsoleInfo from $CONOUT")
-            .attributes()
-        )
-    }
-
-    pub fn reset(&self) -> Result<()> {
-        let handle = Handle::conout()?;
-        unsafe {
-            if SetConsoleTextAttribute(handle.0, self.0) == 0 {
-                return Err(Error::last_os_error());
-            }
+pub fn reset(default: u16) -> Result<()> {
+    let handle = Handle::conout()?;
+    unsafe {
+        if SetConsoleTextAttribute(handle.0, default) == 0 {
+            return Err(Error::last_os_error());
         }
-        Ok(())
     }
+    Ok(())
+}
 
-    pub fn set_style(&self, style: Style) -> Result<()> {
-        let handle = Handle::conout()?;
-        let info = ConsoleInfo::of(&handle)?;
-        let current = info.attributes();
-        // let (just_fg, just_bg, just_fx) = (
-        //     current & 0x000f, current & 0x00f0, current & 0xdf00);
-        let updated: u16 = match style {
-            Style::Fg(c) => {
-                let mut updated_fg = Foreground::from(c);
-                if updated_fg == RESET {
-                    updated_fg = Foreground(self.0 & 0x000f)
-                }
-                if updated_fg == IGNORE {
-                    updated_fg = Foreground(current & 0x000f)
-                }
-                // (imdaveho) NOTE: We need to isolate Colors in Windows
-                // because Color attributes mix. So if you previously had
-                // Color::Red and you wanted Color::Blue, that would end up
-                // as Color::Magenta if you didn't first clear it out
-                // updated_fg.0 | just_bg | just_fx
-                updated_fg.0 | current & !0x000f
-            },
-            Style::Bg(c) => {
-                let mut updated_bg = Background::from(c);
-                if updated_bg == RESET {
-                    updated_bg = Background(self.0 & 0x00f0)
-                }
-                if updated_bg == IGNORE {
-                    updated_bg = Background(current & 0x00f0)
-                }
-                // (imdaveho) NOTE: We need to isolate Colors in Windows
-                // because Color attributes mix. So if you previously had
-                // Color::Red and you wanted Color::Blue, that would end up
-                // as Color::Magenta if you didn't first clear it out
-                // just_fg | updated_bg.0 | just_fx
-                updated_bg.0 | current & !0x00f0
-            },
-            Style::Fx(f) => {
-                let fxs = [Reset, Bold, Dim, Underline, Reverse, Hide];
-                let mut updates = current;
-                for fx in &fxs {
-                    if (f & *fx as u32) != 0 {
-                        match *fx {
-                            Bold => updates |= INTENSE,
-                            Dim => updates &= !INTENSE,
-                            Underline => updates |= UNDERLINE,
-                            Reverse => updates |= REVERSE,
-                            Hide => {
-                                // FOREGROUND and BACKGROUND color differ by 4
-                                // bits; to convert from 0x0020 (BG Green) to
-                                // 0x0002 (FG Green), shift right 4 bits. By
-                                // making the FOREGROUND color the same as the
-                                // BACKGROUND color, effectively you hide the
-                                // printed content.
-                                let updated_fg = (current & 0x00f0) >> 4;
-                                // Since we identified the new FOREGROUND, we
-                                // include it and remove it from the current
-                                // attributes. The BACKGROUND should remain the
-                                // same within the current attrs.
-                                updates = updated_fg | current & !0x000f
-                            },
-                            Reset => updates = current & !0xdf00,
-                        }
+pub fn set_style(default: u16, style: Style) -> Result<()> {
+    let handle = Handle::conout()?;
+    let info = ConsoleInfo::of(&handle)?;
+    let current = info.attributes();
+    // let (just_fg, just_bg, just_fx) = (
+    //     current & 0x000f, current & 0x00f0, current & 0xdf00);
+    let updated: u16 = match style {
+        Style::Fg(c) => {
+            let mut updated_fg = Foreground::from(c);
+            if updated_fg == RESET {
+                updated_fg = Foreground(default & 0x000f)
+            }
+            if updated_fg == IGNORE {
+                updated_fg = Foreground(current & 0x000f)
+            }
+            // (imdaveho) NOTE: We need to isolate Colors in Windows
+            // because Color attributes mix. So if you previously had
+            // Color::Red and you wanted Color::Blue, that would end up
+            // as Color::Magenta if you didn't first clear it out
+            // updated_fg.0 | just_bg | just_fx
+            updated_fg.0 | current & !0x000f
+        },
+        Style::Bg(c) => {
+            let mut updated_bg = Background::from(c);
+            if updated_bg == RESET {
+                updated_bg = Background(default & 0x00f0)
+            }
+            if updated_bg == IGNORE {
+                updated_bg = Background(current & 0x00f0)
+            }
+            // (imdaveho) NOTE: We need to isolate Colors in Windows
+            // because Color attributes mix. So if you previously had
+            // Color::Red and you wanted Color::Blue, that would end up
+            // as Color::Magenta if you didn't first clear it out
+            // just_fg | updated_bg.0 | just_fx
+            updated_bg.0 | current & !0x00f0
+        },
+        Style::Fx(f) => {
+            let fxs = [Reset, Bold, Dim, Underline, Reverse, Hide];
+            let mut updates = current;
+            for fx in &fxs {
+                if (f & *fx as u32) != 0 {
+                    match *fx {
+                        Bold => updates |= INTENSE,
+                        Dim => updates &= !INTENSE,
+                        Underline => updates |= UNDERLINE,
+                        Reverse => updates |= REVERSE,
+                        Hide => {
+                            // FOREGROUND and BACKGROUND color differ by 4
+                            // bits; to convert from 0x0020 (BG Green) to
+                            // 0x0002 (FG Green), shift right 4 bits. By
+                            // making the FOREGROUND color the same as the
+                            // BACKGROUND color, effectively you hide the
+                            // printed content.
+                            let updated_fg = (current & 0x00f0) >> 4;
+                            // Since we identified the new FOREGROUND, we
+                            // include it and remove it from the current
+                            // attributes. The BACKGROUND should remain the
+                            // same within the current attrs.
+                            updates = updated_fg | current & !0x000f
+                        },
+                        Reset => updates = current & !0xdf00,
                     }
                 }
-                updates
-            },
-        };
-        unsafe {
-            if SetConsoleTextAttribute(handle.0, updated) == 0 {
-                return Err(Error::last_os_error());
             }
+            updates
+        },
+    };
+    unsafe {
+        if SetConsoleTextAttribute(handle.0, updated) == 0 {
+            return Err(Error::last_os_error());
         }
-        Ok(())
     }
+    Ok(())
+}
 
-    pub fn set_styles(&self, fg: Color, bg: Color, fx: u32) -> Result<()> {
-        self.set_style(Style::Fg(fg))?;
-        self.set_style(Style::Bg(bg))?;
-        self.set_style(Style::Fx(fx))?;
-        Ok(())
-    }
+pub fn set_styles(default: u16, fg: Color, bg: Color, fx: u32) -> Result<()> {
+    set_style(default, Style::Fg(fg))?;
+    set_style(default, Style::Bg(bg))?;
+    set_style(default, Style::Fx(fx))?;
+    Ok(())
 }
 
 

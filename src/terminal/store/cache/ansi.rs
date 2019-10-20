@@ -43,11 +43,11 @@ impl CellInfoCache {
     pub fn new() -> CellInfoCache {
         let (w, h) = {
             #[cfg(unix)] {
-                crate::terminal::actions::ansi::screen::size()
+                crate::terminal::actions::ansi::unix::size()
             }
 
             #[cfg(windows)] {
-                crate::terminal::actions::wincon::screen::size()
+                crate::terminal::actions::wincon::windows::size()
             }
         };
         let capacity = (w * h) as usize;

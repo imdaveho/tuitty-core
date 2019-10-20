@@ -1,43 +1,62 @@
 // Windows Console API specific functions.
 
-pub mod cursor;
-pub mod output;
-pub mod screen;
-mod style;
+mod cursor;
+mod screen;
+mod output;
 mod mouse;
+mod style;
+mod handle;
+
+pub mod windows {
+    pub use super::{
+        handle::*,
+        screen::size,
+        output::{ enable_raw, disable_raw }
+    };
+}
+
+use crate::common::enums::{ Clear, Style, Color };
 
 // #[cfg(test)]
 // mod tests;
 
-mod handle;
-pub use handle::Handle;
 
-use crate::common::{
-    enums::{ Clear, Style, Color },
-    traits::{ CursorActor, ModeActor, ViewActor, OutputActor },
-};
+pub struct Win32Console;
 
-
-pub struct Win32Console {
-    style: style::ConsoleOutput,
-    original_mode: u32,
-    alternate: Handle,
+trait Win32Action {
+    // CURSOR
+    fn goto(col: i16, row: i16);
+    fn up(n: i16);
+    fn down(n: i16);
+    fn left(n: i16);
+    fn right(n: i16);
+    fn hide_cursor();
+    fn show_cursor();
+    // SCREEN
+    fn clear(method: Clear);
+    fn size() -> (i16, i16);
+    fn resize(w: i16, h: i16);
+    fn enable_alt(alternate: &windows::Handle, original_mode: &u32);
+    fn disable_alt();
+    // OUTPUT
+    fn prints(content: &str);
+    fn printf(content: &str);
+    fn flush();
+    fn raw();
+    fn cook();
+    fn enable_mouse();
+    fn disable_mouse();
+    // STYLE
+    fn set_fg(default: u16, color: Color);
+    fn set_bg(default: u16, color: Color);
+    fn set_fx(effects: u32);
+    fn set_styles(default: u16, fg: Color, bg: Color, fx: u32);
+    fn reset_styles(default: u16);
 }
 
-impl Win32Console {
-    pub fn new() -> Win32Console {
-        Win32Console {
-            style: style::ConsoleOutput::new(),
-            original_mode: output::get_mode()
-                .expect("Error fetching mode from $STDOUT"),
-            alternate: Handle::buffer()
-                .expect("Error creating alternate Console buffer"),
-        }
-    }
-}
-
-impl CursorActor for Win32Console {
-    fn goto(&self, col: i16, row: i16) {
+impl Win32Action for Win32Console {
+    // CURSOR
+    fn goto(col: i16, row: i16) {
         let (mut col, mut row) = (col, row);
         if col < 0 { col = col.abs() }
         if row < 0 { row = row.abs() }
@@ -45,169 +64,129 @@ impl CursorActor for Win32Console {
             .expect("Error setting the cursor position");
     }
 
-    fn up(&self, n: i16) {
+    fn up(n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
         cursor::move_up(n)
             .expect(&format!("Error moving the cursor up by {}", n));
     }
 
-    fn down(&self, n: i16) {
+    fn down(n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
         cursor::move_down(n)
             .expect(&format!("Error moving the cursor down by {}", n));
     }
 
-    fn left(&self, n: i16) {
+    fn left(n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
         cursor::move_left(n)
             .expect(&format!("Error moving the cursor left by {}", n));
     }
 
-    fn right(&self, n: i16) {
+    fn right(n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
         cursor::move_right(n)
             .expect(&format!("Error moving the cursor right by {}", n));
     }
-}
 
-impl ViewActor for Win32Console {
-    fn clear(&self, method: Clear) {
-        screen::clear(method);
-    }
-
-    fn size(&self) -> (i16, i16) {
-        screen::size()
-    }
-
-    fn resize(&self, w: i16, h: i16) {
-        screen::resize(w, h)
-            .expect("Error resizing the screen")
-    }
-
-    fn set_fg(&self, color: Color) {
-        self.style.set_style(Style::Fg(color))
-            .expect("Error setting console foreground");
-    }
-
-    fn set_bg(&self, color: Color) {
-        self.style.set_style(Style::Bg(color))
-            .expect("Error setting console background");
-    }
-
-    fn set_fx(&self, effects: u32) {
-        self.style.set_style(Style::Fx(effects))
-            .expect("Error setting console text attributes");
-    }
-
-    fn set_styles(&self, fg: Color, bg: Color, fx: u32) {
-        self.style.set_styles(fg, bg, fx)
-            .expect("Error setting console styles");
-    }
-
-    fn reset_styles(&self) {
-        self.style.reset()
-            .expect("Error unsetting console styles");
-    }
-}
-
-impl ModeActor for Win32Console {
-    fn hide_cursor(&self) {
+    fn hide_cursor() {
         cursor::hide_cursor()
             .expect("Error setting cursor visibility to 0");
     }
 
-    fn show_cursor(&self) {
+    fn show_cursor() {
         cursor::show_cursor()
             .expect("Error setting cursor visibility to 100");
     }
 
-    fn enable_mouse(&self) {
+    // SCREEN
+    fn clear(method: Clear) {
+        screen::clear(method)
+            .expect("Error clearing the screen");
+    }
+
+    fn size() -> (i16, i16) {
+        screen::size()
+    }
+
+    fn resize(w: i16, h: i16) {
+        screen::resize(w, h)
+            .expect("Error resizing the screen")
+    }
+
+    fn enable_alt(alternate: &windows::Handle, original_mode: &u32) {
+        alternate.set_mode(original_mode)
+            .expect("Error setting alternate screen back to default");
+        alternate.show().expect("Error switching to the alternate screen");
+    }
+
+    fn disable_alt() {
+        screen::disable_alt().expect("Error switching back to $STDOUT");
+    }
+
+    // OUTPUT
+    fn prints(content: &str) {
+        output::prints(content)
+            .expect("Error writing to console");
+    }
+
+    fn printf(content: &str) {
+        // (imdaveho) NOTE: Win32 `printf` identical to `prints`
+        output::prints(content)
+            .expect("Error writing to console");
+    }
+    
+    fn flush() {
+        // (imdaveho) NOTE: Win32 flush is simply a no-op.
+        () 
+    }
+
+    fn raw() {
+        output::enable_raw().expect("Error enabling raw mode");
+    }
+
+    fn cook() {
+        output::disable_raw().expect("Error disabling raw mode");
+    }
+
+    // MOUSE
+    fn enable_mouse() {
         mouse::enable_mouse_mode()
             .expect("Error enabling mouse mode");
     }
 
-    fn disable_mouse(&self) {
+    fn disable_mouse() {
         mouse::disable_mouse_mode()
             .expect("Error disabling mouse mode");
     }
 
-    fn enable_alt(&self) {
-        self.alternate.set_mode(&self.original_mode)
-            .expect("Error setting alternate screen back to defaults");
-        self.alternate.show().expect("Error switching to the alternate screen");
+    // STYLE
+    fn set_fg(default: u16, color: Color) {
+        style::set_style(default, Style::Fg(color))
+            .expect("Error setting console foreground");
     }
 
-    fn disable_alt(&self) {
-        screen::disable_alt().expect("Error switching back to $STDOUT");
+    fn set_bg(default: u16, color: Color) {
+        style::set_style(default, Style::Bg(color))
+            .expect("Error setting console background");
     }
 
-    fn raw(&self) {
-        output::enable_raw().expect("Error enabling raw mode");
+    fn set_fx(effects: u32) {
+        style::set_style(0, Style::Fx(effects))
+            .expect("Error setting console text attributes");
     }
 
-    fn cook(&self) {
-        output::disable_raw().expect("Error disabling raw mode");
+    
+    fn set_styles(default: u16, fg: Color, bg: Color, fx: u32) {
+        style::set_styles(default, fg, bg, fx)
+            .expect("Error setting console styles");
     }
-}
 
-impl OutputActor for Win32Console {
-    fn prints(&self, content: &str) {
-        output::prints(content)
-            .expect("Error writing to console");
-    }
-    // (imdaveho) NOTE: Win32 `printf` identical to `prints`
-    fn printf(&self, content: &str) {
-        output::prints(content)
-            .expect("Error writing to console");
-    }
-    // (imdaveho) NOTE: Win32 flush is simply a no-op.
-    fn flush(&self) { () }
-}
-
-
-pub fn is_ansi_enabled() -> bool {
-    const TERMS: [&'static str; 15] = [
-        "xterm",  // xterm, PuTTY, Mintty
-        "rxvt",   // RXVT
-        "eterm",  // Eterm
-        "screen", // GNU screen, tmux
-        "tmux",   // tmux
-        "vt100", "vt102", "vt220", "vt320",   // DEC VT series
-        "ansi",    // ANSI
-        "scoansi", // SCO ANSI
-        "cygwin",  // Cygwin, MinGW
-        "linux",   // Linux console
-        "konsole", // Konsole
-        "bvterm",  // Bitvise SSH Client
-    ];
-
-    let matched_terms = match std::env::var("TERM") {
-        Ok(val) => val != "dumb" || TERMS.contains(&val.as_str()),
-        Err(_) => false,
-    };
-
-    if matched_terms {
-        return true
-    } else {
-        #[cfg(windows)] {
-        let enable_vt = 0x0004;
-        let handle = match Handle::stdout() {
-            Ok(h) => h,
-            Err(_) => return false,
-        };
-        let mode = match handle.get_mode() {
-            Ok(m) => m,
-            Err(_) => return false,
-        };
-        match handle.set_mode(&(mode | enable_vt)) {
-            Ok(_) => return true,
-            Err(_) => return false,
-        }}
-        #[cfg(not(windows))]
-        return false
+    fn reset_styles(default: u16) {
+        style::reset(default)
+            .expect("Error unsetting console styles");
     }
 }
