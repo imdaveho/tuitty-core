@@ -31,7 +31,7 @@ use winapi::um::{
         GetNumberOfConsoleInputEvents, ReadConsoleInputW,
     },
 };
-use crate::terminal::wincon::Handle;
+use crate::terminal::actions::wincon::windows::Handle;
 use crate::common::enums::{ InputEvent, KeyEvent, MouseEvent, MouseButton };
 
 

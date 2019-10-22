@@ -11,7 +11,7 @@ pub mod windows {
     pub use super::{
         handle::*,
         screen::size,
-        output::{ enable_raw, disable_raw }
+        output::{ enable_raw, disable_raw, get_mode, prints },
     };
 }
 

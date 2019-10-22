@@ -3,7 +3,7 @@
 // use std::ffi::CStr;
 // use std::os::raw::c_char;
 
-mod terminal;
+pub mod terminal;
 pub mod common;
 
 // pub use terminal::{

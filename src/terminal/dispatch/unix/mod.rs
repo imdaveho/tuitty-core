@@ -1,7 +1,7 @@
 // Unix specific modules.
 
 // mod input;
-// mod parser;
+pub mod parser;
 
 // mod reader;
 // pub use reader::{ SyncReader, AsyncReader };

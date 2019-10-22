@@ -9,7 +9,10 @@ mod mouse;
 #[cfg(unix)]
 pub mod unix {
     pub use libc::termios as Termios;
-    pub use super::screen::size;
+    pub use super::{
+        screen::size,
+        output::get_mode,
+    };
 }
 
 use crate::common::enums::{ Clear, Style, Color };
