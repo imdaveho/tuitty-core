@@ -11,7 +11,7 @@ pub mod unix {
     pub use libc::termios as Termios;
     pub use super::{
         screen::size,
-        output::get_mode,
+        output::{ enable_raw, get_mode, set_mode },
     };
 }
 
@@ -151,8 +151,8 @@ impl AnsiAction for AnsiTerminal {
     }
 
     #[cfg(unix)]
-    fn cook(original_mode: unix::Termios) {
-        self::unix::disable_raw(original_mode)
+    fn cook(original_mode: &unix::Termios) {
+        self::unix::set_mode(original_mode)
             .expect("Error disabling raw mode");
     }
 
@@ -172,16 +172,16 @@ impl AnsiAction for AnsiTerminal {
     }
 
     // STYLE
+    fn set_fx(effects: u32) {
+        output::prints(&style::set_style(Style::Fx(effects)));
+    }
+
     fn set_fg(color: Color) {
         output::prints(&style::set_style(Style::Fg(color)));
     }
 
     fn set_bg(color: Color) {
         output::prints(&style::set_style(Style::Bg(color)));
-    }
-
-    fn set_fx(effects: u32) {
-        output::prints(&style::set_style(Style::Fx(effects)));
     }
 
     fn set_styles(fg: Color, bg: Color, fx: u32) {

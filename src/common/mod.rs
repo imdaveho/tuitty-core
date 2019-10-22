@@ -4,6 +4,7 @@ pub mod enums;
 // pub mod meta;
 // pub mod cache;
 pub mod unicode;
+pub const DELAY: u64 = 10;
 
 
 #[cfg(test)]

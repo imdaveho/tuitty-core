@@ -1,31 +1,15 @@
 // This module exposes terminal functions for Ansi and Windows Console.
 
+use crate::common::enums::Action;
+
 pub mod ansi;
 #[cfg(windows)]
 pub mod wincon;
 
 
-// pub enum Terminal {
-//     AnsiTerminal,
-//     Win32Console,
-// }
-
-// impl Terminal {
-//     pub fn new() -> Terminal {
-//         #[cfg(windows)] { 
-//             if !is_ansi_enabled() {
-//                 return Terminal::Win32Console;
-//             }
-//         }
-//         return Terminal::AnsiTerminal;
-//     }
-// }
-
-// macro_rules! terminal {
-//     () => {
-        
-//     };
-// }
+pub fn execute(a: Action) {
+    ()
+}
 
 pub fn is_ansi_enabled() -> bool {
     const TERMS: [&'static str; 15] = [

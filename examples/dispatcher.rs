@@ -1,29 +1,50 @@
 extern crate tuitty;
 
 use std::{thread, time};
-use std::sync::atomic::Ordering;
+// use std::sync::atomic::Ordering;
+use tuitty::common::DELAY;
 use tuitty::common::enums::{ InputEvent, KeyEvent };
-use tuitty::terminal::actions::*;
+// use tuitty::terminal::actions::*;
 
 fn main() {
 
-    // // let alternate = tuitty::terminal::actions::wincon::windows::Handle::buffer().unwrap();
-    // // let original_mode = tuitty::terminal::actions::wincon::windows::get_mode().unwrap();
-    // // tuitty::terminal::actions::wincon::windows::enable_raw();
+    let alternate = tuitty::terminal::actions::wincon::windows::Handle::buffer().unwrap();
+    let original_mode = tuitty::terminal::actions::wincon::windows::get_mode().unwrap();
+    let _ = tuitty::terminal::actions::wincon::windows::enable_raw();
 
-    // // alternate.set_mode(&original_mode).unwrap();
-    // // alternate.show().unwrap();
+    alternate.set_mode(&original_mode).unwrap();
+    alternate.show().unwrap();
 
-    // // let term = Terminal::new();
-    // // match term {
-    // //     Terminal::Ansi(_) => (),
-    // //     Terminal::Win32(_) => {
-    // //         wincon::Win32Console::raw();
-    // //         wincon::Win32Console::enable_alt(&alternate, &original_mode);
-    // //     }
-    // // }
+    let mut dispatch = tuitty::terminal::dispatch::Dispatcher::new();
+    let dispatch = dispatch.listen().dispatch();
+    let listener = dispatch.spawn()
+        .expect("Error spawning an event listener handle");
 
-    // let dispatch = tuitty::terminal::dispatch::Dispatcher::new();
+    loop {
+        match listener.poll_async() {
+            Some(evt) => match evt {
+                InputEvent::Keyboard(kv) => match kv {
+                    KeyEvent::Char(c) => {
+                        if c == 'q' {
+                            dispatch.shutdown();
+                            break
+                        }
+                        let _ = tuitty::terminal::actions::wincon::windows::prints(
+                            &format!("char: {}\n", c));
+                    },
+                    _ => ()
+                },
+                _ => ()
+            },
+            None => (),
+        }
+        thread::sleep(time::Duration::from_millis(DELAY));
+    }
+
+    let _ = tuitty::terminal::actions::wincon::windows::disable_raw();
+    let stdout = tuitty::terminal::actions::wincon::windows::Handle::stdout().unwrap();
+    stdout.set_mode(&original_mode).unwrap();
+    stdout.show().unwrap();
 
     // // loop {
     // //     match dispatch.listener.try_recv() {
@@ -103,11 +124,6 @@ fn main() {
     // // }
 
     // handle.join();
-
-    // // tuitty::terminal::actions::wincon::windows::disable_raw();
-    // // let stdout = tuitty::terminal::actions::wincon::windows::Handle::stdout().unwrap();
-    // // stdout.set_mode(&original_mode).unwrap();
-    // // stdout.show().unwrap();
     
     // // match term {
     // //     Ansi(_) => (),

@@ -3,15 +3,18 @@
 
 use std::{
     thread,
-    io::Result,
     collections::HashMap,
+    io::{ Error, ErrorKind },
     time::{ SystemTime, UNIX_EPOCH, Duration },
     sync::{
         Arc, Mutex,
-        atomic::{ AtomicBool, Ordering },
-        mpsc::{ channel, Sender, Receiver, TryRecvError }
+        atomic::{ AtomicBool, AtomicUsize, Ordering },
+        mpsc::{ channel, Sender, Receiver, TryRecvError, SendError, RecvError }
     },
 };
+
+use crate::terminal::actions::execute;
+use crate::common::DELAY;
 
 #[cfg(unix)]
 mod unix;
@@ -42,7 +45,63 @@ pub struct EventHandle {
     event_rx: Receiver<InputEvent>,
 
     id: usize,
-    notifier: Option<Sender<Cmd>>,
+    notifier: Sender<Cmd>,
+}
+
+impl EventHandle {
+    pub fn pause(&self) -> Result<(), SendError<Cmd>> {
+        self.notifier.send(Cmd::Pause(self.id))
+    }
+
+    pub fn resume(&self) -> Result<(), SendError<Cmd>> {
+        self.notifier.send(Cmd::Resume(self.id))
+    }
+
+    pub fn stop(&self) -> Result<(), SendError<Cmd>> {
+        self.notifier.send(Cmd::Stop(self.id))
+    }
+
+    pub fn lock(&self) -> Result<(), SendError<Cmd>> {
+        self.notifier.send(Cmd::Lock(self.id))
+    }
+
+    pub fn unlock(&self) -> Result<(), SendError<Cmd>> {
+        self.notifier.send(Cmd::Unlock)
+    }
+
+    #[cfg(unix)]
+    pub fn poll_async(&self) -> Option<u8> {
+        self.notifier.send(Cmd::Next)
+            .expect("Error notifying dispatch to fetch next user input");
+        match self.event_rx.try_recv() {
+            Ok(byte) => Some(byte),
+            Err(_) => None,
+        }
+    }
+
+    #[cfg(windows)]
+    pub fn poll_async(&self) -> Option<InputEvent> {
+        self.notifier.send(Cmd::Next)
+            .expect("Error notifying dispatch to fetch next user input");
+        match self.event_rx.try_recv() {
+            Ok(evt) => Some(evt),
+            Err(_) => None,
+        }
+    }
+
+    #[cfg(unix)]
+    pub fn poll_sync(&self) -> Result<u8, RecvError> {
+        self.notifier.send(Cmd::Next)
+            .expect("Error notifying dispatch to fetch next user input");
+        self.event_rx.recv()
+    }
+
+    #[cfg(windows)]
+    pub fn poll_sync(&self) -> Result<InputEvent, RecvError> {
+        self.notifier.send(Cmd::Next)
+            .expect("Error notifying dispatch to fetch next user input");
+        self.event_rx.recv()
+    }
 }
 
 
@@ -54,6 +113,7 @@ pub struct Dispatcher {
     #[cfg(windows)]
     input_rx: Option<Arc<Mutex<Receiver<InputEvent>>>>,
     // Handle emitting events from input_rx.
+    locked_id: Arc<AtomicUsize>,
     emitters: Arc<Mutex<HashMap<usize, Emitter>>>,
     // Handle comnmands to manipulate the terminal.
     event_handle: Option<thread::JoinHandle<()>>,
@@ -67,6 +127,7 @@ impl Dispatcher {
         Dispatcher {
             input_handle: None,
             input_rx: None,
+            locked_id: Arc::new(AtomicUsize::new(0)),
             emitters: Arc::new(Mutex::new(HashMap::with_capacity(8))),
             event_handle: None,
             notifier: None,
@@ -90,7 +151,7 @@ impl Dispatcher {
                 let b = byte.expect("Error reading byte from /dev/tty");
                 if input_tx.send(b).is_err() { break }
             }
-            thread::sleep(Duration::from_millis(1));
+            thread::sleep(Duration::from_millis(DELAY));
         }))}
         #[cfg(windows)] {
         self.input_handle = Some(thread::spawn(move || loop {
@@ -102,7 +163,7 @@ impl Dispatcher {
                 for evt in evts {
                     if input_tx.send(evt).is_err() { break }
                 }
-                thread::sleep(Duration::from_millis(1));
+                thread::sleep(Duration::from_millis(DELAY));
             }
         }))}
 
@@ -111,16 +172,21 @@ impl Dispatcher {
     
     pub fn dispatch(&mut self) -> &mut Dispatcher {
         // Setup channels to handle terminal commands.
+        let (_, rx) = channel();
+        let empty_rx = Arc::new(Mutex::new(rx));
         let input_rx = match &self.input_rx {
             Some(arc) => arc.clone(),
-            None => return self,
+            None => empty_rx.clone(),
         };
         let (notifier, observer) = channel();
         self.notifier = Some(notifier);
         let emitters = self.emitters.clone();
         let emitters_err = "Error obtaining emitter registry lock";
+        let is_running = self.is_running.clone();
+        let locked_id = self.locked_id.clone();
         // Begin dispatcher event loop.
         self.event_handle = Some(thread::spawn(move || loop {
+            if !is_running.load(Ordering::SeqCst) { break }
             let cmd = match observer.try_recv() {
                 Ok(cmd) => cmd,
                 Err(e) => match e {
@@ -130,17 +196,28 @@ impl Dispatcher {
             };
             let input_rx = input_rx.lock()
                 .expect("Error obtaining input_rx lock");
+            // let store = Store::new(); <-- this will hold State.
             match cmd {
                 Cmd::Continue => (),
-                Cmd::Emit => match input_rx.try_recv() {
+                Cmd::Next => match input_rx.try_recv() {
                     Ok(ev) => {
                         let mut registry = emitters.lock()
                             .expect(emitters_err);
                         // Emitter registry clean up.
                         registry.retain(|_, emitter| emitter.is_running );
-                        for (_, emitter) in registry.iter() {
-                            if emitter.is_paused { continue }
-                            if emitter.event_tx.send(ev).is_err() { break }
+                        match locked_id.load(Ordering::SeqCst) {
+                            0 => {
+                                for (_, emitter) in registry.iter() {
+                                    if emitter.is_paused { continue }
+                                    if emitter.event_tx.send(ev)
+                                        .is_err() { break }
+                                }
+                            },
+                            id => match registry.get(&id) {
+                                Some(emitter) => if emitter.event_tx.send(ev)
+                                    .is_err() { break },
+                                None => locked_id.store(0, Ordering::SeqCst)
+                            }
                         }
                     },
                     Err(e) => match e {
@@ -148,14 +225,45 @@ impl Dispatcher {
                         TryRecvError::Disconnected => break
                     }
                 },
-                Cmd::Execute(a) => {
-
-                }
+                Cmd::Pause(id) => {
+                    let mut registry = emitters.lock()
+                        .expect(emitters_err);
+                    registry.entry(id).and_modify(|emitter| emitter.is_paused = true );
+                },
+                Cmd::Resume(id) => {
+                    let mut registry = emitters.lock()
+                        .expect(emitters_err);
+                    registry.entry(id).and_modify(|emitter| emitter.is_paused = false );
+                },
+                Cmd::Stop(id) => {
+                    let mut registry = emitters.lock()
+                        .expect(emitters_err);
+                    registry.entry(id).and_modify(|emitter| emitter.is_running = false );
+                },
+                Cmd::Lock(id) => {
+                    match locked_id.load(Ordering::SeqCst) {
+                        0 => locked_id.store(id, Ordering::SeqCst),
+                        _ => continue,
+                    }
+                },
+                Cmd::Unlock => {
+                    match locked_id.load(Ordering::SeqCst) {
+                        0 => continue,
+                        _ => locked_id.store(0, Ordering::SeqCst),
+                    }
+                },
+                Cmd::Execute(a) => execute(a),
             }
-            thread::sleep(Duration::from_millis(1));
+            thread::sleep(Duration::from_millis(DELAY));
         }));
         
         return self;
+    }
+
+    pub fn shutdown(&mut self) {
+        self.is_running.store(false, Ordering::SeqCst);
+        if let Some(t) = self.input_handle.take() { let _ = t.join(); }
+        if let Some(t) = self.event_handle.take() { let _ = t.join(); }
     }
 
     fn randomish(&self) -> usize {
@@ -167,6 +275,7 @@ impl Dispatcher {
                         .duration_since(UNIX_EPOCH)
                         .expect("Error fetching duration since 1970")
                         .subsec_nanos() as usize;
+                    if key == 0 { continue }
                     if !senders.contains_key(&key) { break }
                 }
                 return key;
@@ -180,7 +289,7 @@ impl Dispatcher {
         }
     }
 
-    pub fn spawn(&self) -> EventHandle {
+    pub fn spawn(&self) -> Result<EventHandle, Error> {
         let err_msg = "Error obtaining emitter registry lock";
         let (event_tx, event_rx) = channel();
         let id = self.randomish();
@@ -190,44 +299,16 @@ impl Dispatcher {
             is_paused: false,
             is_running: true,
         });
-        let notifier = self.notifier.clone();
-        
-        EventHandle { 
-            event_rx: event_rx,
-            id: id,
-            notifier: notifier,
+
+        match &self.notifier {
+            Some(notifier) => {
+                Ok(EventHandle { 
+                    event_rx: event_rx,
+                    id: id,
+                    notifier: notifier.clone(),
+                })
+            },
+            None => Err(Error::new(ErrorKind::InvalidData, "Missing notifier Sender")),
         }
     }
-
-    // pub fn pause(&self, rx: &EventListener) {
-    //     let err_msg = "Error obtaining lock for the dispatch registry";
-    //     let mut senders = self.registry.lock().expect(err_msg);
-    //     if let Some(em) = senders.get_mut(&rx.lookup) {
-    //         em.sending = false;
-    //     }
-    // }
-
-    // pub fn resume(&self, rx: &EventListener) {
-    //     let err_msg = "Error obtaining lock for the dispatch registry";
-    //     let mut senders = self.registry.lock().expect(err_msg);
-    //     if let Some(em) = senders.get_mut(&rx.lookup) {
-    //         em.sending = true;
-    //     }
-    // }
-
-    // pub fn close(&self, rx: &EventListener) {
-    //     let err_msg = "Error obtaining lock for the dispatch registry";
-    //     let mut senders = self.registry.lock().expect(err_msg);
-    //     if let Some(em) = senders.get_mut(&rx.lookup) {
-    //         em.shutdown = true;
-    //     }
-    // }
-
-    // pub fn shutdown(&self) {
-    //     self.shutdown.store(true, Ordering::SeqCst);
-    // }
-
-    // pub fn stop(&self) -> Arc<AtomicBool> {
-    //     self.shutdown.clone()
-    // }
-}
+} 
