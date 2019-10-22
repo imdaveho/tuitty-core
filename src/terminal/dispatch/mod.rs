@@ -13,18 +13,34 @@ use std::{
     },
 };
 
-use crate::terminal::actions::execute;
-use crate::common::DELAY;
+use crate::{
+    common::{ 
+        DELAY, 
+        enums::{ Cmd, Action::{*, self} },
+    },
+    terminal::actions::{ 
+        is_ansi_enabled, 
+        ansi::{ AnsiTerminal, AnsiAction },
+    },
+};
 
 #[cfg(unix)]
 mod unix;
 #[cfg(unix)]
 use std::{ fs, io::{ Read, BufReader } };
+#[cfg(unix)]
+use crate::terminal::actions::ansi::unix::get_mode;
 
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
-use crate::common::enums::{ InputEvent, Cmd };
+use crate::{
+    common::enums::InputEvent,
+    terminal::actions::wincon::{
+        Win32Console, Win32Action,
+        windows::{ Handle, ConsoleInfo, get_mode },
+    },
+};
 
 
 struct Emitter {
@@ -102,6 +118,10 @@ impl EventHandle {
             .expect("Error notifying dispatch to fetch next user input");
         self.event_rx.recv()
     }
+
+    pub fn signal(&self, action: Action) -> Result<(), SendError<Cmd>> {
+        self.notifier.send(Cmd::Signal(action))
+    }
 }
 
 
@@ -171,13 +191,35 @@ impl Dispatcher {
     }
     
     pub fn dispatch(&mut self) -> &mut Dispatcher {
-        // Setup channels to handle terminal commands.
+        // Ensure that the input receiver exists.
+        // (imdaveho) NOTE: if `.dispatch()` was called
+        // before `.listen()`, terminal commands can stil
+        // function without input events.
         let (_, rx) = channel();
         let empty_rx = Arc::new(Mutex::new(rx));
         let input_rx = match &self.input_rx {
             Some(arc) => arc.clone(),
             None => empty_rx.clone(),
         };
+
+        // Fetch one-time configurations. Since Dispatcher will be called at
+        // the start, it is not terrible to store them here.
+        #[cfg(windows)]
+        let DEFAULT: u16 = ConsoleInfo::of(
+                &Handle::conout()
+                .expect("Error fetching $CONOUT"))
+            .expect("Error fetching ConsoleInfo from $CONOUT")
+            .attributes();
+        #[cfg(windows)]
+        let VTE: bool = is_ansi_enabled();
+        #[cfg(windows)]
+        let ORIGINAL_MODE = get_mode()
+            .expect("Error fetching mode from $STDOUT");
+        #[cfg(unix)]
+        let ORIGINAL_MODE = get_mode()
+            .expect("Error fetching Termios");
+
+        // Setup channels and atomic refs to handle terminal commands.
         let (notifier, observer) = channel();
         self.notifier = Some(notifier);
         let emitters = self.emitters.clone();
@@ -185,76 +227,173 @@ impl Dispatcher {
         let is_running = self.is_running.clone();
         let locked_id = self.locked_id.clone();
         // Begin dispatcher event loop.
-        self.event_handle = Some(thread::spawn(move || loop {
-            if !is_running.load(Ordering::SeqCst) { break }
-            let cmd = match observer.try_recv() {
-                Ok(cmd) => cmd,
-                Err(e) => match e {
-                    TryRecvError::Empty => Cmd::Continue,
-                    TryRecvError::Disconnected => break
-                }
-            };
-            let input_rx = input_rx.lock()
-                .expect("Error obtaining input_rx lock");
-            // let store = Store::new(); <-- this will hold State.
-            match cmd {
-                Cmd::Continue => (),
-                Cmd::Next => match input_rx.try_recv() {
-                    Ok(ev) => {
-                        let mut registry = emitters.lock()
-                            .expect(emitters_err);
-                        // Emitter registry clean up.
-                        registry.retain(|_, emitter| emitter.is_running );
-                        match locked_id.load(Ordering::SeqCst) {
-                            0 => {
-                                for (_, emitter) in registry.iter() {
-                                    if emitter.is_paused { continue }
-                                    if emitter.event_tx.send(ev)
-                                        .is_err() { break }
-                                }
-                            },
-                            id => match registry.get(&id) {
-                                Some(emitter) => if emitter.event_tx.send(ev)
-                                    .is_err() { break },
-                                None => locked_id.store(0, Ordering::SeqCst)
-                            }
-                        }
-                    },
+        self.event_handle = Some(thread::spawn(move || {
+            #[cfg(windows)]
+            let ALT_SCREEN = Handle::buffer()
+                .expect("Error creating alternate Console buffer");
+            
+            loop {
+                if !is_running.load(Ordering::SeqCst) { break }
+                let cmd = match observer.try_recv() {
+                    Ok(cmd) => cmd,
                     Err(e) => match e {
-                        TryRecvError::Empty => (),
+                        TryRecvError::Empty => Cmd::Continue,
                         TryRecvError::Disconnected => break
                     }
-                },
-                Cmd::Pause(id) => {
-                    let mut registry = emitters.lock()
-                        .expect(emitters_err);
-                    registry.entry(id).and_modify(|emitter| emitter.is_paused = true );
-                },
-                Cmd::Resume(id) => {
-                    let mut registry = emitters.lock()
-                        .expect(emitters_err);
-                    registry.entry(id).and_modify(|emitter| emitter.is_paused = false );
-                },
-                Cmd::Stop(id) => {
-                    let mut registry = emitters.lock()
-                        .expect(emitters_err);
-                    registry.entry(id).and_modify(|emitter| emitter.is_running = false );
-                },
-                Cmd::Lock(id) => {
-                    match locked_id.load(Ordering::SeqCst) {
-                        0 => locked_id.store(id, Ordering::SeqCst),
-                        _ => continue,
-                    }
-                },
-                Cmd::Unlock => {
-                    match locked_id.load(Ordering::SeqCst) {
-                        0 => continue,
-                        _ => locked_id.store(0, Ordering::SeqCst),
-                    }
-                },
-                Cmd::Execute(a) => execute(a),
+                };
+                let input_rx = input_rx.lock()
+                    .expect("Error obtaining input_rx lock");
+                match cmd {
+                    Cmd::Continue => (),
+                    Cmd::Next => match input_rx.try_recv() {
+                        Ok(ev) => {
+                            let mut registry = emitters.lock()
+                                .expect(emitters_err);
+                            // Emitter registry clean up.
+                            registry.retain(|_, emitter| emitter.is_running );
+                            match locked_id.load(Ordering::SeqCst) {
+                                0 => {
+                                    for (_, emitter) in registry.iter() {
+                                        if emitter.is_paused { continue }
+                                        if emitter.event_tx.send(ev)
+                                            .is_err() { break }
+                                    }
+                                },
+                                id => match registry.get(&id) {
+                                    Some(emitter) => if emitter.event_tx.send(ev)
+                                        .is_err() { break },
+                                    None => locked_id.store(0, Ordering::SeqCst)
+                                }
+                            }
+                        },
+                        Err(e) => match e {
+                            TryRecvError::Empty => (),
+                            TryRecvError::Disconnected => break
+                        }
+                    },
+                    Cmd::Pause(id) => {
+                        let mut registry = emitters.lock()
+                            .expect(emitters_err);
+                        registry.entry(id).and_modify(|emitter| emitter.is_paused = true );
+                    },
+                    Cmd::Resume(id) => {
+                        let mut registry = emitters.lock()
+                            .expect(emitters_err);
+                        registry.entry(id).and_modify(|emitter| emitter.is_paused = false );
+                    },
+                    Cmd::Stop(id) => {
+                        let mut registry = emitters.lock()
+                            .expect(emitters_err);
+                        registry.entry(id).and_modify(|emitter| emitter.is_running = false );
+                    },
+                    Cmd::Lock(id) => {
+                        match locked_id.load(Ordering::SeqCst) {
+                            0 => locked_id.store(id, Ordering::SeqCst),
+                            _ => continue,
+                        }
+                    },
+                    Cmd::Unlock => {
+                        match locked_id.load(Ordering::SeqCst) {
+                            0 => continue,
+                            _ => locked_id.store(0, Ordering::SeqCst),
+                        }
+                    },
+                    #[cfg(unix)]
+                    Cmd::Signal(action) => match action {
+                        // CURSOR
+                        Goto(col, row) => AnsiTerminal::goto(col, row),
+                        Up(n) => AnsiTerminal::up(n),
+                        Down(n) => AnsiTerminal::down(n),
+                        Left(n) => AnsiTerminal::left(n),
+                        Right(n) => AnsiTerminal::right(n),
+                        // SCREEN/OUTPUT
+                        Clear(clr) => AnsiTerminal::clear(clr),
+                        Prints(s) => AnsiTerminal::prints(&s),
+                        Printf(s) => AnsiTerminal::printf(&s),
+                        Flush => AnsiTerminal::flush(),
+                        // STYLE
+                        SetFx(efx) => AnsiTerminal::set_fx(efx),
+                        SetFg(c) => AnsiTerminal::set_fg(c),
+                        SetBg(c) => AnsiTerminal::set_bg(c),
+                        SetStyles(f, b, e) => AnsiTerminal::set_styles(f, b, e),
+                        ResetStyles => AnsiTerminal::reset_styles(),
+                        // STATEFUL/MODES
+                        Resize(w, h) => AnsiTerminal::resize(w, h),
+                        HideCursor => AnsiTerminal::hide_cursor(),
+                        ShowCursor => AnsiTerminal::show_cursor(),
+                        EnableMouse => AnsiTerminal::enable_mouse(),
+                        DisableMouse => AnsiTerminal::disable_mouse(),
+                        EnableAlt => AnsiTerminal::enable_alt(),
+                        DisableAlt => AnsiTerminal::disable_alt(),
+                        Raw => AnsiTerminal::raw(),
+                        Cook => AnsiTerminal::cook(&ORIGINAL_MODE), 
+                    },
+                    #[cfg(windows)]
+                    Cmd::Signal(action) => match VTE { true => match action {
+                        // CURSOR
+                        Goto(col, row) => AnsiTerminal::goto(col, row),
+                        Up(n) => AnsiTerminal::up(n),
+                        Down(n) => AnsiTerminal::down(n),
+                        Left(n) => AnsiTerminal::left(n),
+                        Right(n) => AnsiTerminal::right(n),
+                        // SCREEN/OUTPUT
+                        Clear(clr) => AnsiTerminal::clear(clr),
+                        Prints(s) => AnsiTerminal::prints(&s),
+                        Printf(s) => AnsiTerminal::printf(&s),
+                        Flush => AnsiTerminal::flush(),
+                        // STYLE
+                        SetFx(efx) => AnsiTerminal::set_fx(efx),
+                        SetFg(c) => AnsiTerminal::set_fg(c),
+                        SetBg(c) => AnsiTerminal::set_bg(c),
+                        SetStyles(f, b, e) => {
+                            AnsiTerminal::set_styles(f, b, e) },
+                        ResetStyles => AnsiTerminal::reset_styles(),
+                        // STATEFUL/MODES
+                        Resize(w, h) => AnsiTerminal::resize(w, h),
+                        HideCursor => AnsiTerminal::hide_cursor(),
+                        ShowCursor => AnsiTerminal::show_cursor(),
+                        EnableMouse => AnsiTerminal::enable_mouse(),
+                        DisableMouse => AnsiTerminal::disable_mouse(),
+                        EnableAlt => AnsiTerminal::enable_alt(),
+                        DisableAlt => AnsiTerminal::disable_alt(),
+                        Raw => AnsiTerminal::raw(),
+                        Cook => Win32Console::cook(),
+                    },
+                    false => match action {
+                        // CURSOR
+                        Goto(col, row) => Win32Console::goto(col, row),
+                        Up(n) => Win32Console::up(n),
+                        Down(n) => Win32Console::down(n),
+                        Left(n) => Win32Console::left(n),
+                        Right(n) => Win32Console::right(n),
+                        // SCREEN/OUTPUT
+                        Clear(clr) => Win32Console::clear(clr),
+                        Prints(s) => Win32Console::prints(&s),
+                        Printf(s) => Win32Console::printf(&s),
+                        Flush => Win32Console::flush(),
+                        // STYLE
+                        SetFx(efx) => Win32Console::set_fx(efx),
+                        SetFg(c) => Win32Console::set_fg(c, DEFAULT),
+                        SetBg(c) => Win32Console::set_bg(c, DEFAULT),
+                        SetStyles(f, b, e) => {
+                            Win32Console::set_styles(f, b, e, DEFAULT) },
+                        ResetStyles => {
+                            Win32Console::reset_styles(DEFAULT) },
+                        // STATEFUL/MODES
+                        Resize(w, h) => Win32Console::resize(w, h),
+                        HideCursor => Win32Console::hide_cursor(),
+                        ShowCursor => Win32Console::show_cursor(),
+                        EnableMouse => Win32Console::enable_mouse(),
+                        DisableMouse => Win32Console::disable_mouse(),
+                        EnableAlt => Win32Console::enable_alt(
+                            &ALT_SCREEN, &ORIGINAL_MODE),
+                        DisableAlt => Win32Console::disable_alt(),
+                        Raw => Win32Console::raw(),
+                        Cook => Win32Console::cook(),
+                    }}
+                }
+                thread::sleep(Duration::from_millis(DELAY));
             }
-            thread::sleep(Duration::from_millis(DELAY));
         }));
         
         return self;
@@ -311,4 +450,4 @@ impl Dispatcher {
             None => Err(Error::new(ErrorKind::InvalidData, "Missing notifier Sender")),
         }
     }
-} 
+}

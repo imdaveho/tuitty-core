@@ -23,7 +23,7 @@ use crate::common::enums::{ Clear, Style, Color };
 
 pub struct Win32Console;
 
-trait Win32Action {
+pub trait Win32Action {
     // CURSOR
     fn goto(col: i16, row: i16);
     fn up(n: i16);
@@ -48,9 +48,9 @@ trait Win32Action {
     fn disable_mouse();
     // STYLE
     fn set_fx(effects: u32);
-    fn set_fg(default: u16, color: Color);
-    fn set_bg(default: u16, color: Color);
-    fn set_styles(default: u16, fg: Color, bg: Color, fx: u32);
+    fn set_fg(color: Color, default: u16);
+    fn set_bg(color: Color, default: u16);
+    fn set_styles(fg: Color, bg: Color, fx: u32, default: u16);
     fn reset_styles(default: u16);
 }
 
@@ -169,17 +169,17 @@ impl Win32Action for Win32Console {
             .expect("Error setting console text attributes");
     }
 
-    fn set_fg(default: u16, color: Color) {
+    fn set_fg(color: Color, default: u16) {
         style::set_style(default, Style::Fg(color))
             .expect("Error setting console foreground");
     }
 
-    fn set_bg(default: u16, color: Color) {
+    fn set_bg(color: Color, default: u16) {
         style::set_style(default, Style::Bg(color))
             .expect("Error setting console background");
     }
     
-    fn set_styles(default: u16, fg: Color, bg: Color, fx: u32) {
+    fn set_styles(fg: Color, bg: Color, fx: u32, default: u16) {
         style::set_styles(default, fg, bg, fx)
             .expect("Error setting console styles");
     }

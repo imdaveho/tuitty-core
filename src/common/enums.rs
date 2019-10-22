@@ -187,7 +187,7 @@ pub enum Cmd {
     Stop(usize),
     Lock(usize),
     Unlock,
-    Execute(Action),
+    Signal(Action),
 }
 
 
@@ -198,26 +198,26 @@ pub enum Action {
     Down(i16),
     Left(i16),
     Right(i16),
-    HideCursor,
-    ShowCursor,
-    // SCREEN
+    // SCREEN/OUTPUT
     Clear(Clear),
-    Size,
-    Resize(i16, i16),
-    EnableAlt,
-    DisableAlt,
-    // OUTPUT
     Prints(String),
     Printf(String),
     Flush,
-    Raw,
-    Cook,
-    EnableMouse,
-    DisableMouse,
     // STYLE
     SetFx(u32),
     SetFg(Color),
     SetBg(Color),
     SetStyles(Color, Color, u32),
     ResetStyles,
+    // STATEFUL/MODES
+    Resize(i16, i16),
+    HideCursor,
+    ShowCursor,
+    EnableMouse,
+    DisableMouse,
+    EnableAlt,
+    DisableAlt,
+    Raw,
+    Cook,
+    // Size, (imdaveho) NOTE: Nowhere to return (i16, i16).
 }

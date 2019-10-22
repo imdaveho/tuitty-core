@@ -1,15 +1,14 @@
 // This module exposes terminal functions for Ansi and Windows Console.
 
-use crate::common::enums::Action;
+// use crate::common::enums::Action::{ self, * };
 
 pub mod ansi;
 #[cfg(windows)]
 pub mod wincon;
 
 
-pub fn execute(a: Action) {
-    ()
-}
+// TODO: How can I fetch &store.alternate from a signal from Dispatcher to Actions?
+
 
 pub fn is_ansi_enabled() -> bool {
     const TERMS: [&'static str; 15] = [

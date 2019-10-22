@@ -23,7 +23,7 @@ use crate::common::enums::{ Clear, Style, Color };
 
 pub struct AnsiTerminal;
 
-trait AnsiAction {
+pub trait AnsiAction {
     // CURSOR
     fn goto(col: i16, row: i16);
     fn up(n: i16);
@@ -44,7 +44,7 @@ trait AnsiAction {
     fn flush();
     fn raw();
     #[cfg(unix)]
-    fn cook(original_mode: unix::Termios); 
+    fn cook(original_mode: &unix::Termios); 
     #[cfg(windows)]
     fn cook();
     fn enable_mouse();
