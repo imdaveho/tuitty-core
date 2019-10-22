@@ -179,9 +179,9 @@ pub enum KeyEvent {
     ShiftLeft,
 }
 
+
 pub enum Cmd {
     Continue,
-    Next,
     Pause(usize),
     Resume(usize),
     Stop(usize),

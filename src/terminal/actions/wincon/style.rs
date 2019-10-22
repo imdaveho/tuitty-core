@@ -15,17 +15,17 @@ pub const RESET: u16 = 0xFFFF;
 pub const IGNORE: u16 = 0xFFF0;
 
 
-pub fn reset(default: u16) -> Result<()> {
+pub fn reset(reset_style: u16) -> Result<()> {
     let handle = Handle::conout()?;
     unsafe {
-        if SetConsoleTextAttribute(handle.0, default) == 0 {
+        if SetConsoleTextAttribute(handle.0, reset_style) == 0 {
             return Err(Error::last_os_error());
         }
     }
     Ok(())
 }
 
-pub fn set_style(default: u16, style: Style) -> Result<()> {
+pub fn set_style(style: Style, reset_style: u16) -> Result<()> {
     let handle = Handle::conout()?;
     let info = ConsoleInfo::of(&handle)?;
     let current = info.attributes();
@@ -35,7 +35,7 @@ pub fn set_style(default: u16, style: Style) -> Result<()> {
         Style::Fg(c) => {
             let mut updated_fg = Foreground::from(c);
             if updated_fg == RESET {
-                updated_fg = Foreground(default & 0x000f)
+                updated_fg = Foreground(reset_style & 0x000f)
             }
             if updated_fg == IGNORE {
                 updated_fg = Foreground(current & 0x000f)
@@ -50,7 +50,7 @@ pub fn set_style(default: u16, style: Style) -> Result<()> {
         Style::Bg(c) => {
             let mut updated_bg = Background::from(c);
             if updated_bg == RESET {
-                updated_bg = Background(default & 0x00f0)
+                updated_bg = Background(reset_style & 0x00f0)
             }
             if updated_bg == IGNORE {
                 updated_bg = Background(current & 0x00f0)
@@ -101,10 +101,10 @@ pub fn set_style(default: u16, style: Style) -> Result<()> {
     Ok(())
 }
 
-pub fn set_styles(default: u16, fg: Color, bg: Color, fx: u32) -> Result<()> {
-    set_style(default, Style::Fg(fg))?;
-    set_style(default, Style::Bg(bg))?;
-    set_style(default, Style::Fx(fx))?;
+pub fn set_styles(fg: Color, bg: Color, fx: u32, reset_style: u16) -> Result<()> {
+    set_style(Style::Fg(fg), reset_style)?;
+    set_style(Style::Bg(bg), reset_style)?;
+    set_style(Style::Fx(fx), reset_style)?;
     Ok(())
 }
 

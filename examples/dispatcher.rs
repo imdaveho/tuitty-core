@@ -5,13 +5,9 @@ use tuitty::common::DELAY;
 use tuitty::common::enums::{ InputEvent, KeyEvent, Action::* };
 
 fn main() {
-    let mut dispatch = tuitty::terminal::dispatch::Dispatcher::new();
-    let dispatch = dispatch
-        .listen()
-        .dispatch();
-    
-    let listener = dispatch.spawn()
-        .expect("Error spawning");
+    let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
+    let dispatch = dispatch.listen();
+    let listener = dispatch.spawn();
 
     listener.signal(Raw).expect("Error signaling dispatch - raw");
     listener.signal(EnableAlt).expect("Error signaling dispatch - alt");
@@ -22,7 +18,6 @@ fn main() {
                 InputEvent::Keyboard(kv) => match kv {
                     KeyEvent::Char(c) => {
                         if c == 'q' {
-                            // dispatch.shutdown();
                             break
                         }
                         listener.signal(Goto(0, 0)).expect("Error signaling dispatch - goto");
@@ -36,8 +31,8 @@ fn main() {
         }
         thread::sleep(time::Duration::from_millis(DELAY));
     });
-    
-    let counter = dispatch.spawn().expect("Error spawning");
+
+    let counter = dispatch.spawn();
 
     let counter_handle = thread::spawn(move || {
         let mut i = 0;
@@ -63,14 +58,13 @@ fn main() {
         }
     });
 
-    let _ = listener_handle.join();
-    let _ = counter_handle.join();
+    listener_handle.join().expect("Listener failed to join");
+    counter_handle.join().expect("Counter failed to join");
 
-    let listener = dispatch.spawn().expect("Error spawning");
-    listener.signal(Cook).expect("Error signaling dispatch - cook");
-    listener.signal(DisableAlt).expect("Error signaling dispatch - stdout");
+    dispatch.signal(Cook).expect("Error signaling dispatch - cook");
+    dispatch.signal(DisableAlt).expect("Error signaling dispatch - stdout");
 
-    dispatch.shutdown();
+    dispatch.shutdown().expect("Dispatch shutdown error on threads");
 
-    thread::sleep(time::Duration::from_millis(2000));
+    // thread::sleep(time::Duration::from_millis(2000));
 }

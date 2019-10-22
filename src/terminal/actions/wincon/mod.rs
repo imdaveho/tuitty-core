@@ -48,10 +48,10 @@ pub trait Win32Action {
     fn disable_mouse();
     // STYLE
     fn set_fx(effects: u32);
-    fn set_fg(color: Color, default: u16);
-    fn set_bg(color: Color, default: u16);
-    fn set_styles(fg: Color, bg: Color, fx: u32, default: u16);
-    fn reset_styles(default: u16);
+    fn set_fg(color: Color, reset_style: u16);
+    fn set_bg(color: Color, reset_style: u16);
+    fn set_styles(fg: Color, bg: Color, fx: u32, reset_style: u16);
+    fn reset_styles(reset_style: u16);
 }
 
 impl Win32Action for Win32Console {
@@ -138,10 +138,9 @@ impl Win32Action for Win32Console {
         output::prints(content)
             .expect("Error writing to console");
     }
-    
+
     fn flush() {
-        // (imdaveho) NOTE: Win32 flush is simply a no-op.
-        () 
+        () // (imdaveho) NOTE: Win32 flush is simply a no-op.
     }
 
     fn raw() {
@@ -165,27 +164,27 @@ impl Win32Action for Win32Console {
 
     // STYLE
     fn set_fx(effects: u32) {
-        style::set_style(0, Style::Fx(effects))
+        style::set_style(Style::Fx(effects), 0)
             .expect("Error setting console text attributes");
     }
 
-    fn set_fg(color: Color, default: u16) {
-        style::set_style(default, Style::Fg(color))
+    fn set_fg(color: Color, reset_style: u16) {
+        style::set_style(Style::Fg(color), reset_style)
             .expect("Error setting console foreground");
     }
 
-    fn set_bg(color: Color, default: u16) {
-        style::set_style(default, Style::Bg(color))
+    fn set_bg(color: Color, reset_style: u16) {
+        style::set_style(Style::Bg(color), reset_style)
             .expect("Error setting console background");
     }
-    
-    fn set_styles(fg: Color, bg: Color, fx: u32, default: u16) {
-        style::set_styles(default, fg, bg, fx)
+
+    fn set_styles(fg: Color, bg: Color, fx: u32, reset_style: u16) {
+        style::set_styles(fg, bg, fx, reset_style)
             .expect("Error setting console styles");
     }
 
-    fn reset_styles(default: u16) {
-        style::reset(default)
+    fn reset_styles(reset_style: u16) {
+        style::reset(reset_style)
             .expect("Error unsetting console styles");
     }
 }
