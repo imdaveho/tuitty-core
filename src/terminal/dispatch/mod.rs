@@ -28,9 +28,11 @@ use crate::terminal::actions::ansi::unix::get_mode;
 mod windows;
 #[cfg(windows)]
 use crate::terminal::actions::wincon::{
-    Win32Action, is_ansi_enabled, Win32Console as Console,
+    Win32Action, Win32Console as Console,
     windows::{ Handle, ConsoleInfo, get_mode },
 };
+#[cfg(windows)]
+use crate::terminal::actions::is_ansi_enabled;
 
 
 struct Emitter {
@@ -92,10 +94,8 @@ impl EventHandle {
 
     #[cfg(windows)]
     pub fn poll_async(&self) -> Option<InputEvent> {
-        match self.event_rx.try_recv() {
-            Ok(evt) => Some(evt),
-            Err(_) => None,
-        }
+        let mut iterator = self.event_rx.try_iter();
+        iterator.next()
     }
 
     #[cfg(unix)]
@@ -114,10 +114,9 @@ impl EventHandle {
     }
 
     #[cfg(windows)]
-    pub fn poll_sync(&self) -> Result<InputEvent, RecvError> {
-        self.signal_tx.send(Cmd::Next)
-            .expect("Error notifying dispatch to fetch next user input");
-        self.event_rx.recv()
+    pub fn poll_sync(&self) -> Option<InputEvent> {
+        let mut iterator = self.event_rx.iter();
+        iterator.next()
     }
 
     pub fn signal(&self, action: Action) -> Result<(), SendError<Cmd>> {
@@ -176,8 +175,7 @@ impl Dispatcher {
             #[cfg(windows)]
             let alternate = Handle::buffer()
                 .expect("Error creating alternate Console buffer");
-            loop {
-                if !is_running_arc.load(Ordering::SeqCst) { break }
+            while is_running_arc.load(Ordering::SeqCst) {
                 // Include minor delay so the thread isn't blindly using CPU.
                 thread::sleep(Duration::from_millis(DELAY));
                 // Push user input events if the self.listen() has been called.
@@ -200,15 +198,19 @@ impl Dispatcher {
                                 }
                             },
                             id => match roster.get(&id) {
-                                Some(tx) => if tx.event_tx.send(m)
-                                    .is_err() { break },
+                                // (imdaveho) TODO: Handle the Err state?
+                                // Previous: break out of the loop. But might
+                                // have caused weird conditions on .join() --
+                                // further observation needed.
+                                Some(tx) => { let _ = tx.event_tx.send(m); },
                                 None => lock_owner = 0,
                             }
                         }
                     },
                     Err(e) => match e {
                         TryRecvError::Empty => (),
-                        TryRecvError::Disconnected => break
+                        TryRecvError::Disconnected => is_running_arc
+                            .store(false, Ordering::SeqCst),
                     }
                 }
                 // Handle signal commands.
@@ -260,76 +262,76 @@ impl Dispatcher {
                                 Terminal::up(n)
                             },
                             Down(n) => {
-                                #[cfg(windows)] { if win32 {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::down(n); continue
                                 }}
                                 Terminal::down(n)
                             },
                             Left(n) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::left(n); continue
                                 }}
                                 Terminal::left(n)
                             },
                             Right(n) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::right(n); continue
                                 }}
                                 Terminal::right(n)
                             },
                             // SCREEN/OUTPUT
                             Clear(clr) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::clear(clr); continue
                                 }}
                                 Terminal::clear(clr)
                             },
                             Prints(s) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::prints(&s); continue
                                 }}
                                 Terminal::prints(&s)
                             },
                             Printf(s) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::printf(&s); continue
                                 }}
                                 Terminal::printf(&s)
                             },
                             Flush => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::flush(); continue
                                 }}
                                 Terminal::flush()
                             },
                             // STYLE
                             SetFx(efx) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::set_fx(efx); continue
                                 }}
                                 Terminal::set_fx(efx)
                             },
                             SetFg(c) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::set_fg(c, reset_style); continue
                                 }}
                                 Terminal::set_fg(c)
                             },
                             SetBg(c) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::set_bg(c, reset_style); continue
                                 }}
                                 Terminal::set_bg(c)
                             },
                             SetStyles(f, b, e) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::set_styles(f, b, e, reset_style);
                                     continue
                                 }}
                                 Terminal::set_styles(f, b, e)
                             },
                             ResetStyles => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::reset_styles(reset_style);
                                     continue
                                 }}
@@ -337,44 +339,44 @@ impl Dispatcher {
                             },
                             // STATEFUL/MODES
                             Resize(w, h) => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::resize(w, h); continue
                                 }}
                                 Terminal::resize(w, h)
                             },
                             HideCursor => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::hide_cursor(); continue
                                 }}
                                 Terminal::hide_cursor()
                             },
                             ShowCursor => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::show_cursor(); continue
                                 }}
                                 Terminal::show_cursor()
                             },
                             EnableMouse => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::enable_mouse(); continue
                                 }}
                                 Terminal::enable_mouse()
                             },
                             DisableMouse => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::disable_mouse(); continue
                                 }}
                                 Terminal::disable_mouse()
                             },
                             EnableAlt => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::enable_alt(
                                         &alternate, &original_mode); continue
                                 }}
                                 Terminal::enable_alt()
                             },
                             DisableAlt => {
-                                #[cfg(windows)] { if winapi {
+                                #[cfg(windows)] { if is_winapi {
                                     Console::disable_alt(); continue
                                 }}
                                 Terminal::disable_alt()
@@ -391,7 +393,8 @@ impl Dispatcher {
                     },
                     Err(e) => match e {
                         TryRecvError::Empty => (),
-                        TryRecvError::Disconnected => break
+                        TryRecvError::Disconnected => is_running_arc
+                            .store(false, Ordering::SeqCst),
                     }
                 }
             }
@@ -413,27 +416,33 @@ impl Dispatcher {
         let is_running = self.is_running.clone();
         // Begin reading user input.
         #[cfg(unix)] {
-        self.input_handle = Some(thread::spawn(move || loop {
-            if !is_running.load(Ordering::SeqCst) { break }
-            let tty = BufReader::new(fs::OpenOptions::new()
-                .read(true).write(true).open("/dev/tty")
-                .expect("Error opening /dev/tty"));
-            for byte in tty.bytes() {
-                let b = byte.expect("Error reading byte from /dev/tty");
-                if input_tx.send(b).is_err() { break }
+        self.input_handle = Some(thread::spawn(move || {
+            while is_running.load(Ordering::SeqCst) {
+                let tty = BufReader::new(fs::OpenOptions::new()
+                    .read(true).write(true).open("/dev/tty")
+                    .expect("Error opening /dev/tty"));
+                for byte in tty.bytes() {
+                    if !is_running.load(Ordering::SeqCst) { break }
+                    let b = byte.expect("Error reading byte from /dev/tty");
+                    // (imdaveho) TODO: Handle the Err state?
+                    // Previous: break out of the loop. But might
+                    // have caused weird conditions on .join() --
+                    // further observation needed.
+                    let _ = input_tx.send(b);
+                }
+                thread::sleep(Duration::from_millis(DELAY));
             }
-            thread::sleep(Duration::from_millis(DELAY));
         }))}
         #[cfg(windows)] {
-        self.input_handle = Some(thread::spawn(move || loop {
-            if !is_running.load(Ordering::SeqCst) { break }
-            loop {
-                if !is_running.load(Ordering::SeqCst) { break }
+        self.input_handle = Some(thread::spawn(move || {
+            while is_running.load(Ordering::SeqCst) {
                 let (_, evts) = windows::parser::read_input_events()
                     .expect("Error reading console input");
-                for evt in evts {
-                    if input_tx.send(evt).is_err() { break }
-                }
+                // (imdaveho) TODO: Handle the Err state?
+                // Previous: break out of the loop. But might
+                // have caused weird conditions on .join() --
+                // further observation needed.
+                for evt in evts { let _ = input_tx.send(evt); }
                 thread::sleep(Duration::from_millis(DELAY));
             }
         }))}
@@ -444,6 +453,9 @@ impl Dispatcher {
     pub fn shutdown(&mut self) -> std::thread::Result<()> {
         self.is_running.store(false, Ordering::SeqCst);
         if let Some(t) = self.input_handle.take() { t.join()? }
+        let mut roster = self.emitters.lock()
+            .expect("Error obtaining emitters lock");
+        roster.clear();
         if let Some(t) = self.event_handle.take() { t.join()? }
         Ok(())
     }

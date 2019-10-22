@@ -9,8 +9,8 @@ fn main() {
     let dispatch = dispatch.listen();
     let listener = dispatch.spawn();
 
-    listener.signal(Raw).expect("Error signaling dispatch - raw");
-    listener.signal(EnableAlt).expect("Error signaling dispatch - alt");
+    dispatch.signal(Raw).expect("Error signaling dispatch - raw");
+    dispatch.signal(EnableAlt).expect("Error signaling dispatch - alt");
 
     let listener_handle = thread::spawn(move || loop {
         match listener.poll_async() {
@@ -29,7 +29,7 @@ fn main() {
             },
             None => (),
         }
-        thread::sleep(time::Duration::from_millis(DELAY));
+        thread::sleep(time::Duration::from_millis(400));
     });
 
     let counter = dispatch.spawn();
@@ -42,8 +42,10 @@ fn main() {
             let content = format!("count: {}", i);
             counter.signal(Printf(content)).expect("Error signaling dispatch - printf");
             i += 1;
-            thread::sleep(time::Duration::from_millis(1200));
             match counter.poll_async() {
+            // BECAUSE YOU ARE COPYING THE VALUES, AND THE DELAY IS GREATER,
+            // THERE IS A BACKLOG OF EVTS THAT NEED TO BE CLEARED BEFORE
+            // HITTING THIS BREAK IN ORDER TO JOIN().
                 Some(evt) => match evt {
                     InputEvent::Keyboard(kv) => match kv {
                         KeyEvent::Char(c) => {
@@ -55,6 +57,7 @@ fn main() {
                 },
                 None => (),
             }
+            thread::sleep(time::Duration::from_millis(400));
         }
     });
 
