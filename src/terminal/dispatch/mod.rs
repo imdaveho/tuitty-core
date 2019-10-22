@@ -205,18 +205,18 @@ impl Dispatcher {
         // Fetch one-time configurations. Since Dispatcher will be called at
         // the start, it is not terrible to store them here.
         #[cfg(windows)]
-        let DEFAULT: u16 = ConsoleInfo::of(
+        let default: u16 = ConsoleInfo::of(
                 &Handle::conout()
                 .expect("Error fetching $CONOUT"))
             .expect("Error fetching ConsoleInfo from $CONOUT")
             .attributes();
         #[cfg(windows)]
-        let VTE: bool = is_ansi_enabled();
+        let is_vte: bool = is_ansi_enabled();
         #[cfg(windows)]
-        let ORIGINAL_MODE = get_mode()
+        let original_mode = get_mode()
             .expect("Error fetching mode from $STDOUT");
         #[cfg(unix)]
-        let ORIGINAL_MODE = get_mode()
+        let original_mode = get_mode()
             .expect("Error fetching Termios");
 
         // Setup channels and atomic refs to handle terminal commands.
@@ -229,7 +229,7 @@ impl Dispatcher {
         // Begin dispatcher event loop.
         self.event_handle = Some(thread::spawn(move || {
             #[cfg(windows)]
-            let ALT_SCREEN = Handle::buffer()
+            let alternate = Handle::buffer()
                 .expect("Error creating alternate Console buffer");
             
             loop {
@@ -279,7 +279,8 @@ impl Dispatcher {
                     Cmd::Resume(id) => {
                         let mut registry = emitters.lock()
                             .expect(emitters_err);
-                        registry.entry(id).and_modify(|emitter| emitter.is_paused = false );
+                        registry.entry(id)
+                        .and_modify(|emitter| emitter.is_paused = false );
                     },
                     Cmd::Stop(id) => {
                         let mut registry = emitters.lock()
@@ -326,10 +327,11 @@ impl Dispatcher {
                         EnableAlt => AnsiTerminal::enable_alt(),
                         DisableAlt => AnsiTerminal::disable_alt(),
                         Raw => AnsiTerminal::raw(),
-                        Cook => AnsiTerminal::cook(&ORIGINAL_MODE), 
+                        Cook => AnsiTerminal::cook(&original_mode), 
                     },
                     #[cfg(windows)]
-                    Cmd::Signal(action) => match VTE { true => match action {
+                    Cmd::Signal(action) => match is_vte { 
+                    true => match action {
                         // CURSOR
                         Goto(col, row) => AnsiTerminal::goto(col, row),
                         Up(n) => AnsiTerminal::up(n),
@@ -373,12 +375,12 @@ impl Dispatcher {
                         Flush => Win32Console::flush(),
                         // STYLE
                         SetFx(efx) => Win32Console::set_fx(efx),
-                        SetFg(c) => Win32Console::set_fg(c, DEFAULT),
-                        SetBg(c) => Win32Console::set_bg(c, DEFAULT),
+                        SetFg(c) => Win32Console::set_fg(c, default),
+                        SetBg(c) => Win32Console::set_bg(c, default),
                         SetStyles(f, b, e) => {
-                            Win32Console::set_styles(f, b, e, DEFAULT) },
+                            Win32Console::set_styles(f, b, e, default) },
                         ResetStyles => {
-                            Win32Console::reset_styles(DEFAULT) },
+                            Win32Console::reset_styles(default) },
                         // STATEFUL/MODES
                         Resize(w, h) => Win32Console::resize(w, h),
                         HideCursor => Win32Console::hide_cursor(),
@@ -386,7 +388,7 @@ impl Dispatcher {
                         EnableMouse => Win32Console::enable_mouse(),
                         DisableMouse => Win32Console::disable_mouse(),
                         EnableAlt => Win32Console::enable_alt(
-                            &ALT_SCREEN, &ORIGINAL_MODE),
+                            &alternate, &original_mode),
                         DisableAlt => Win32Console::disable_alt(),
                         Raw => Win32Console::raw(),
                         Cook => Win32Console::cook(),
