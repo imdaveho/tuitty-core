@@ -18,7 +18,7 @@ use crate::{
 };
 
 #[cfg(unix)]
-mod unix;
+pub mod unix;
 #[cfg(unix)]
 use std::{ fs, io::{ Read, BufReader } };
 #[cfg(unix)]
@@ -98,7 +98,7 @@ impl EventHandle {
         let mut result = Vec::with_capacity(8);
         while let Some(ch) = iterator.next() {
             let parsed_evt = unix::parser::parse_event(ch, &mut iterator);
-            if let Ok(evt) = parsed_evt { result.push(evt) } 
+            if let Ok(evt) = parsed_evt { result.push(evt) }
             else { continue }
         }
         result.pop()
@@ -471,16 +471,6 @@ impl Dispatcher {
         self.spawn()
     }
 
-    pub fn shutdown(&mut self) -> std::thread::Result<()> {
-        self.is_running.store(false, Ordering::SeqCst);
-        if let Some(t) = self.input_handle.take() { t.join()? }
-        let mut roster = self.emitters.lock()
-            .expect("Error obtaining emitters lock");
-        roster.clear();
-        if let Some(t) = self.event_handle.take() { t.join()? }
-        Ok(())
-    }
-
     fn randomish(&self) -> usize {
         match self.emitters.lock() {
             Ok(senders) => {
@@ -524,5 +514,21 @@ impl Dispatcher {
 
     pub fn signal(&self, action: Action) -> Result<(), SendError<Cmd>> {
         self.signal_tx.send(Cmd::Signal(action))
+    }
+
+    fn shutdown(&mut self) -> std::thread::Result<()> {
+        self.is_running.store(false, Ordering::SeqCst);
+        if let Some(t) = self.input_handle.take() { t.join()? }
+        let mut roster = self.emitters.lock()
+            .expect("Error obtaining emitters lock");
+        roster.clear();
+        if let Some(t) = self.event_handle.take() { t.join()? }
+        Ok(())
+    }
+}
+
+impl Drop for Dispatcher {
+    fn drop(&mut self) {
+        self.shutdown().expect("Error on shutdown")
     }
 }

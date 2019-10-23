@@ -53,9 +53,10 @@ fn main() {
                 },
                 None => (),
             }
-            thread::sleep(time::Duration::from_millis(1000));
+            thread::sleep(time::Duration::from_millis(400));
         }
         counter.unlock();
+        counter.signal(ShowCursor);
     });
 
     listener_handle.join().expect("Listener failed to join");
@@ -63,8 +64,6 @@ fn main() {
 
     dispatch.signal(Cook).expect("Error signaling dispatch - cook");
     dispatch.signal(DisableAlt).expect("Error signaling dispatch - stdout");
-
-    dispatch.shutdown().expect("Dispatch shutdown error on threads");
 
     // thread::sleep(time::Duration::from_millis(2000));
 }
