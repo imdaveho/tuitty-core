@@ -6,22 +6,21 @@ use tuitty::common::enums::{ InputEvent, KeyEvent, Action::* };
 
 fn main() {
     let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
-    let dispatch = dispatch.listen();
-    let listener = dispatch.spawn();
-
+    let _stdin = dispatch.listen();
     dispatch.signal(Raw).expect("Error signaling dispatch - raw");
     dispatch.signal(EnableAlt).expect("Error signaling dispatch - alt");
 
+    let listener = dispatch.spawn();
     let listener_handle = thread::spawn(move || loop {
-        match listener.poll_async() {
+        match listener.poll_latest_async() {
             Some(evt) => match evt {
                 InputEvent::Keyboard(kv) => match kv {
                     KeyEvent::Char(c) => {
                         if c == 'q' {
                             break
                         }
-                        listener.signal(Goto(0, 0)).expect("Error signaling dispatch - goto");
-                        listener.signal(Prints(format!("char: {}\n", c))).expect("Error signaling dispatch - prints");
+                        listener.signal(Goto(0, 0));
+                        listener.signal(Prints(format!("char: {}\n", c)));
                     },
                     _ => ()
                 },
@@ -29,23 +28,20 @@ fn main() {
             },
             None => (),
         }
-        thread::sleep(time::Duration::from_millis(400));
+        thread::sleep(time::Duration::from_millis(DELAY));
     });
 
     let counter = dispatch.spawn();
-
     let counter_handle = thread::spawn(move || {
         let mut i = 0;
-        counter.signal(HideCursor).expect("Error signaling dispatch - hidecursor");
+        counter.signal(HideCursor);
+        counter.lock();
         loop {
-            counter.signal(Goto(10,10)).expect("Error signaling dispatch - goto");
+            counter.signal(Goto(10,10));
             let content = format!("count: {}", i);
-            counter.signal(Printf(content)).expect("Error signaling dispatch - printf");
+            counter.signal(Printf(content));
             i += 1;
-            match counter.poll_async() {
-            // BECAUSE YOU ARE COPYING THE VALUES, AND THE DELAY IS GREATER,
-            // THERE IS A BACKLOG OF EVTS THAT NEED TO BE CLEARED BEFORE
-            // HITTING THIS BREAK IN ORDER TO JOIN().
+            match counter.poll_latest_async() {
                 Some(evt) => match evt {
                     InputEvent::Keyboard(kv) => match kv {
                         KeyEvent::Char(c) => {
@@ -57,8 +53,9 @@ fn main() {
                 },
                 None => (),
             }
-            thread::sleep(time::Duration::from_millis(400));
+            thread::sleep(time::Duration::from_millis(1000));
         }
+        counter.unlock();
     });
 
     listener_handle.join().expect("Listener failed to join");

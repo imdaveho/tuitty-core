@@ -182,8 +182,8 @@ pub enum KeyEvent {
 
 pub enum Cmd {
     Continue,
-    Pause(usize),
-    Resume(usize),
+    Suspend(usize),
+    Transmit(usize),
     Stop(usize),
     Lock(usize),
     Unlock,

@@ -41,7 +41,7 @@ struct Emitter {
     #[cfg(windows)]
     event_tx: Sender<InputEvent>,
 
-    is_paused: bool,
+    is_suspend: bool,
     is_running: bool,
 }
 
@@ -57,24 +57,24 @@ pub struct EventHandle {
 }
 
 impl EventHandle {
-    pub fn pause(&self) -> Result<(), SendError<Cmd>> {
-        self.signal_tx.send(Cmd::Pause(self.id))
+    pub fn suspend(&self) {
+        let _ = self.signal_tx.send(Cmd::Suspend(self.id));
     }
 
-    pub fn resume(&self) -> Result<(), SendError<Cmd>> {
-        self.signal_tx.send(Cmd::Resume(self.id))
+    pub fn transmit(&self) {
+        let _ = self.signal_tx.send(Cmd::Transmit(self.id));
     }
 
-    pub fn stop(&self) -> Result<(), SendError<Cmd>> {
-        self.signal_tx.send(Cmd::Stop(self.id))
+    pub fn stop(&self) {
+        let _ = self.signal_tx.send(Cmd::Stop(self.id));
     }
 
-    pub fn lock(&self) -> Result<(), SendError<Cmd>> {
-        self.signal_tx.send(Cmd::Lock(self.id))
+    pub fn lock(&self) {
+        let _ = self.signal_tx.send(Cmd::Lock(self.id));
     }
 
-    pub fn unlock(&self) -> Result<(), SendError<Cmd>> {
-        self.signal_tx.send(Cmd::Unlock)
+    pub fn unlock(&self) {
+        let _ = self.signal_tx.send(Cmd::Unlock);
     }
 
     #[cfg(unix)]
@@ -92,10 +92,32 @@ impl EventHandle {
         }
     }
 
+    #[cfg(unix)]
+    pub fn poll_latest_async(&self) -> Option<InputEvent> {
+        let mut iterator = self.event_rx.try_iter();
+        let mut result = Vec::with_capacity(8);
+        while let Some(ch) = iterator.next() {
+            let parsed_evt = unix::parser::parse_event(ch, &mut iterator);
+            if let Ok(evt) = parsed_evt { result.push(evt) } 
+            else { continue }
+        }
+        result.pop()
+    }
+
     #[cfg(windows)]
     pub fn poll_async(&self) -> Option<InputEvent> {
         let mut iterator = self.event_rx.try_iter();
         iterator.next()
+    }
+
+    #[cfg(windows)]
+    pub fn poll_latest_async(&self) -> Option<InputEvent> {
+        let mut iterator = self.event_rx.try_iter();
+        let mut result = Vec::with_capacity(8);
+        while let Some(evt) = iterator.next() {
+            result.push(evt)
+        }
+        result.pop()
     }
 
     #[cfg(unix)]
@@ -119,8 +141,8 @@ impl EventHandle {
         iterator.next()
     }
 
-    pub fn signal(&self, action: Action) -> Result<(), SendError<Cmd>> {
-        self.signal_tx.send(Cmd::Signal(action))
+    pub fn signal(&self, action: Action) {
+        let _ = self.signal_tx.send(Cmd::Signal(action));
     }
 }
 
@@ -190,7 +212,7 @@ impl Dispatcher {
                         match lock_owner {
                             0 => {
                                 for (_, tx) in roster.iter() {
-                                    if tx.is_paused { continue }
+                                    if tx.is_suspend { continue }
                                     // (imdaveho) TODO: Handle the Err state?
                                     // Reason: used to be .is_err() { break }
                                     // but this breaks the for loop not thread
@@ -217,17 +239,17 @@ impl Dispatcher {
                 match signal_rx.try_recv() {
                     Ok(cmd) => match cmd {
                         Cmd::Continue => (),
-                        Cmd::Pause(id) => {
+                        Cmd::Suspend(id) => {
                             let mut roster = emitters_arc.lock()
                                 .expect(lock_err);
                             roster.entry(id)
-                                .and_modify(|tx| tx.is_paused = true );
+                                .and_modify(|tx| tx.is_suspend = true );
                         },
-                        Cmd::Resume(id) => {
+                        Cmd::Transmit(id) => {
                             let mut roster = emitters_arc.lock()
                                 .expect(lock_err);
                             roster.entry(id)
-                                .and_modify(|tx| tx.is_paused = false );
+                                .and_modify(|tx| tx.is_suspend = false );
                         },
                         Cmd::Stop(id) => {
                             let mut roster = emitters_arc.lock()
@@ -410,7 +432,7 @@ impl Dispatcher {
         }
     }
 
-    pub fn listen(&mut self) -> &mut Dispatcher {
+    pub fn listen(&mut self) -> EventHandle {
         // Send the input_tx Sender to listen for user input.
         let input_tx = self.input_tx.clone();
         let is_running = self.is_running.clone();
@@ -446,8 +468,7 @@ impl Dispatcher {
                 thread::sleep(Duration::from_millis(DELAY));
             }
         }))}
-
-        return self;
+        self.spawn()
     }
 
     pub fn shutdown(&mut self) -> std::thread::Result<()> {
@@ -490,7 +511,7 @@ impl Dispatcher {
         let mut roster = self.emitters.lock().expect(err_msg);
         roster.insert(id, Emitter {
             event_tx: event_tx,
-            is_paused: false,
+            is_suspend: false,
             is_running: true,
         });
 
