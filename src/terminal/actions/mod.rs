@@ -188,7 +188,7 @@ pub mod win32 {
         if vte { ansi::output::prints(
             &ansi::cursor::move_right(n)); return }
         let err_msg = format!("Error moving the cursor up by {}", n);
-        cursor::move_right(n).expect(&err_msg);
+        wincon::cursor::move_right(n).expect(&err_msg);
     }
 
     pub fn hide_cursor(vte: bool) {
