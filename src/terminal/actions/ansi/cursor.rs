@@ -28,13 +28,3 @@ pub fn hide_cursor() -> String {
 pub fn show_cursor() -> String {
     "\x1B[?25h".to_string()
 }
-
-
-// (imdaveho) NOTE: Implemented internally to work with library features.
-// pub fn mark_pos() -> String {
-//     "\x1B[s".to_string()
-// }
-
-// pub fn load_pos() -> String {
-//     "\x1B[u".to_string()
-// }

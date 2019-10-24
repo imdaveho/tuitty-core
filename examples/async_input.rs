@@ -6,6 +6,11 @@ use std::sync::{
     atomic::{ AtomicBool, Ordering }
 };
 
+// ATTEMPT 2
+// #[cfg(unix)]
+// use std::os::unix::io::{ IntoRawFd, FromRawFd };
+// use std::io::Write;
+
 #[cfg(unix)]
 use tuitty::{
     terminal::{
@@ -15,7 +20,7 @@ use tuitty::{
             AnsiTerminal as Terminal,
         },
     },
-    common::enums::{ InputEvent, KeyEvent },
+    common::enums::{ InputEvent, KeyEvent, MouseEvent },
 };
 
 
@@ -26,9 +31,50 @@ fn main() {
         let original_mode = unix::get_mode().expect("Error fetching Termios");
         Terminal::enable_alt();
         Terminal::raw();
+        Terminal::enable_mouse();
+        Terminal::hide_cursor();
         let (input_tx, input_rx) = channel();
 
         let input_handle = thread::spawn(move || {
+
+            // ATTEMPT 2 - using FileFd to pass input later
+            // Doesn't work since write..just prints out on the screen
+            // Need to send EOT or some kind of process end to the thread...
+            // For now...we just don't join the thread...
+            // When the program exits...this should close the thread naturally.
+            // let tty_fd = fs::OpenOptions::new()
+            //     .read(true).write(true)
+            //     .open("/dev/tty").expect("Error opening /dev/tty")
+            //     .into_raw_fd();
+
+            // while is_running_arc.load(Ordering::SeqCst) {
+            //     let tty = unsafe {
+            //         BufReader::new(fs::File::from_raw_fd(tty_fd))
+            //     };
+            //     for byte in tty.bytes() {
+            //         if !is_running_arc.load(Ordering::SeqCst) { break }
+            //         let b = byte.expect("Error reading byte from /dev/tty");
+            //         // (imdaveho) TODO: Handle the Err state?
+            //         // Previous: break out of the loop. But might
+            //         // have caused weird conditions on .join() --
+            //         // further observation needed.
+            //         let _ = input_tx.send(b);
+            //     }
+            //     thread::sleep(Duration::from_millis(10));
+            // }
+            // ATTEMPT 1 - Works only for single byte sequences
+            // while is_running_arc.load(Ordering::SeqCst) {
+            //     let mut tty = BufReader::new(fs::OpenOptions::new()
+            //                              .read(true).write(true).open("/dev/tty")
+            //                              .expect("Error opening /dev/tty"));
+            //     let mut buf: [u8; 1] = [0];
+            //     let _ = tty.read_exact(&mut buf);
+            //     let _ = input_tx.send(buf[0]);
+
+            //     thread::sleep(Duration::from_millis(10));
+            // }
+
+            // ORIGINAL - Hangs at end
             while is_running_arc.load(Ordering::SeqCst) {
                 let tty = BufReader::new(fs::OpenOptions::new()
                                          .read(true).write(true).open("/dev/tty")
@@ -45,6 +91,17 @@ fn main() {
                 thread::sleep(Duration::from_millis(10));
             }
         });
+
+        // let is_running_chk = is_running.clone();
+        // let check_thread = thread::spawn(move || {
+        //     let mut counter = 0;
+        //     while is_running_chk.load(Ordering::SeqCst) {
+        //         Terminal::goto(0, 5);
+        //         Terminal::printf(&format!("Iter: {}", counter));
+        //         thread::sleep(Duration::from_millis(100));
+        //         counter += 1;
+        //     }
+        // });
 
         loop {
             let mut iterator = input_rx.try_iter();
@@ -67,7 +124,30 @@ fn main() {
                                 break
                             }
                             Terminal::goto(0, 0);
-                            Terminal::printf(&format!("Pressed: {}", c));
+                            Terminal::printf(&format!("Event: Char({}){:<16}", c, " "));
+                        },
+                        KeyEvent::Ctrl(c) => {
+                            Terminal::goto(0, 0);
+                        Terminal::printf(&format!("Event: Ctrl({}){:<16}", c, " "));
+                        },
+                        KeyEvent::Alt(c) => {
+                            Terminal::goto(0, 0);
+                            Terminal::printf(&format!("Event: Alt({}){:<16}", c, " "));
+                        },
+                        KeyEvent::CtrlLeft => {
+                            Terminal::goto(0, 0);
+                            Terminal::printf(&format!("Event: CtrlLeft{:<16}", " "));
+                        },
+                        KeyEvent::CtrlRight => {
+                            Terminal::goto(0, 0);
+                            Terminal::printf(&format!("Event: CtrlRight{:<16}", " "));
+                        },
+                        _ => (),
+                    },
+                    InputEvent::Mouse(mv) => match mv {
+                        MouseEvent::Press(_, col, row) => {
+                            Terminal::goto(0, 0);
+                            Terminal::printf(&format!("Event: MousePress({},{}){:<16}", col, row, " "));
                         },
                         _ => (),
                     },
@@ -79,8 +159,14 @@ fn main() {
         }
 
         input_handle.join().expect("Error joining");
+        // check_thread.join().expect("Error joining check_thread");
+
+        Terminal::show_cursor();
+        Terminal::disable_mouse();
         Terminal::cook(&original_mode);
         Terminal::disable_alt();
+
+        thread::sleep(Duration::from_secs(2));
     }
 }
 

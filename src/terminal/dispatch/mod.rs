@@ -2,48 +2,25 @@
 // user input and supports multithreaded programs through message passing.
 
 use std::{
-    thread,
-    collections::HashMap,
+    thread, collections::HashMap,
     time::{ SystemTime, UNIX_EPOCH, Duration },
     sync::{
-        Arc, Mutex,
-        atomic::{ AtomicBool, Ordering },
-        mpsc::{ channel, Sender, Receiver, TryRecvError, SendError }
-    },
+        Arc, Mutex, atomic::{ AtomicBool, Ordering },
+        mpsc::{ channel, Sender, Receiver, TryRecvError, SendError }},
 };
-
-use crate::{
-    common::{ DELAY, enums::{ Cmd, Action::{*, self}, InputEvent } },
-    terminal::actions::ansi::{ AnsiAction, AnsiTerminal as Terminal },
-};
+use crate::common::{ enums::{ Cmd, Action::{*, self}, InputEvent }, DELAY };
 
 #[cfg(unix)]
 pub mod unix;
 #[cfg(unix)]
 use std::{ fs, io::{ Read, BufReader } };
 #[cfg(unix)]
-use crate::terminal::actions::ansi::unix::get_mode;
+use crate::terminal::actions::posix;
 
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
-use crate::terminal::actions::wincon::{
-    Win32Action, Win32Console as Console,
-    windows::{ Handle, ConsoleInfo, get_mode },
-};
-#[cfg(windows)]
-use crate::terminal::actions::is_ansi_enabled;
-
-
-struct Emitter {
-    #[cfg(unix)]
-    event_tx: Sender<u8>,
-    #[cfg(windows)]
-    event_tx: Sender<InputEvent>,
-
-    is_suspend: bool,
-    is_running: bool,
-}
+use crate::terminal::actions::win32;
 
 
 pub struct EventHandle {
@@ -147,6 +124,17 @@ impl EventHandle {
 }
 
 
+struct Emitter {
+    #[cfg(unix)]
+    event_tx: Sender<u8>,
+    #[cfg(windows)]
+    event_tx: Sender<InputEvent>,
+
+    is_suspend: bool,
+    is_running: bool,
+}
+
+
 pub struct Dispatcher {
     // Handle user events.
     #[cfg(unix)]
@@ -165,21 +153,6 @@ pub struct Dispatcher {
 
 impl Dispatcher {
     pub fn init() -> Dispatcher {
-        // Fetch terminal state at the start when Dispatcher first inits.
-        #[cfg(windows)]
-        let is_winapi: bool = !is_ansi_enabled();
-        #[cfg(windows)]
-        let original_mode = get_mode()
-            .expect("Error fetching mode from $STDOUT");
-        #[cfg(unix)]
-        let original_mode = get_mode()
-            .expect("Error fetching Termios");
-        #[cfg(windows)]
-        let reset_style: u16 = ConsoleInfo::of(
-            &Handle::conout()
-                .expect("Error fetching $CONOUT"))
-            .expect("Error fetching ConsoleInfo from $CONOUT")
-            .attributes();
         // Initialize struct fields.
         let emitters = Arc::new(Mutex::new(HashMap::with_capacity(8)));
         let is_running = Arc::new(AtomicBool::new(true));
@@ -188,6 +161,15 @@ impl Dispatcher {
         // Setup Arcs to move into thread.
         let is_running_arc = is_running.clone();
         let emitters_arc = emitters.clone();
+
+        // Fetch terminal state in main thread.
+        #[cfg(unix)]
+        let initial = posix::get_mode();
+        #[cfg(windows)]
+        let initial = win32::get_mode();
+        #[cfg(windows)]
+        let default = win32::get_attrib();
+
         // Start event loop.
         let event_handle = thread::spawn(move || {
             let mut lock_owner = 0;
@@ -197,6 +179,9 @@ impl Dispatcher {
             #[cfg(windows)]
             let alternate = Handle::buffer()
                 .expect("Error creating alternate Console buffer");
+            #[cfg(windows)]
+            let vte = is_ansi_enabled();
+
             while is_running_arc.load(Ordering::SeqCst) {
                 // Include minor delay so the thread isn't blindly using CPU.
                 thread::sleep(Duration::from_millis(DELAY));
@@ -272,145 +257,146 @@ impl Dispatcher {
                         Cmd::Signal(a) => match a {
                             // CURSOR
                             Goto(col, row) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::goto(col, row); continue
-                                }}
-                                Terminal::goto(col, row)
+                                #[cfg(unix)]
+                                posix::goto(col, row);
+                                #[cfg(windows)]
+                                win32::goto(col, row, vte);
                             },
                             Up(n) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::up(n); continue
-                                }}
-                                Terminal::up(n)
+                                #[cfg(unix)]
+                                posix::up(n);
+                                #[cfg(windows)]
+                                win32::up(n, vte);
                             },
                             Down(n) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::down(n); continue
-                                }}
-                                Terminal::down(n)
+                                #[cfg(unix)]
+                                posix::down(n);
+                                #[cfg(windows)]
+                                win32::down(n, vte);
                             },
                             Left(n) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::left(n); continue
-                                }}
-                                Terminal::left(n)
+                                #[cfg(unix)]
+                                posix::left(n);
+                                #[cfg(windows)]
+                                win32::left(n, vte);
                             },
                             Right(n) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::right(n); continue
-                                }}
-                                Terminal::right(n)
+                                #[cfg(unix)]
+                                posix::right(n);
+                                #[cfg(windows)]
+                                win32::right(n, vte);
                             },
                             // SCREEN/OUTPUT
                             Clear(clr) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::clear(clr); continue
-                                }}
-                                Terminal::clear(clr)
+                                #[cfg(unix)]
+                                posix::clear(clr);
+                                #[cfg(windows)]
+                                win32::clear(clr, vte);
                             },
                             Prints(s) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::prints(&s); continue
-                                }}
-                                Terminal::prints(&s)
+                                #[cfg(unix)]
+                                posix::prints(&s);
+                                #[cfg(windows)]
+                                win32::prints(&s, vte);
                             },
                             Printf(s) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::printf(&s); continue
-                                }}
-                                Terminal::printf(&s)
+                                #[cfg(unix)]
+                                posix::printf(&s);
+                                #[cfg(windows)]
+                                win32::printf(&s, vte);
                             },
                             Flush => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::flush(); continue
-                                }}
-                                Terminal::flush()
+                                #[cfg(unix)]
+                                posix::flush();
+                                #[cfg(windows)]
+                                win32::flush(vte);
                             },
                             // STYLE
-                            SetFx(efx) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::set_fx(efx); continue
-                                }}
-                                Terminal::set_fx(efx)
+                            SetFx(ef) => {
+                                #[cfg(unix)]
+                                posix::set_fx(ef);
+                                #[cfg(windows)]
+                                win32::set_fx(ef, vte);
                             },
                             SetFg(c) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::set_fg(c, reset_style); continue
-                                }}
-                                Terminal::set_fg(c)
+                                #[cfg(unix)]
+                                posix::set_fg(c);
+                                #[cfg(windows)]
+                                win32::set_fg(c, default, vte);
                             },
                             SetBg(c) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::set_bg(c, reset_style); continue
-                                }}
-                                Terminal::set_bg(c)
+                                #[cfg(unix)]
+                                posix::set_bg(c);
+                                #[cfg(windows)]
+                                win32::set_bg(c, default, vte);
                             },
                             SetStyles(f, b, e) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::set_styles(f, b, e, reset_style);
-                                    continue
-                                }}
-                                Terminal::set_styles(f, b, e)
+                                #[cfg(unix)]
+                                posix::set_styles(f, b, e);
+                                #[cfg(windows)]
+                                win32::set_styles(f, b, e, default, vte);
                             },
                             ResetStyles => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::reset_styles(reset_style);
-                                    continue
-                                }}
-                                Terminal::reset_styles()
+                                #[cfg(unix)]
+                                posix::reset_styles();
+                                #[cfg(windows)]
+                                win32::reset_style(default, vte);
                             },
                             // STATEFUL/MODES
                             Resize(w, h) => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::resize(w, h); continue
-                                }}
-                                Terminal::resize(w, h)
+                                #[cfg(unix)]
+                                posix::resize(w, h);
+                                #[cfg(windows)]
+                                win32::resize(w, h, vte);
                             },
                             HideCursor => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::hide_cursor(); continue
-                                }}
-                                Terminal::hide_cursor()
+                                #[cfg(unix)]
+                                posix::hide_cursor();
+                                #[cfg(windows)]
+                                win32::hide_cursor(vte);
                             },
                             ShowCursor => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::show_cursor(); continue
-                                }}
-                                Terminal::show_cursor()
+                                #[cfg(unix)]
+                                posix::show_cursor();
+                                #[cfg(windows)]
+                                win32::show_cursor(vte);
                             },
                             EnableMouse => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::enable_mouse(); continue
-                                }}
-                                Terminal::enable_mouse()
+                                #[cfg(unix)]
+                                posix::enable_mouse();
+                                #[cfg(windows)]
+                                win32::enable_mouse(vte);
                             },
                             DisableMouse => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::disable_mouse(); continue
-                                }}
-                                Terminal::disable_mouse()
+                                #[cfg(unix)]
+                                posix::disable_mouse();
+                                #[cfg(windows)]
+                                win32::disable_mouse(vte);
                             },
                             EnableAlt => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::enable_alt(
-                                        &alternate, &original_mode); continue
-                                }}
-                                Terminal::enable_alt()
+                                #[cfg(unix)]
+                                posix::enable_alt();
+                                #[cfg(windows)]
+                                win32::enable_alt(&screen, &initial, vte);
                             },
                             DisableAlt => {
-                                #[cfg(windows)] { if is_winapi {
-                                    Console::disable_alt(); continue
-                                }}
-                                Terminal::disable_alt()
+                                #[cfg(unix)]
+                                posix::disable_alt();
+                                #[cfg(windows)]
+                                win32::disable_alt(vte);
                             },
-                            #[cfg(unix)]
-                            Raw => Terminal::raw(),
-                            #[cfg(unix)]
-                            Cook => Terminal::cook(&original_mode),
-                            #[cfg(windows)]
-                            Raw => Console::raw(),
-                            #[cfg(windows)]
-                            Cook => Console::cook(),
+                            Raw => {
+                                #[cfg(unix)]
+                                posix::raw();
+                                #[cfg(windows)]
+                                win32::raw();
+                            },
+                            Cook => {
+                                #[cfg(unix)]
+                                posix::cook(&initial);
+                                #[cfg(windows)]
+                                win32::cook();
+                            }
                         }
                     },
                     Err(e) => match e {
@@ -420,6 +406,8 @@ impl Dispatcher {
                     }
                 }
             }
+            #[cfg(windows)]
+            let _ = alternate.close();
         });
 
         Dispatcher {
@@ -468,6 +456,7 @@ impl Dispatcher {
                 thread::sleep(Duration::from_millis(DELAY));
             }
         }))}
+
         self.spawn()
     }
 
@@ -518,7 +507,7 @@ impl Dispatcher {
 
     fn shutdown(&mut self) -> std::thread::Result<()> {
         self.is_running.store(false, Ordering::SeqCst);
-        if let Some(t) = self.input_handle.take() { t.join()? }
+        // if let Some(t) = self.input_handle.take() { t.join()? }
         let mut roster = self.emitters.lock()
             .expect("Error obtaining emitters lock");
         roster.clear();

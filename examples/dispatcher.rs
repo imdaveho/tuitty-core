@@ -4,13 +4,14 @@ use std::{thread, time};
 use tuitty::common::DELAY;
 use tuitty::common::enums::{ InputEvent, KeyEvent, Action::* };
 
+
 fn main() {
     let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
-    let _stdin = dispatch.listen();
+
     dispatch.signal(Raw).expect("Error signaling dispatch - raw");
     dispatch.signal(EnableAlt).expect("Error signaling dispatch - alt");
 
-    let listener = dispatch.spawn();
+    let listener = dispatch.listen();
     let listener_handle = thread::spawn(move || loop {
         match listener.poll_latest_async() {
             Some(evt) => match evt {
@@ -62,8 +63,13 @@ fn main() {
     listener_handle.join().expect("Listener failed to join");
     counter_handle.join().expect("Counter failed to join");
 
+    dispatch.signal(Goto(10, 10)).expect("Error goto");
+    dispatch.signal(Printf("Hello, World".to_string())).expect("Error printf");
+
+    thread::sleep(time::Duration::from_millis(2000));
+
     dispatch.signal(Cook).expect("Error signaling dispatch - cook");
     dispatch.signal(DisableAlt).expect("Error signaling dispatch - stdout");
 
-    // thread::sleep(time::Duration::from_millis(2000));
+    thread::sleep(time::Duration::from_millis(2000));
 }
