@@ -411,7 +411,6 @@ impl Dispatcher {
                 for byte in tty.bytes() {
                     if !is_running.load(Ordering::SeqCst) { break }
                     let b = byte.expect("Error reading byte from /dev/tty");
-                    // let _ = input_tx.send(b);
                     // Emitters clean up.
                     let mut roster = emitters_arc.lock().expect(lock_err);
                     if !roster.is_empty() {
@@ -442,7 +441,6 @@ impl Dispatcher {
             while is_running.load(Ordering::SeqCst) {
                 let (_, evts) = windows::parser::read_input_events()
                     .expect("Error reading console input");
-                // for evt in evts { let _ = input_tx.send(evt); }
                 for evt in evts {
                     // Emitters clean up.
                     let mut roster = emitters_arc.lock().expect(lock_err);
