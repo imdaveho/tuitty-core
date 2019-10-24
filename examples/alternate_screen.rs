@@ -3,43 +3,43 @@ extern crate tuitty;
 use std::{ thread, time::Duration };
 
 #[cfg(unix)]
-use tuitty::terminal::actions::unix;
+use tuitty::terminal::actions::posix;
 
 #[cfg(windows)]
-use tuitty::terminal::actions::windows;
+use tuitty::terminal::actions::win32;
 
 
 fn direct_scenario() {
 
     #[cfg(unix)] {
-        let initial = unix::get_mode();
+        let initial = posix::get_mode();
 
-        unix::enable_alt();
-        unix::raw();
+        posix::enable_alt();
+        posix::raw();
 
-        unix::goto(0, 0);
-        unix::printf("Hello, world!");
+        posix::goto(0, 0);
+        posix::printf("Hello, world!");
         thread::sleep(Duration::from_secs(2));
 
-        unix::cook(&initial);
-        unix::disable_alt();
+        posix::cook(&initial);
+        posix::disable_alt();
         thread::sleep(Duration::from_secs(1));
     }
 
     #[cfg(windows)] {
-        let vte = windows::is_ansi_enabled();
-        let initial = windows::get_mode();
-        let screen = windows::Handle::buffer().unwrap();
+        let vte = win32::is_ansi_enabled();
+        let initial = win32::get_mode();
+        let screen = win32::Handle::buffer().unwrap();
 
-        windows::enable_alt(&screen, &initial, vte);
-        windows::raw();
+        win32::enable_alt(&screen, &initial, vte);
+        win32::raw();
 
-        windows::goto(0, 0, vte);
-        windows::printf("Hello, world!", vte);
+        win32::goto(0, 0, vte);
+        win32::printf("Hello, world!", vte);
         thread::sleep(Duration::from_secs(2));
 
-        windows::cook();
-        windows::disable_alt(vte);
+        win32::cook();
+        win32::disable_alt(vte);
         thread::sleep(Duration::from_secs(1));
     }
 

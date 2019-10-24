@@ -1,7 +1,7 @@
 // Functions to parse Windows Console inputs and map them to the proper event.
 
 mod input_event;
-use input_event::{ 
+use input_event::{
     InputRecord, InputEventType,
     ControlKeyState, EventFlags
 };
@@ -31,7 +31,7 @@ use winapi::um::{
         GetNumberOfConsoleInputEvents, ReadConsoleInputW,
     },
 };
-use crate::terminal::actions::wincon::windows::Handle;
+use crate::terminal::actions::win32::Handle;
 use crate::common::enums::{ InputEvent, KeyEvent, MouseEvent, MouseButton };
 
 

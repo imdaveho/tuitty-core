@@ -173,10 +173,10 @@ impl Dispatcher {
             // Windows *mut c_void cannot be safely moved into thread. So
             // we create it within the thread.
             #[cfg(windows)]
-            let screen = Handle::buffer()
+            let screen = win32::Handle::buffer()
                 .expect("Error creating alternate Console buffer");
             #[cfg(windows)]
-            let vte = is_ansi_enabled();
+            let vte = win32::is_ansi_enabled();
             let lock_err = "Error obtaining emitters lock";
             while is_running_arc.load(Ordering::SeqCst) {
                 // Include minor delay so the thread isn't blindly using CPU.

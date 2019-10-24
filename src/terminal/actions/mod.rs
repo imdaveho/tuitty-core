@@ -136,7 +136,7 @@ pub mod posix {
 pub mod win32 {
     use super::{ ansi, wincon };
     use crate::common::enums::{ Clear, Style, Color };
-    pub use super::wincon::handle::Handle;
+    pub use super::wincon::handle::{ Handle, ConsoleInfo };
 
     // CURSOR FUNCTIONS
     pub fn goto(col: i16, row: i16, vte: bool) {
@@ -148,7 +148,7 @@ pub mod win32 {
             &ansi::cursor::goto(col, row)); return }
         let err_msg = "Error setting the cursor position";
         wincon::cursor::goto(col, row)
-            .expect();
+            .expect(err_msg);
     }
 
     pub fn up(n: i16, vte: bool) {
@@ -168,7 +168,7 @@ pub mod win32 {
         if vte { ansi::output::prints(
             &ansi::cursor::move_down(n)); return }
         let err_msg = format!("Error moving the cursor up by {}", n);
-        wincon::cursor::move_down(n).expect(err_msg);
+        wincon::cursor::move_down(n).expect(&err_msg);
     }
 
     pub fn left(n: i16, vte: bool) {
@@ -178,7 +178,7 @@ pub mod win32 {
         if vte { ansi::output::prints(
             &ansi::cursor::move_left(n)); return }
         let err_msg = format!("Error moving the cursor up by {}", n);
-        wincon::cursor::move_left(n).expect(err_msg);
+        wincon::cursor::move_left(n).expect(&err_msg);
     }
 
     pub fn right(n: i16, vte: bool) {
@@ -188,7 +188,7 @@ pub mod win32 {
         if vte { ansi::output::prints(
             &ansi::cursor::move_right(n)); return }
         let err_msg = format!("Error moving the cursor up by {}", n);
-        cursor::move_right(n).expect(err_msg);
+        cursor::move_right(n).expect(&err_msg);
     }
 
     pub fn hide_cursor(vte: bool) {
@@ -202,7 +202,7 @@ pub mod win32 {
         if vte { ansi::output::prints(
             &ansi::cursor::show_cursor()); return }
         let err_msg = "Error setting cursor visibility to 100";
-        wincon::cursor::show_cursor().expect();
+        wincon::cursor::show_cursor().expect(err_msg);
     }
 
     // SCREEN FUNCTIONS
@@ -355,7 +355,7 @@ pub mod win32 {
             return true
         } else {
             let enable_vt = 0x0004;
-            let handle = match wincon::windows::Handle::stdout() {
+            let handle = match Handle::stdout() {
                 Ok(h) => h,
                 Err(_) => return false,
             };

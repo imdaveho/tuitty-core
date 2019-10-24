@@ -13,26 +13,41 @@ use std::sync::{
 
 #[cfg(unix)]
 use tuitty::{
-    terminal::{
-        dispatch::unix::parser,
-        actions::ansi::{
-            unix, AnsiAction,
-            AnsiTerminal as Terminal,
-        },
-    },
+    terminal::{ dispatch::unix::parser, actions::posix },
     common::enums::{ InputEvent, KeyEvent, MouseEvent },
 };
 
+
+// pub struct Bytes<R> {
+//     inner: R,
+// }
+
+// impl<R: Read> Iterator for Bytes<R> {
+//     type Item = Result<u8>;
+
+//     fn next(&mut self, cond: Arc<AtomicBool>) -> Option<Result<u8>> {
+//         let mut byte = 0;
+//         while cond.load(Ordering::SeqCst) {
+//             return match self.inner.read(slice::from_mut(&mut byte)) {
+//                 Ok(0) => None,
+//                 Ok(..) => Some(Ok(byte)),
+//                 Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
+//                 Err(e) => Some(Err(e)),
+//             };
+//         }
+//         Some(Ok(0))
+//     }
+// }
 
 fn main() {
     #[cfg(unix)] {
         let is_running = Arc::new(AtomicBool::new(true));
         let is_running_arc = is_running.clone();
-        let original_mode = unix::get_mode().expect("Error fetching Termios");
-        Terminal::enable_alt();
-        Terminal::raw();
-        Terminal::enable_mouse();
-        Terminal::hide_cursor();
+        let original_mode = posix::get_mode();
+        posix::enable_alt();
+        posix::raw();
+        posix::enable_mouse();
+        posix::hide_cursor();
         let (input_tx, input_rx) = channel();
 
         let input_handle = thread::spawn(move || {
@@ -79,14 +94,19 @@ fn main() {
                 let tty = BufReader::new(fs::OpenOptions::new()
                                          .read(true).write(true).open("/dev/tty")
                                          .expect("Error opening /dev/tty"));
-                for byte in tty.bytes() {
+                // for byte in tty.bytes() {
+                //     if !is_running_arc.load(Ordering::SeqCst) { break }
+                //     let b = byte.expect("Error reading byte from /dev/tty");
+                //     // (imdaveho) TODO: Handle the Err state?
+                //     // Previous: break out of the loop. But might
+                //     // have caused weird conditions on .join() --
+                //     // further observation needed.
+                //     let _ = input_tx.send(b);
+                // }
+                let t = tty.bytes();
+                for _b in t {
                     if !is_running_arc.load(Ordering::SeqCst) { break }
-                    let b = byte.expect("Error reading byte from /dev/tty");
-                    // (imdaveho) TODO: Handle the Err state?
-                    // Previous: break out of the loop. But might
-                    // have caused weird conditions on .join() --
-                    // further observation needed.
-                    let _ = input_tx.send(b);
+                    let _ = input_tx.send(59);
                 }
                 thread::sleep(Duration::from_millis(10));
             }
@@ -123,31 +143,31 @@ fn main() {
                                 is_running.store(false, Ordering::SeqCst);
                                 break
                             }
-                            Terminal::goto(0, 0);
-                            Terminal::printf(&format!("Event: Char({}){:<16}", c, " "));
+                            posix::goto(0, 0);
+                            posix::printf(&format!("Event: Char({}){:<16}", c, " "));
                         },
                         KeyEvent::Ctrl(c) => {
-                            Terminal::goto(0, 0);
-                        Terminal::printf(&format!("Event: Ctrl({}){:<16}", c, " "));
+                            posix::goto(0, 0);
+                        posix::printf(&format!("Event: Ctrl({}){:<16}", c, " "));
                         },
                         KeyEvent::Alt(c) => {
-                            Terminal::goto(0, 0);
-                            Terminal::printf(&format!("Event: Alt({}){:<16}", c, " "));
+                            posix::goto(0, 0);
+                            posix::printf(&format!("Event: Alt({}){:<16}", c, " "));
                         },
                         KeyEvent::CtrlLeft => {
-                            Terminal::goto(0, 0);
-                            Terminal::printf(&format!("Event: CtrlLeft{:<16}", " "));
+                            posix::goto(0, 0);
+                            posix::printf(&format!("Event: CtrlLeft{:<16}", " "));
                         },
                         KeyEvent::CtrlRight => {
-                            Terminal::goto(0, 0);
-                            Terminal::printf(&format!("Event: CtrlRight{:<16}", " "));
+                            posix::goto(0, 0);
+                            posix::printf(&format!("Event: CtrlRight{:<16}", " "));
                         },
                         _ => (),
                     },
                     InputEvent::Mouse(mv) => match mv {
                         MouseEvent::Press(_, col, row) => {
-                            Terminal::goto(0, 0);
-                            Terminal::printf(&format!("Event: MousePress({},{}){:<16}", col, row, " "));
+                            posix::goto(0, 0);
+                            posix::printf(&format!("Event: MousePress({},{}){:<16}", col, row, " "));
                         },
                         _ => (),
                     },
@@ -161,10 +181,10 @@ fn main() {
         input_handle.join().expect("Error joining");
         // check_thread.join().expect("Error joining check_thread");
 
-        Terminal::show_cursor();
-        Terminal::disable_mouse();
-        Terminal::cook(&original_mode);
-        Terminal::disable_alt();
+        posix::show_cursor();
+        posix::disable_mouse();
+        posix::cook(&original_mode);
+        posix::disable_alt();
 
         thread::sleep(Duration::from_secs(2));
     }
