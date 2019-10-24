@@ -12,27 +12,30 @@ fn main() {
     dispatch.signal(EnableAlt).expect("Error signaling dispatch - alt");
 
     let listener = dispatch.listen();
-    let listener_handle = thread::spawn(move || loop {
-        match listener.poll_latest_async() {
-            Some(evt) => match evt {
-                InputEvent::Keyboard(kv) => match kv {
-                    KeyEvent::Char(c) => {
-                        if c == 'q' {
-                            break
-                        }
-                        listener.signal(Goto(0, 0));
-                        listener.signal(Prints(format!("char: {}\n", c)));
+    let listener_handle = thread::spawn(move || {
+        loop {
+            match listener.poll_latest_async() {
+                Some(evt) => match evt {
+                    InputEvent::Keyboard(kv) => match kv {
+                        KeyEvent::Char(c) => {
+                            if c == 'q' {
+                                break
+                            }
+                            listener.signal(Goto(0, 0));
+                            listener.signal(Prints(format!("char: {}\n", c)));
+                        },
+                        _ => ()
                     },
                     _ => ()
                 },
-                _ => ()
-            },
-            None => (),
+                None => (),
+            }
+            thread::sleep(time::Duration::from_millis(DELAY));
         }
-        thread::sleep(time::Duration::from_millis(DELAY));
+        listener.signal(ShowCursor);
     });
 
-    let counter = dispatch.spawn();
+    let counter = dispatch.listen(); // works as spawn or listen!
     let counter_handle = thread::spawn(move || {
         let mut i = 0;
         counter.signal(HideCursor);
@@ -57,7 +60,6 @@ fn main() {
             thread::sleep(time::Duration::from_millis(400));
         }
         counter.unlock();
-        counter.signal(ShowCursor);
     });
 
     listener_handle.join().expect("Listener failed to join");

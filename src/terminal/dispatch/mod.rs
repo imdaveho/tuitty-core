@@ -5,7 +5,7 @@ use std::{
     thread, collections::HashMap,
     time::{ SystemTime, UNIX_EPOCH, Duration },
     sync::{
-        Arc, Mutex, atomic::{ AtomicBool, Ordering },
+        Arc, Mutex, atomic::{ AtomicBool, AtomicUsize, Ordering },
         mpsc::{ channel, Sender, Receiver, TryRecvError, SendError }},
 };
 use crate::common::{ enums::{ Cmd, Action::{*, self}, InputEvent }, DELAY };
@@ -124,7 +124,7 @@ impl EventHandle {
 }
 
 
-struct Emitter {
+struct EventEmitter {
     #[cfg(unix)]
     event_tx: Sender<u8>,
     #[cfg(windows)]
@@ -136,17 +136,15 @@ struct Emitter {
 
 
 pub struct Dispatcher {
-    // Handle user events.
-    #[cfg(unix)]
-    input_tx: Sender<u8>,
-    #[cfg(windows)]
-    input_tx: Sender<InputEvent>,
+    // Read /dev/tty to send keyboard and mouse events.
     input_handle: Option<thread::JoinHandle<()>>,
-    // Handle event broadcast.
-    emitters: Arc<Mutex<HashMap<usize, Emitter>>>,
-    // Handle comnmands to manipulate the terminal.
+    // Broadcast to all spawned EventHandles.
+    lock_owner: Arc<AtomicUsize>,
+    emitters: Arc<Mutex<HashMap<usize, EventEmitter>>>,
     event_handle: Option<thread::JoinHandle<()>>,
+    // Process signals from spawned EventHandles.
     signal_tx: Sender<Cmd>,
+    signal_handle: Option<thread::JoinHandle<()>>,
     // Handle graceful shutdown and clean up.
     is_running: Arc<AtomicBool>,
 }
@@ -156,11 +154,11 @@ impl Dispatcher {
         // Initialize struct fields.
         let emitters = Arc::new(Mutex::new(HashMap::with_capacity(8)));
         let is_running = Arc::new(AtomicBool::new(true));
-        let (input_tx, input_rx) = channel();
-        let (signal_tx, signal_rx) = channel();
-        // Setup Arcs to move into thread.
-        let is_running_arc = is_running.clone();
+        let lock_owner = Arc::new(AtomicUsize::new(0));
+        // Setup Arc's to move into thread.
         let emitters_arc = emitters.clone();
+        let is_running_arc = is_running.clone();
+        let lock_owner_arc = lock_owner.clone();
 
         // Fetch terminal state in main thread.
         #[cfg(unix)]
@@ -170,56 +168,20 @@ impl Dispatcher {
         #[cfg(windows)]
         let default = win32::get_attrib();
 
-        // Start event loop.
-        let event_handle = thread::spawn(move || {
-            let mut lock_owner = 0;
-            let lock_err = "Error obtaining emitters lock";
+        // Start signal loop.
+        let (signal_tx, signal_rx) = channel();
+        let signal_handle = thread::spawn(move || {
             // Windows *mut c_void cannot be safely moved into thread. So
             // we create it within the thread.
             #[cfg(windows)]
-            let alternate = Handle::buffer()
+            let screen = Handle::buffer()
                 .expect("Error creating alternate Console buffer");
             #[cfg(windows)]
             let vte = is_ansi_enabled();
-
+            let lock_err = "Error obtaining emitters lock";
             while is_running_arc.load(Ordering::SeqCst) {
                 // Include minor delay so the thread isn't blindly using CPU.
                 thread::sleep(Duration::from_millis(DELAY));
-                // Push user input events if the self.listen() has been called.
-                match input_rx.try_recv() {
-                    Ok(m) => {
-                        let mut roster = emitters_arc.lock().expect(lock_err);
-                        // Emitters clean up.
-                        if !roster.is_empty() {
-                            roster.retain(|_, tx: &mut Emitter| tx.is_running);
-                        }
-                        // Push user input event.
-                        match lock_owner {
-                            0 => {
-                                for (_, tx) in roster.iter() {
-                                    if tx.is_suspend { continue }
-                                    // (imdaveho) TODO: Handle the Err state?
-                                    // Reason: used to be .is_err() { break }
-                                    // but this breaks the for loop not thread
-                                    let _ = tx.event_tx.send(m);
-                                }
-                            },
-                            id => match roster.get(&id) {
-                                // (imdaveho) TODO: Handle the Err state?
-                                // Previous: break out of the loop. But might
-                                // have caused weird conditions on .join() --
-                                // further observation needed.
-                                Some(tx) => { let _ = tx.event_tx.send(m); },
-                                None => lock_owner = 0,
-                            }
-                        }
-                    },
-                    Err(e) => match e {
-                        TryRecvError::Empty => (),
-                        TryRecvError::Disconnected => is_running_arc
-                            .store(false, Ordering::SeqCst),
-                    }
-                }
                 // Handle signal commands.
                 match signal_rx.try_recv() {
                     Ok(cmd) => match cmd {
@@ -228,30 +190,38 @@ impl Dispatcher {
                             let mut roster = emitters_arc.lock()
                                 .expect(lock_err);
                             roster.entry(id)
-                                .and_modify(|tx| tx.is_suspend = true );
+                                .and_modify(|tx: &mut EventEmitter| {
+                                    tx.is_suspend = true
+                                });
                         },
                         Cmd::Transmit(id) => {
                             let mut roster = emitters_arc.lock()
                                 .expect(lock_err);
                             roster.entry(id)
-                                .and_modify(|tx| tx.is_suspend = false );
+                                .and_modify(|tx: &mut EventEmitter| {
+                                    tx.is_suspend = false
+                                });
                         },
                         Cmd::Stop(id) => {
                             let mut roster = emitters_arc.lock()
                                 .expect(lock_err);
                             roster.entry(id)
-                                .and_modify(|tx| tx.is_running = false );
+                                .and_modify(|tx: &mut EventEmitter| {
+                                    tx.is_running = false
+                                });
                         },
                         Cmd::Lock(id) => {
-                            match lock_owner {
-                                0 => lock_owner = id,
+                            match lock_owner_arc.load(Ordering::SeqCst) {
+                                0 => lock_owner_arc
+                                    .store(id, Ordering::SeqCst),
                                 _ => continue,
                             }
                         },
                         Cmd::Unlock => {
-                            match lock_owner {
+                            match lock_owner_arc.load(Ordering::SeqCst) {
                                 0 => continue,
-                                _ => lock_owner = 0,
+                                _ => lock_owner_arc
+                                    .store(0, Ordering::SeqCst),
                             }
                         },
                         Cmd::Signal(a) => match a {
@@ -406,23 +376,78 @@ impl Dispatcher {
                     }
                 }
             }
+            // Close the alternate screen.
             #[cfg(windows)]
-            let _ = alternate.close();
+            let _ = screen.close();
         });
 
         Dispatcher {
             input_handle: None,
-            input_tx: input_tx,
             emitters: emitters,
-            event_handle: Some(event_handle),
+            lock_owner: lock_owner,
+            event_handle: None,
             signal_tx: signal_tx,
+            signal_handle: Some(signal_handle),
             is_running: is_running,
         }
     }
 
     pub fn listen(&mut self) -> EventHandle {
-        // Send the input_tx Sender to listen for user input.
-        let input_tx = self.input_tx.clone();
+        // Do not duplicate threads.
+        // If input handle exists don't do anything.
+        if let Some(_) = self.input_handle { return self.spawn() }
+        // Setup input channel and Arc's to move to thread.
+        let (input_tx, input_rx) = channel();
+        let is_running = self.is_running.clone();
+        let lock_owner = self.lock_owner.clone();
+        let emitters_arc = self.emitters.clone();
+
+        // Start event emitting loop.
+        self.event_handle = Some(thread::spawn(move || {
+            let lock_err = "Error obtaining emitters lock";
+            while is_running.load(Ordering::SeqCst) {
+                // Include minor delay so the thread isn't blindly using CPU.
+                thread::sleep(Duration::from_millis(DELAY));
+                // Push user input events if the self.listen() has been called.
+                match input_rx.try_recv() {
+                    Ok(m) => {
+                        // Emitters clean up.
+                        let mut roster = emitters_arc.lock().expect(lock_err);
+                        if !roster.is_empty() {
+                            roster.retain( |_, tx: &mut EventEmitter| {
+                                tx.is_running
+                            })
+                        }
+                        // Push user input event.
+                        match lock_owner.load(Ordering::SeqCst) {
+                            0 => {
+                                for (_, tx) in roster.iter() {
+                                    if tx.is_suspend { continue }
+                                    // (imdaveho) TODO: Handle the Err state?
+                                    // Reason: used to be .is_err() { break }
+                                    // but this breaks the for loop not thread
+                                    let _ = tx.event_tx.send(m);
+                                }
+                            },
+                            id => match roster.get(&id) {
+                                // (imdaveho) TODO: Handle the Err state?
+                                // Previous: break out of the loop. But might
+                                // have caused weird conditions on .join() --
+                                // further observation needed.
+                                Some(tx) => { let _ = tx.event_tx.send(m); },
+                                None => lock_owner.store(0, Ordering::SeqCst),
+                            }
+                        }
+                    },
+                    Err(e) => match e {
+                        TryRecvError::Empty => (),
+                        TryRecvError::Disconnected => is_running
+                            .store(false, Ordering::SeqCst),
+                    }
+                }
+            }
+        }));
+
         let is_running = self.is_running.clone();
         // Begin reading user input.
         #[cfg(unix)] {
@@ -443,6 +468,7 @@ impl Dispatcher {
                 thread::sleep(Duration::from_millis(DELAY));
             }
         }))}
+
         #[cfg(windows)] {
         self.input_handle = Some(thread::spawn(move || {
             while is_running.load(Ordering::SeqCst) {
@@ -488,7 +514,7 @@ impl Dispatcher {
         let (event_tx, event_rx) = channel();
         let id = self.randomish();
         let mut roster = self.emitters.lock().expect(err_msg);
-        roster.insert(id, Emitter {
+        roster.insert(id, EventEmitter {
             event_tx: event_tx,
             is_suspend: false,
             is_running: true,
@@ -508,10 +534,11 @@ impl Dispatcher {
     fn shutdown(&mut self) -> std::thread::Result<()> {
         self.is_running.store(false, Ordering::SeqCst);
         // if let Some(t) = self.input_handle.take() { t.join()? }
-        let mut roster = self.emitters.lock()
-            .expect("Error obtaining emitters lock");
+        let lock_err = "Error obtaining emitters lock";
+        let mut roster = self.emitters.lock().expect(lock_err);
         roster.clear();
         if let Some(t) = self.event_handle.take() { t.join()? }
+        if let Some(t) = self.signal_handle.take() { t.join()? }
         Ok(())
     }
 }
