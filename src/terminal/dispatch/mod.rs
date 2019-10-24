@@ -141,7 +141,6 @@ pub struct Dispatcher {
     // Broadcast to all spawned EventHandles.
     lock_owner: Arc<AtomicUsize>,
     emitters: Arc<Mutex<HashMap<usize, EventEmitter>>>,
-    event_handle: Option<thread::JoinHandle<()>>,
     // Process signals from spawned EventHandles.
     signal_tx: Sender<Cmd>,
     signal_handle: Option<thread::JoinHandle<()>>,
@@ -385,7 +384,6 @@ impl Dispatcher {
             input_handle: None,
             emitters: emitters,
             lock_owner: lock_owner,
-            event_handle: None,
             signal_tx: signal_tx,
             signal_handle: Some(signal_handle),
             is_running: is_running,
@@ -396,59 +394,13 @@ impl Dispatcher {
         // Do not duplicate threads.
         // If input handle exists don't do anything.
         if let Some(_) = self.input_handle { return self.spawn() }
+
         // Setup input channel and Arc's to move to thread.
-        let (input_tx, input_rx) = channel();
         let is_running = self.is_running.clone();
         let lock_owner = self.lock_owner.clone();
         let emitters_arc = self.emitters.clone();
+        let lock_err = "Error obtaining emitters lock";
 
-        // Start event emitting loop.
-        self.event_handle = Some(thread::spawn(move || {
-            let lock_err = "Error obtaining emitters lock";
-            while is_running.load(Ordering::SeqCst) {
-                // Include minor delay so the thread isn't blindly using CPU.
-                thread::sleep(Duration::from_millis(DELAY));
-                // Push user input events if the self.listen() has been called.
-                match input_rx.try_recv() {
-                    Ok(m) => {
-                        // Emitters clean up.
-                        let mut roster = emitters_arc.lock().expect(lock_err);
-                        if !roster.is_empty() {
-                            roster.retain( |_, tx: &mut EventEmitter| {
-                                tx.is_running
-                            })
-                        }
-                        // Push user input event.
-                        match lock_owner.load(Ordering::SeqCst) {
-                            0 => {
-                                for (_, tx) in roster.iter() {
-                                    if tx.is_suspend { continue }
-                                    // (imdaveho) TODO: Handle the Err state?
-                                    // Reason: used to be .is_err() { break }
-                                    // but this breaks the for loop not thread
-                                    let _ = tx.event_tx.send(m);
-                                }
-                            },
-                            id => match roster.get(&id) {
-                                // (imdaveho) TODO: Handle the Err state?
-                                // Previous: break out of the loop. But might
-                                // have caused weird conditions on .join() --
-                                // further observation needed.
-                                Some(tx) => { let _ = tx.event_tx.send(m); },
-                                None => lock_owner.store(0, Ordering::SeqCst),
-                            }
-                        }
-                    },
-                    Err(e) => match e {
-                        TryRecvError::Empty => (),
-                        TryRecvError::Disconnected => is_running
-                            .store(false, Ordering::SeqCst),
-                    }
-                }
-            }
-        }));
-
-        let is_running = self.is_running.clone();
         // Begin reading user input.
         #[cfg(unix)] {
         self.input_handle = Some(thread::spawn(move || {
@@ -459,11 +411,27 @@ impl Dispatcher {
                 for byte in tty.bytes() {
                     if !is_running.load(Ordering::SeqCst) { break }
                     let b = byte.expect("Error reading byte from /dev/tty");
-                    // (imdaveho) TODO: Handle the Err state?
-                    // Previous: break out of the loop. But might
-                    // have caused weird conditions on .join() --
-                    // further observation needed.
-                    let _ = input_tx.send(b);
+                    // let _ = input_tx.send(b);
+                    // Emitters clean up.
+                    let mut roster = emitters_arc.lock().expect(lock_err);
+                    if !roster.is_empty() {
+                        roster.retain( |_, tx: &mut EventEmitter| {
+                            tx.is_running
+                        })
+                    }
+                    // Push user input event.
+                    match lock_owner.load(Ordering::SeqCst) {
+                        0 => {
+                            for (_, tx) in roster.iter() {
+                                if tx.is_suspend { continue }
+                                let _ = tx.event_tx.send(b);
+                            }
+                        },
+                        id => match roster.get(&id) {
+                            Some(tx) => { let _ = tx.event_tx.send(b); },
+                            None => lock_owner.store(0, Ordering::SeqCst),
+                        }
+                    }
                 }
                 thread::sleep(Duration::from_millis(DELAY));
             }
@@ -474,11 +442,29 @@ impl Dispatcher {
             while is_running.load(Ordering::SeqCst) {
                 let (_, evts) = windows::parser::read_input_events()
                     .expect("Error reading console input");
-                // (imdaveho) TODO: Handle the Err state?
-                // Previous: break out of the loop. But might
-                // have caused weird conditions on .join() --
-                // further observation needed.
-                for evt in evts { let _ = input_tx.send(evt); }
+                // for evt in evts { let _ = input_tx.send(evt); }
+                for evt in evts {
+                    // Emitters clean up.
+                    let mut roster = emitters_arc.lock().expect(lock_err);
+                    if !roster.is_empty() {
+                        roster.retain( |_, tx: &mut EventEmitter| {
+                            tx.is_running
+                        })
+                    }
+                    // Push user input event.
+                    match lock_owner.load(Ordering::SeqCst) {
+                        0 => {
+                            for (_, tx) in roster.iter() {
+                                if tx.is_suspend { continue }
+                                let _ = tx.event_tx.send(evt);
+                            }
+                        },
+                        id => match roster.get(&id) {
+                            Some(tx) => { let _ = tx.event_tx.send(evt); },
+                            None => lock_owner.store(0, Ordering::SeqCst),
+                        }
+                    }
+                }
                 thread::sleep(Duration::from_millis(DELAY));
             }
         }))}
@@ -537,7 +523,6 @@ impl Dispatcher {
         let lock_err = "Error obtaining emitters lock";
         let mut roster = self.emitters.lock().expect(lock_err);
         roster.clear();
-        if let Some(t) = self.event_handle.take() { t.join()? }
         if let Some(t) = self.signal_handle.take() { t.join()? }
         Ok(())
     }
