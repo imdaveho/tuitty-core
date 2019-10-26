@@ -6,38 +6,11 @@ use std::sync::{
     atomic::{ AtomicBool, Ordering }
 };
 
-// ATTEMPT 2
-// #[cfg(unix)]
-// use std::os::unix::io::{ IntoRawFd, FromRawFd };
-// use std::io::Write;
-
 #[cfg(unix)]
 use tuitty::{
-    terminal::{ dispatch::unix::parser, actions::posix },
+    terminal::{ actions::posix, dispatch::unix::parser },
     common::enums::{ InputEvent, KeyEvent, MouseEvent },
 };
-
-
-// pub struct Bytes<R> {
-//     inner: R,
-// }
-
-// impl<R: Read> Iterator for Bytes<R> {
-//     type Item = Result<u8>;
-
-//     fn next(&mut self, cond: Arc<AtomicBool>) -> Option<Result<u8>> {
-//         let mut byte = 0;
-//         while cond.load(Ordering::SeqCst) {
-//             return match self.inner.read(slice::from_mut(&mut byte)) {
-//                 Ok(0) => None,
-//                 Ok(..) => Some(Ok(byte)),
-//                 Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
-//                 Err(e) => Some(Err(e)),
-//             };
-//         }
-//         Some(Ok(0))
-//     }
-// }
 
 fn main() {
     #[cfg(unix)] {
@@ -48,24 +21,15 @@ fn main() {
         posix::raw();
         posix::enable_mouse();
         posix::hide_cursor();
+        posix::flush();
         let (input_tx, input_rx) = channel();
 
         let input_handle = thread::spawn(move || {
-
-            // ATTEMPT 2 - using FileFd to pass input later
-            // Doesn't work since write..just prints out on the screen
-            // Need to send EOT or some kind of process end to the thread...
-            // For now...we just don't join the thread...
-            // When the program exits...this should close the thread naturally.
-            // let tty_fd = fs::OpenOptions::new()
-            //     .read(true).write(true)
-            //     .open("/dev/tty").expect("Error opening /dev/tty")
-            //     .into_raw_fd();
-
+            // ORIGINAL - Hangs at end
             // while is_running_arc.load(Ordering::SeqCst) {
-            //     let tty = unsafe {
-            //         BufReader::new(fs::File::from_raw_fd(tty_fd))
-            //     };
+            //     let tty = BufReader::new(fs::OpenOptions::new()
+            //                              .read(true).write(true).open("/dev/tty")
+            //                              .expect("Error opening /dev/tty"));
             //     for byte in tty.bytes() {
             //         if !is_running_arc.load(Ordering::SeqCst) { break }
             //         let b = byte.expect("Error reading byte from /dev/tty");
@@ -77,39 +41,55 @@ fn main() {
             //     }
             //     thread::sleep(Duration::from_millis(10));
             // }
-            // ATTEMPT 1 - Works only for single byte sequences
-            // while is_running_arc.load(Ordering::SeqCst) {
-            //     let mut tty = BufReader::new(fs::OpenOptions::new()
-            //                              .read(true).write(true).open("/dev/tty")
-            //                              .expect("Error opening /dev/tty"));
-            //     let mut buf: [u8; 1] = [0];
-            //     let _ = tty.read_exact(&mut buf);
-            //     let _ = input_tx.send(buf[0]);
 
-            //     thread::sleep(Duration::from_millis(10));
+            // TESTING MANUAL READS -- LOOKING GOOD!
+            // let mut i = 0;
+            // while i < 4 {
+            //     let mut tty = BufReader::new(
+            //         fs::OpenOptions::new()
+            //             .read(true).write(true).open("/dev/tty")
+            //             .expect("Error opening /dev/tty"));
+            //     // DID NOT WORK
+            //     // read_exact x2
+            //     // let mut it1 = [0; 1];
+            //     // let _ = tty.read_exact(&mut it1);
+            //     // let mut it2 = [0; 1];
+            //     // let _ = tty.read_exact(&mut it2);
+            //     // println!("{:?}", it1);
+            //     // println!("{:?}", it2);
+            //     // DID WORK!
+            //     let mut buf: [u8; 20] = [0; 20];
+            //     let mut newr = tty.take(20);
+            //     let _ = newr.read(&mut buf);
+            //     let item = buf[0];
+            //     let rest: Vec<u8> = buf[1..]
+            //         .to_vec().into_iter()
+            //         .filter(|x| x != &0).collect();
+            //     let mut rest = rest.into_iter();
+            //     let evt = parser::parse_event(item, &mut rest);
+            //     // println!("{:?}", input);
+            //     // println!("(item: {:?}, &mut iter: {:?})", item, iter);
+            //     // println!("next: {:?}", iter.next());
+            //     println!("{:?}", evt);
+            //     i += 1;
             // }
 
-            // ORIGINAL - Hangs at end
             while is_running_arc.load(Ordering::SeqCst) {
-                let tty = BufReader::new(fs::OpenOptions::new()
-                                         .read(true).write(true).open("/dev/tty")
-                                         .expect("Error opening /dev/tty"));
-                // for byte in tty.bytes() {
-                //     if !is_running_arc.load(Ordering::SeqCst) { break }
-                //     let b = byte.expect("Error reading byte from /dev/tty");
-                //     // (imdaveho) TODO: Handle the Err state?
-                //     // Previous: break out of the loop. But might
-                //     // have caused weird conditions on .join() --
-                //     // further observation needed.
-                //     let _ = input_tx.send(b);
-                // }
-                let t = tty.bytes();
-                for _b in t {
-                    if !is_running_arc.load(Ordering::SeqCst) { break }
-                    let _ = input_tx.send(59);
-                }
-                thread::sleep(Duration::from_millis(10));
+                let tty = BufReader::new(
+                    fs::OpenOptions::new()
+                        .read(true).write(true).open("/dev/tty")
+                        .expect("Error opening /dev/tty"));
+                let (mut input, mut taken) = ([0; 12], tty.take(12));
+                let _ = taken.read(&mut input);
+                let item = input[0];
+                // let rest: Vec<u8> = input[1..]
+                //     .to_vec().into_iter()
+                //     .filter(|x| x != &0).collect();
+                // let mut rest = rest.into_iter();
+                let mut rest = input[1..].to_vec().into_iter();
+                let _ = input_tx.send(parser::parse_event(item, &mut rest));
             }
+
         });
 
         // let is_running_chk = is_running.clone();
@@ -125,16 +105,22 @@ fn main() {
 
         loop {
             let mut iterator = input_rx.try_iter();
-            let evt = match iterator.next() {
-                Some(ch) => {
-                    let parsed_evt = parser::parse_event(
-                        ch, &mut iterator);
-                    if let Ok(evt) = parsed_evt {
-                        Some(evt)
-                    } else { None }
-                }
-                None => None,
-            };
+
+            // Original
+            // let evt = match iterator.next() {
+            //     Some(ch) => {
+            //         let parsed_evt = parser::parse_event(
+            //             ch, &mut iterator);
+            //         if let Ok(evt) = parsed_evt {
+            //             Some(evt)
+            //         } else { None }
+            //     }
+            //     None => None,
+            // };
+
+            // Scenario 1.
+            let evt = iterator.next();
+
             match evt {
                 Some(ev) => match ev {
                     InputEvent::Keyboard(kv) => match kv {
@@ -178,15 +164,13 @@ fn main() {
             thread::sleep(Duration::from_millis(10));
         }
 
-        input_handle.join().expect("Error joining");
+        // input_handle.join().expect("Error joining");
         // check_thread.join().expect("Error joining check_thread");
 
         posix::show_cursor();
         posix::disable_mouse();
         posix::cook(&original_mode);
         posix::disable_alt();
-
-        thread::sleep(Duration::from_secs(2));
     }
 }
 

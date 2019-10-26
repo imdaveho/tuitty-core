@@ -39,7 +39,7 @@ fn main() {
     let counter_handle = thread::spawn(move || {
         let mut i = 0;
         counter.signal(HideCursor);
-        counter.lock();
+        // counter.lock();
         loop {
             counter.signal(Goto(10,10));
             let content = format!("count: {}", i);
@@ -59,7 +59,7 @@ fn main() {
             }
             thread::sleep(time::Duration::from_millis(400));
         }
-        counter.unlock();
+        // counter.unlock();
     });
 
     listener_handle.join().expect("Listener failed to join");
