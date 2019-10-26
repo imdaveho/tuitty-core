@@ -35,76 +35,79 @@ use crate::terminal::actions::win32::Handle;
 use crate::common::enums::{ InputEvent, KeyEvent, MouseEvent, MouseButton };
 
 
-pub fn read_single_event() -> Result<Option<InputEvent>> {
-    let conin = Handle::conin()?;
+// pub fn read_single_event() -> Result<Option<InputEvent>> {
+//     let conin = Handle::conin()?;
 
-    let mut buf_len: DWORD = 0;
-    if unsafe {
-        GetNumberOfConsoleInputEvents(conin.0, &mut buf_len)
-    } == 0 {
-        return Err(Error::last_os_error());
-    }
+//     let mut buf_len: DWORD = 0;
+//     if unsafe {
+//         GetNumberOfConsoleInputEvents(conin.0, &mut buf_len)
+//     } == 0 {
+//         return Err(Error::last_os_error());
+//     }
 
-    // Fast-skipping all the code below if there is nothing to read at all
-     if buf_len == 0 {
-        return Ok(None);
-    }
+//     // Fast-skipping all the code below if there is nothing to read at all
+//      if buf_len == 0 {
+//         return Ok(None);
+//     }
 
-    let mut buf: Vec<INPUT_RECORD> = Vec::with_capacity(1);
-    let mut size = 0;
+//     let mut buf: Vec<INPUT_RECORD> = Vec::with_capacity(1);
+//     let mut size = 0;
 
-    if unsafe {
-        ReadConsoleInputW(conin.0, buf.as_mut_ptr(), 1, &mut size)
-    } == 0 {
-        return Err(Error::last_os_error());
-    } else {
-        unsafe {
-            buf.set_len(1 as usize);
-        }
-    }
+//     if unsafe {
+//         ReadConsoleInputW(conin.0, buf.as_mut_ptr(), 1, &mut size)
+//     } == 0 {
+//         return Err(Error::last_os_error());
+//     } else {
+//         unsafe {
+//             buf.set_len(1 as usize);
+//         }
+//     }
 
-    let input = buf[..(1 as usize)]
-            .iter()
-            .map(|x| InputRecord::from(*x))
-            .collect::<Vec<InputRecord>>()[0]
-            .to_owned();
-    match input.event_type {
-        InputEventType::KeyEvent => {
-            let key_event = unsafe {
-                KeyEventRecord::from(*input.event.KeyEvent())
-            };
-            if key_event.key_down {
-                return Ok(Some(InputEvent::Keyboard(
-                parse_key_event(&key_event))))
-            }
-            return Ok(None)
-        }
-        InputEventType::MouseEvent => {
-            let mouse_event = unsafe {
-                MouseEventRecord::from(*input.event.MouseEvent())
-            };
-            Ok(Some(InputEvent::Mouse(
-            parse_mouse_event(&mouse_event))))
-        }
-        // TODO implement terminal resize event
-        InputEventType::WindowBufferSizeEvent => Ok(None),
-        InputEventType::FocusEvent => Ok(None),
-        InputEventType::MenuEvent => Ok(None),
-    }
-}
+//     let input = buf[..(1 as usize)]
+//             .iter()
+//             .map(|x| InputRecord::from(*x))
+//             .collect::<Vec<InputRecord>>()[0]
+//             .to_owned();
+//     match input.event_type {
+//         InputEventType::KeyEvent => {
+//             let key_event = unsafe {
+//                 KeyEventRecord::from(*input.event.KeyEvent())
+//             };
+//             if key_event.key_down {
+//                 return Ok(Some(InputEvent::Keyboard(
+//                 parse_key_event(&key_event))))
+//             }
+//             return Ok(None)
+//         }
+//         InputEventType::MouseEvent => {
+//             let mouse_event = unsafe {
+//                 MouseEventRecord::from(*input.event.MouseEvent())
+//             };
+//             Ok(Some(InputEvent::Mouse(
+//             parse_mouse_event(&mouse_event))))
+//         }
+//         // TODO implement terminal resize event
+//         InputEventType::WindowBufferSizeEvent => Ok(None),
+//         InputEventType::FocusEvent => Ok(None),
+//         InputEventType::MenuEvent => Ok(None),
+//     }
+// }
 
 pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
-    let conin = Handle::conin()?;
+    let conin = match Handle::conin() {
+        Ok(h) => h,
+        Err(_) => return (0, InputEvent::Unsupported),
+    }
 
     let mut buf_len: DWORD = 0;
     if unsafe {
         GetNumberOfConsoleInputEvents(conin.0, &mut buf_len)
     } == 0 {
-        return Err(Error::last_os_error());
+        return InputEvent::Unsupported;
     }
     // Fast-skipping all the code below if there is nothing to read at all
     if buf_len == 0 {
-        return Ok((0, vec![]));
+        return (0, vec![]);
     }
 
     let mut buf: Vec<INPUT_RECORD> = Vec::with_capacity(buf_len as usize);
@@ -113,7 +116,7 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
     if unsafe {
         ReadConsoleInputW(conin.0, buf.as_mut_ptr(), buf_len, &mut size)
     } == 0 {
-        return Err(Error::last_os_error());
+        return InputEvent::Unsupported;
     } else {
         unsafe {
             buf.set_len(buf_len as usize);
@@ -155,7 +158,7 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
             InputEventType::MenuEvent => (),
         }
     }
-    return Ok((result.0, events));
+    return (result.0, events);
 }
 
 
