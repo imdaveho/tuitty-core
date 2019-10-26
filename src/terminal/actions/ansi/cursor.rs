@@ -28,3 +28,7 @@ pub fn hide_cursor() -> String {
 pub fn show_cursor() -> String {
     "\x1B[?25h".to_string()
 }
+
+pub fn pos() -> String {
+    "\x1B[6n".to_string()
+}

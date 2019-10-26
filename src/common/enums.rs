@@ -119,7 +119,7 @@ impl BitAnd<Effect> for u32 {
 
 // (imdaveho) NOTE: Copy/Clone needed to send over channels.
 // See: crate::terminal::dispatch
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub enum InputEvent {
     Keyboard(KeyEvent),
     Mouse(MouseEvent),
@@ -128,13 +128,13 @@ pub enum InputEvent {
 }
 
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub enum StoreEvent {
     Pos(i16, i16),
     Size(i16, i16),
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub enum MouseEvent {
     Press(MouseButton, i16, i16),
     Release(i16, i16),
@@ -142,7 +142,7 @@ pub enum MouseEvent {
 }
 
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub enum MouseButton {
     Left,
     Right,
@@ -152,7 +152,7 @@ pub enum MouseButton {
 }
 
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub enum KeyEvent {
     Backspace,
     Enter,
@@ -193,8 +193,7 @@ pub enum Cmd {
     Lock(usize),
     Unlock,
     Signal(Action),
-    GetPos(usize),
-    // Size,
+    Request(Store)
 }
 
 
@@ -228,4 +227,10 @@ pub enum Action {
     Cook,
     // Size, (imdaveho) NOTE: Nowhere to return (i16, i16).
     // Pos(usize),
+}
+
+
+pub enum Store {
+    Pos(usize),
+    Size(usize),
 }

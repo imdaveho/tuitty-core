@@ -11,7 +11,7 @@ use std::{
 use crate::common::{
     DELAY, enums::{
         Action::{*, self}, InputEvent::{*, self},
-        StoreEvent::*, Cmd,
+        Cmd, Store, StoreEvent::*
     }
 };
 
@@ -29,12 +29,8 @@ use crate::terminal::actions::win32;
 
 
 pub struct EventHandle {
-    // #[cfg(unix)]
-    // event_rx: Receiver<u8>,
-    // #[cfg(windows)]
-    event_rx: Receiver<InputEvent>,
-
     id: usize,
+    event_rx: Receiver<InputEvent>,
     signal_tx: Sender<Cmd>,
 }
 
@@ -59,40 +55,11 @@ impl EventHandle {
         let _ = self.signal_tx.send(Cmd::Unlock);
     }
 
-    // #[cfg(unix)]
-    // pub fn poll_async(&self) -> Option<InputEvent> {
-    //     let mut iterator = self.event_rx.try_iter();
-    //     match iterator.next() {
-    //         Some(ch) => {
-    //             let parsed_evt = unix::parser::parse_event(
-    //                 ch, &mut iterator);
-    //             if let Ok(evt) = parsed_evt {
-    //                 Some(evt)
-    //             } else { None }
-    //         }
-    //         None => None,
-    //     }
-    // }
-
-    // #[cfg(unix)]
-    // pub fn poll_latest_async(&self) -> Option<InputEvent> {
-    //     let mut iterator = self.event_rx.try_iter();
-    //     let mut result = Vec::with_capacity(8);
-    //     while let Some(ch) = iterator.next() {
-    //         let parsed_evt = unix::parser::parse_event(ch, &mut iterator);
-    //         if let Ok(evt) = parsed_evt { result.push(evt) }
-    //         else { continue }
-    //     }
-    //     result.pop()
-    // }
-
-    // #[cfg(windows)]
     pub fn poll_async(&self) -> Option<InputEvent> {
         let mut iterator = self.event_rx.try_iter();
         iterator.next()
     }
 
-    // #[cfg(windows)]
     pub fn poll_latest_async(&self) -> Option<InputEvent> {
         let mut iterator = self.event_rx.try_iter();
         let mut result = Vec::with_capacity(8);
@@ -102,22 +69,6 @@ impl EventHandle {
         result.pop()
     }
 
-    // #[cfg(unix)]
-    // pub fn poll_sync(&self) -> Option<InputEvent> {
-    //     let mut iterator = self.event_rx.iter();
-    //     match iterator.next() {
-    //         Some(ch) => {
-    //             let parsed_evt = unix::parser::parse_event(
-    //                 ch, &mut iterator);
-    //             if let Ok(evt) = parsed_evt {
-    //                 Some(evt)
-    //             } else { None }
-    //         }
-    //         None => None,
-    //     }
-    // }
-
-    // #[cfg(windows)]
     pub fn poll_sync(&self) -> Option<InputEvent> {
         let mut iterator = self.event_rx.iter();
         iterator.next()
@@ -130,29 +81,40 @@ impl EventHandle {
     }
 
     pub fn pos(&self) -> (i16, i16) {
-        let _ = self.signal_tx.send(Cmd::GetPos(self.id));
-        let mut iterator = self.event_rx.iter();
-        let pos_evt = iterator.next().unwrap_or(Unsupported);
-        // match pos_evt {
-        //     Dispatch(ev) => match ev {
-        //         Pos(col, row) => (col, row),
-        //         _ => (0, 0)
-        //     },
-        //     _ => (0, 0)
-        // }
-        if let Dispatch(Pos(col, row)) = pos_evt {
-            (col, row)
-        } else { (0, 0) }
+        let _ = self.signal_tx.send(
+            Cmd::Request(Store::Pos(self.id)));
+        let mut iter = self.event_rx.iter();
+        loop {
+            if let Some(Dispatch(Pos(col, row))) = iter.next() {
+                return (col, row)
+            }
+        }
+    }
+
+    pub fn size(&self) -> (i16, i16) {
+        let _ = self.signal_tx.send(
+            Cmd::Request(Store::Size(self.id)));
+        let mut iter = self.event_rx.iter();
+        loop {
+            if let Some(Dispatch(Size(w, h))) = iter.next() {
+                return (w, h)
+            }
+        }
+        // (imdvaeho) TODO: this should still call the top
+        // since it will pull from the store. But there will
+        // have to be a sync with store call to get updated
+        // size esp. on SIGWINCH.
+        // #[cfg(unix)]
+        // let (w, h) = posix::size();
+        // #[cfg(windows)]
+        // let (w, h) = win32::size();
+        // (w, h)
     }
 }
 
 
 struct EventEmitter {
-    // #[cfg(unix)]
-    // event_tx: Sender<u8>,
-    // #[cfg(windows)]
     event_tx: Sender<InputEvent>,
-
     is_suspend: bool,
     is_running: bool,
 }
@@ -200,7 +162,7 @@ impl Dispatcher {
                 .expect("Error creating alternate Console buffer");
             #[cfg(windows)]
             let vte = win32::is_ansi_enabled();
-            let lock_err = "Error obtaining emitters lock";
+
             while is_running_arc.load(Ordering::SeqCst) {
                 // Include minor delay so the thread isn't blindly using CPU.
                 thread::sleep(Duration::from_millis(DELAY));
@@ -209,24 +171,42 @@ impl Dispatcher {
                     Ok(cmd) => match cmd {
                         Cmd::Continue => (),
                         Cmd::Suspend(id) => {
-                            let mut roster = emitters_arc.lock()
-                                .expect(lock_err);
+                            let mut roster = match emitters_arc.lock() {
+                                Ok(r) => r,
+                                Err(_) => match emitters_arc.lock() {
+                                    Ok(r) => r,
+                                    Err(_) => continue
+                                },
+                            };
+
                             roster.entry(id)
                                 .and_modify(|tx: &mut EventEmitter| {
                                     tx.is_suspend = true
                                 });
                         },
                         Cmd::Transmit(id) => {
-                            let mut roster = emitters_arc.lock()
-                                .expect(lock_err);
+                            let mut roster = match emitters_arc.lock() {
+                                Ok(r) => r,
+                                Err(_) => match emitters_arc.lock() {
+                                    Ok(r) => r,
+                                    Err(_) => continue
+                                },
+                            };
+
                             roster.entry(id)
                                 .and_modify(|tx: &mut EventEmitter| {
                                     tx.is_suspend = false
                                 });
                         },
                         Cmd::Stop(id) => {
-                            let mut roster = emitters_arc.lock()
-                                .expect(lock_err);
+                            let mut roster = match emitters_arc.lock() {
+                                Ok(r) => r,
+                                Err(_) => match emitters_arc.lock() {
+                                    Ok(r) => r,
+                                    Err(_) => continue
+                                },
+                            };
+
                             roster.entry(id)
                                 .and_modify(|tx: &mut EventEmitter| {
                                     tx.is_running = false
@@ -244,15 +224,6 @@ impl Dispatcher {
                                 0 => continue,
                                 _ => lock_owner_arc
                                     .store(0, Ordering::SeqCst),
-                            }
-                        },
-                        Cmd::GetPos(id) => {
-                            let roster = emitters_arc.lock()
-                                .expect(lock_err);
-                            let (col, row) = (10, 12);
-                            if let Some(tx) = roster.get(&id) {
-                                let _ = tx.event_tx
-                                    .send(InputEvent::Dispatch(Pos(col, row)));
                             }
                         },
                         Cmd::Signal(a) => match a {
@@ -399,6 +370,58 @@ impl Dispatcher {
                                 win32::cook();
                             },
                         }
+                        Cmd::Request(s) => match s {
+                            #[cfg(unix)]
+                            Store::Pos(id) => {
+                                // (imdaveho) TODO: InputEvent handling for
+                                // Pos() should only happen for syncing with
+                                // the store. Edit this Cmd to pull (col, row)
+                                // from the store instead.
+                                match lock_owner_arc.load(Ordering::SeqCst) {
+                                    0 => lock_owner_arc
+                                        .store(id, Ordering::SeqCst),
+                                    _ => continue,
+                                }
+                                posix::pos();
+                                match lock_owner_arc.load(Ordering::SeqCst) {
+                                    0 => continue,
+                                    _ => lock_owner_arc
+                                        .store(0, Ordering::SeqCst),
+                                }
+                            },
+                            #[cfg(windows)]
+                            Store::Pos(id) => {
+                                let roster = match emitters_arc.lock() {
+                                    Ok(r) => r,
+                                    Err(_) => match emitters_arc.lock() {
+                                        Ok(r) => r,
+                                        Err(_) => continue
+                                    },
+                                };
+                                if let Some(tx) = roster.get(&id) {
+                                    let (col, row) = win32::pos(vte);
+                                    let _ = tx.event_tx.send(Dispatch(
+                                        Pos(col, row)));
+                                }
+                            },
+                            Store::Size(id) => {
+                                let roster = match emitters_arc.lock() {
+                                    Ok(r) => r,
+                                    Err(_) => match emitters_arc.lock() {
+                                        Ok(r) => r,
+                                        Err(_) => continue
+                                    },
+                                };
+                                if let Some(tx) = roster.get(&id) {
+                                    #[cfg(unix)]
+                                    let (w, h) = posix::size();
+                                    #[cfg(windows)]
+                                    let (w, h) = win32::size();
+                                    let _ = tx.event_tx.send(Dispatch(
+                                        Size(w, h)));
+                                }
+                            },
+                        },
                     },
                     Err(e) => match e {
                         TryRecvError::Empty => (),
@@ -431,51 +454,68 @@ impl Dispatcher {
         let is_running = self.is_running.clone();
         let lock_owner = self.lock_owner.clone();
         let emitters_arc = self.emitters.clone();
-        let lock_err = "Error obtaining emitters lock";
 
         // Begin reading user input.
-        // #[cfg(unix)] {
-        // self.input_handle = Some(thread::spawn(move || {
-        //     // while is_running.load(Ordering::SeqCst) {
-        //         let tty = BufReader::new(fs::OpenOptions::new()
-        //             .read(true).write(true).open("/dev/tty")
-        //             .expect("Error opening /dev/tty"));
-        //         for byte in tty.bytes() {
-        //             if !is_running.load(Ordering::SeqCst) { break }
-        //             let b = byte.expect("Error reading byte from /dev/tty");
-        //             // Emitters clean up.
-        //             let mut roster = emitters_arc.lock().expect(lock_err);
-        //             if !roster.is_empty() {
-        //                 roster.retain( |_, tx: &mut EventEmitter| {
-        //                     tx.is_running
-        //                 })
-        //             }
-        //             // Push user input event.
-        //             match lock_owner.load(Ordering::SeqCst) {
-        //                 0 => {
-        //                     for (_, tx) in roster.iter() {
-        //                         if tx.is_suspend { continue }
-        //                         let _ = tx.event_tx.send(b);
-        //                     }
-        //                 },
-        //                 id => match roster.get(&id) {
-        //                     Some(tx) => { let _ = tx.event_tx.send(b); },
-        //                     None => lock_owner.store(0, Ordering::SeqCst),
-        //                 }
-        //             }
-        //         }
-        //     //     thread::sleep(Duration::from_millis(DELAY));
-        //     // }
-        // }))}
+        #[cfg(unix)] {
+        self.input_handle = Some(thread::spawn(move || {
+            while is_running.load(Ordering::SeqCst) {
+                let tty = match fs::OpenOptions::new()
+                    .read(true).write(true).open("/dev/tty")
+                {
+                    Ok(f) => BufReader::new(f),
+                    Err(_) => continue
+                };
+
+                let (mut input, mut taken) = ([0; 12], tty.take(12));
+                let _ = taken.read(&mut input);
+
+                // Emitters clean up.
+                let mut roster = match emitters_arc.lock() {
+                    Ok(r) => r,
+                    Err(_) => match emitters_arc.lock() {
+                        Ok(r) => r,
+                        Err(_) => continue
+                    },
+                };
+                if !roster.is_empty() {
+                    roster.retain( |_, tx: &mut EventEmitter| {
+                        tx.is_running
+                    })
+                }
+                // Parse the user input from /dev/tty.
+                let item = input[0];
+                let mut rest = input[1..].to_vec().into_iter();
+                let evt = unix::parser::parse_event(item, &mut rest);
+                // Push user input event.
+                match lock_owner.load(Ordering::SeqCst) {
+                    0 => {
+                        for (_, tx) in roster.iter() {
+                            if tx.is_suspend { continue }
+                            let _ = tx.event_tx.send(evt);
+                        }
+                    },
+                    id => match roster.get(&id) {
+                        Some(tx) => { let _ = tx.event_tx.send(evt); },
+                        None => lock_owner.store(0, Ordering::SeqCst),
+                    }
+                }
+                thread::sleep(Duration::from_millis(DELAY));
+            }
+        }))}
 
         #[cfg(windows)] {
         self.input_handle = Some(thread::spawn(move || {
             while is_running.load(Ordering::SeqCst) {
-                let (_, evts) = windows::parser::read_input_events()
-                    .expect("Error reading console input");
+                let (_, evts) = windows::parser::read_input_events();
                 for evt in evts {
                     // Emitters clean up.
-                    let mut roster = emitters_arc.lock().expect(lock_err);
+                    let mut roster = match emitters_arc.lock() {
+                        Ok(r) => r,
+                        Err(_) => match emitters_arc.lock() {
+                            Ok(r) => r,
+                            Err(_) => continue
+                        },
+                    };
                     if !roster.is_empty() {
                         roster.retain( |_, tx: &mut EventEmitter| {
                             tx.is_running
@@ -537,8 +577,8 @@ impl Dispatcher {
         });
 
         EventHandle {
-            event_rx: event_rx,
             id: id,
+            event_rx: event_rx,
             signal_tx: self.signal_tx.clone(),
         }
     }
@@ -554,6 +594,14 @@ impl Dispatcher {
         let mut roster = self.emitters.lock().expect(lock_err);
         roster.clear();
         if let Some(t) = self.signal_handle.take() { t.join()? }
+
+        #[cfg(unix)]
+        posix::printf("\n");
+        #[cfg(windows)]
+        let vte = is_ansi_enabled();
+        #[cfg(windows)]
+        win32::printf("\n", vte);
+
         Ok(())
     }
 }

@@ -45,6 +45,10 @@ pub mod posix {
         output::prints(&cursor::move_right(n));
     }
 
+    pub fn pos() {
+        output::printf(&cursor::pos());
+    }
+
     pub fn hide_cursor() {
         output::prints(&cursor::hide_cursor());
     }
@@ -189,6 +193,13 @@ pub mod win32 {
             &ansi::cursor::move_right(n)); return }
         let err_msg = format!("Error moving the cursor up by {}", n);
         wincon::cursor::move_right(n).expect(&err_msg);
+    }
+
+    pub fn pos(vte: bool) {
+        if vte { ansi::output::prints(
+            &ansi::cursor::pos()); return }
+        let err_msg = "Error getting cursor positions";
+        wincon::cursor::pos().expect(err_msg);
     }
 
     pub fn hide_cursor(vte: bool) {

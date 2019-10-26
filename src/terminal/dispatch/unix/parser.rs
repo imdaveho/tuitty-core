@@ -323,8 +323,8 @@ fn parse_csi_cursor_position(buf: Vec<u8>) -> InputEvent {
         .map(|n| n.parse().unwrap())
         .collect();
 
-    let row = nums[0];
-    let col = nums[1];
+    let row = nums[0] - 1;
+    let col = nums[1] - 1;
 
     Dispatch(Pos(col, row))
 }
