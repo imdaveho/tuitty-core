@@ -193,7 +193,7 @@ pub enum Cmd {
     Lock(usize),
     Unlock,
     Signal(Action),
-    Request(Store)
+    Request(State)
 }
 
 
@@ -230,7 +230,7 @@ pub enum Action {
 }
 
 
-pub enum Store {
+pub enum State {
     Pos(usize),
     Size(usize),
 }

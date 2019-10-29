@@ -1,6 +1,6 @@
 pub mod actions;
 pub mod dispatch;
-// pub mod store;
+pub mod store;
 
 
 // #[cfg(unix)]

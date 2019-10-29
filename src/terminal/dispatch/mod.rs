@@ -11,9 +11,11 @@ use std::{
 use crate::common::{
     DELAY, enums::{
         Action::{*, self}, InputEvent::{*, self},
-        Cmd, Store, StoreEvent::*
+        Cmd, State, StoreEvent::*
     }
 };
+
+use crate::terminal::store::Store;
 
 #[cfg(unix)]
 pub mod unix;
@@ -82,7 +84,7 @@ impl EventHandle {
 
     pub fn pos(&self) -> (i16, i16) {
         let _ = self.signal_tx.send(
-            Cmd::Request(Store::Pos(self.id)));
+            Cmd::Request(State::Pos(self.id)));
         let mut iter = self.event_rx.iter();
         loop {
             if let Some(Dispatch(Pos(col, row))) = iter.next() {
@@ -93,7 +95,7 @@ impl EventHandle {
 
     pub fn size(&self) -> (i16, i16) {
         let _ = self.signal_tx.send(
-            Cmd::Request(Store::Size(self.id)));
+            Cmd::Request(State::Size(self.id)));
         let mut iter = self.event_rx.iter();
         loop {
             if let Some(Dispatch(Size(w, h))) = iter.next() {
@@ -139,6 +141,7 @@ impl Dispatcher {
         let emitters = Arc::new(Mutex::new(HashMap::with_capacity(8)));
         let is_running = Arc::new(AtomicBool::new(true));
         let lock_owner = Arc::new(AtomicUsize::new(0));
+
         // Setup Arc's to move into thread.
         let emitters_arc = emitters.clone();
         let is_running_arc = is_running.clone();
@@ -155,6 +158,9 @@ impl Dispatcher {
         // Start signal loop.
         let (signal_tx, signal_rx) = channel();
         let signal_handle = thread::spawn(move || {
+            // Initialize the Store.
+            let mut store = Store::new();
+
             // Windows *mut c_void cannot be safely moved into thread. So
             // we create it within the thread.
             #[cfg(windows)]
@@ -229,22 +235,25 @@ impl Dispatcher {
                         Cmd::Signal(a) => match a {
                             // CURSOR
                             Goto(col, row) => {
-                                #[cfg(unix)]
-                                posix::goto(col, row);
-                                #[cfg(windows)]
-                                win32::goto(col, row, vte);
+                                // #[cfg(unix)]
+                                // posix::goto(col, row);
+                                // #[cfg(windows)]
+                                // win32::goto(col, row, vte);
+                                store.sync_goto(col, row)
                             },
                             Up(n) => {
-                                #[cfg(unix)]
-                                posix::up(n);
-                                #[cfg(windows)]
-                                win32::up(n, vte);
+                                // #[cfg(unix)]
+                                // posix::up(n);
+                                // #[cfg(windows)]
+                                // win32::up(n, vte);
+                                store.sync_up(n)
                             },
                             Down(n) => {
-                                #[cfg(unix)]
-                                posix::down(n);
-                                #[cfg(windows)]
-                                win32::down(n, vte);
+                                // #[cfg(unix)]
+                                // posix::down(n);
+                                // #[cfg(windows)]
+                                // win32::down(n, vte);
+                                store.sync_down(n)
                             },
                             Left(n) => {
                                 #[cfg(unix)]
@@ -372,7 +381,7 @@ impl Dispatcher {
                         }
                         Cmd::Request(s) => match s {
                             #[cfg(unix)]
-                            Store::Pos(id) => {
+                            State::Pos(id) => {
                                 // (imdaveho) TODO: InputEvent handling for
                                 // Pos() should only happen for syncing with
                                 // the store. Edit this Cmd to pull (col, row)
@@ -390,7 +399,7 @@ impl Dispatcher {
                                 }
                             },
                             #[cfg(windows)]
-                            Store::Pos(id) => {
+                            State::Pos(id) => {
                                 let roster = match emitters_arc.lock() {
                                     Ok(r) => r,
                                     Err(_) => match emitters_arc.lock() {
@@ -404,7 +413,7 @@ impl Dispatcher {
                                         Pos(col, row)));
                                 }
                             },
-                            Store::Size(id) => {
+                            State::Size(id) => {
                                 let roster = match emitters_arc.lock() {
                                     Ok(r) => r,
                                     Err(_) => match emitters_arc.lock() {
@@ -596,11 +605,11 @@ impl Dispatcher {
         if let Some(t) = self.signal_handle.take() { t.join()? }
 
         #[cfg(unix)]
-        posix::printf("\n");
+        posix::printf("\r");
         #[cfg(windows)]
         let vte = is_ansi_enabled();
         #[cfg(windows)]
-        win32::printf("\n", vte);
+        win32::printf("\r", vte);
 
         Ok(())
     }

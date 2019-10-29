@@ -2,14 +2,14 @@
 // fetching of cursor position, screen size, characters under the cursor, and
 // the restoration of content on each terminal screen that gets created. 
 
-mod ansi;
+// mod ansi;
 
-#[cfg(windows)]
-mod wincon;
+// #[cfg(windows)]
+// mod wincon;
 
 // use crate::common::enums::{ Style, Color, Clear };
 // use crate::common::enums::Clear;
-use crate::terminal::actions::is_ansi_enabled;
+// use crate::terminal::actions::is_ansi_enabled;
 
 
 // (imdaveho) TODO: `\t` handling for ANSI
@@ -22,22 +22,23 @@ use crate::terminal::actions::is_ansi_enabled;
 // 	return runewidth.RuneWidth(r)
 // }
 
-#[derive(Clone)]
-pub enum ScreenCache {
-    Ansi(ansi::CellInfoCache),
-    #[cfg(windows)]
-    Win32(wincon::CharInfoCache),
-}
 
-impl ScreenCache {
-    pub fn new() -> ScreenCache {
-        #[cfg(windows)] {
-            if !is_ansi_enabled() {
-                return ScreenCache::Win32(wincon::CharInfoCache::new());
-            }
-        }
-        return ScreenCache::Ansi(ansi::CellInfoCache::new());
-    }
+// #[derive(Clone)]
+// pub enum ScreenCache {
+//     Ansi(ansi::CellInfoCache),
+//     #[cfg(windows)]
+//     Win32(wincon::CharInfoCache),
+// }
+
+// impl ScreenCache {
+    // pub fn new() -> ScreenCache {
+    //     #[cfg(windows)] {
+    //         if !is_ansi_enabled() {
+    //             return ScreenCache::Win32(wincon::CharInfoCache::new());
+    //         }
+    //     }
+    //     return ScreenCache::Ansi(ansi::CellInfoCache::new());
+    // }
 
     // // Win32 Only - function to cache the entire screen into `CharInfo` buffer.
     // #[cfg(windows)]

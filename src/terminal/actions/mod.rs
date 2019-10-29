@@ -1,7 +1,5 @@
 // This module exposes terminal functions for Ansi and Windows Console.
 
-// use crate::common::enums::Action::{ self, * };
-
 mod ansi;
 #[cfg(windows)]
 mod wincon;

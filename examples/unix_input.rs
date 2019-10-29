@@ -14,7 +14,12 @@ fn main() {
     posix::enable_alt();
     posix::raw();
     posix::hide_cursor();
-    posix::flush();
+
+    // posix::goto(5, 5);
+    // posix::prints("Hello");
+    // thread::sleep(Duration::from_secs(2));
+
+    // posix::flush();
 
     // let _ = dispatch.signal(EnableAlt);
     // let _ = dispatch.signal(Raw);
@@ -42,6 +47,7 @@ fn main() {
                 },
                 None => (),
             }
+            posix::flush();
             thread::sleep(Duration::from_millis(10));
         }
         // listener.signal(ShowCursor);
@@ -56,7 +62,7 @@ fn main() {
             posix::goto(10, 10);
             let content = format!("count: {}", i);
             // counter.signal(Printf(content));
-            posix::printf(&content);
+            posix::prints(&content);
             i += 1;
             match counter.poll_latest_async() {
                 Some(evt) => match evt {
@@ -84,23 +90,23 @@ fn main() {
     let listen_handle = thread::spawn(move || {
         thread::sleep(Duration::from_millis(2000));
         posix::goto(14, 16);
-        posix::flush();
+        // posix::flush();
         // listen.signal(Goto(14, 16));
         // listen.signal(Flush);
         let (col, row) = listen.pos();
         thread::sleep(Duration::from_millis(200));
         posix::goto(5, 3);
-        posix::printf(&format!("col: {}, row: {}", col, row));
+        posix::prints(&format!("col: {}, row: {}", col, row));
         // listen.signal(Goto(5, 3));
         // let st = format!("col: {}, row: {}", col, row);
         // listen.signal(Printf(st));
         thread::sleep(Duration::from_millis(1000));
         posix::goto(14, 16);
-        posix::flush();
+        // posix::flush();
         let (w, h) = listen.size();
         thread::sleep(Duration::from_millis(200));
-        posix::goto(5, 4);
-        posix::printf(&format!("w: {}, h: {}", w, h));
+        // posix::goto(5, 4);
+        posix::prints(&format!("w: {}, h: {}", w, h));
     });
 
 
@@ -108,9 +114,10 @@ fn main() {
     counter_handle.join().expect("Counter failed to join");
     listener_handle.join().expect("Counter failed to join");
 
+    posix::show_cursor();
     posix::cook(&original_mode);
     posix::disable_alt();
-    posix::flush();
+    // posix::flush();
 
     // let _ = dispatch.signal(ShowCursor);
     // let _ = dispatch.signal(Cook);
