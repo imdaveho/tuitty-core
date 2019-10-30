@@ -8,8 +8,9 @@ use tuitty::common::enums::{ InputEvent, KeyEvent, Action::* };
 fn main() {
     let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
 
-    dispatch.signal(EnableAlt).expect("Error signaling dispatch - alt");
+    // dispatch.signal(EnableAlt).expect("Error signaling dispatch - alt");
     dispatch.signal(Raw).expect("Error signaling dispatch - raw");
+    dispatch.signal(Flush);
 
     let listener = dispatch.listen();
     let listener_handle = thread::spawn(move || {
@@ -22,7 +23,8 @@ fn main() {
                                 break
                             }
                             listener.signal(Goto(0, 0));
-                            listener.signal(Prints(format!("char: {}\n", c)));
+                            listener.signal(Prints(format!("char: {}>012\t34\t<--tab", c)));
+                            listener.signal(Flush);
                         },
                         _ => ()
                     },
@@ -44,6 +46,7 @@ fn main() {
             counter.signal(Goto(10,10));
             let content = format!("count: {}", i);
             counter.signal(Printf(content));
+            counter.signal(Flush);
             i += 1;
             match counter.poll_latest_async() {
                 Some(evt) => match evt {
@@ -67,11 +70,13 @@ fn main() {
 
     dispatch.signal(Goto(10, 10)).expect("Error goto");
     dispatch.signal(Printf("Hello, World".to_string())).expect("Error printf");
+    dispatch.signal(Flush);
 
     thread::sleep(time::Duration::from_millis(2000));
 
     dispatch.signal(Cook).expect("Error signaling dispatch - cook");
-    dispatch.signal(DisableAlt).expect("Error signaling dispatch - stdout");
+    dispatch.signal(Flush);
+    // dispatch.signal(DisableAlt).expect("Error signaling dispatch - stdout");
 
     thread::sleep(time::Duration::from_millis(2000));
 }

@@ -110,16 +110,6 @@ impl Store {
         }
     }
 
-    fn tabstop(&self) -> usize {
-        let (col, _) = self.current_pos;
-        let mut tabstop = (col / self.tabsize)
-            * self.tabsize + self.tabsize;
-        if tabstop > self.width - 1 {
-            tabstop = self.width - 1
-        }
-        tabstop as usize
-    }
-
     fn from_index(&self, index: usize) -> (i16, i16) {
         let index = index as i16;
         ((index % self.width), (index / self.width))
@@ -231,7 +221,11 @@ impl Store {
         }
     }
 
-    pub fn reset_style(&mut self) {
+    pub fn sync_styles(&mut self, f: Color, b: Color, fx: u32) {
+        self.current_style = (f, b, fx);
+    }
+
+    pub fn reset_styles(&mut self) {
         self.current_style = (Reset, Reset, Effect::Reset as u32);
     }
 
@@ -267,6 +261,7 @@ impl Store {
         let mut index = self.from_pos(col, row);
         let segments: Vec<&str> = UnicodeGraphemes
             ::graphemes(content, true).collect();
+
         for ch in segments {
             // Check capacity and truncate to keep at capacity.
             if self.cell_buffer.get(index).is_none() {
@@ -282,30 +277,45 @@ impl Store {
                     "\x00" => continue, // Skip!
                     "\r" => { index = (index / w) * w; continue },
                     "\n" => {
-                        let (_, r) = self.from_index(index);
-                        let stop = self.from_pos(0, r + 1);
-                        for _ in index..stop {
-                            self.cell_buffer.pop_back();
-                            self.cell_buffer.insert(index, None);
-                            index += 1;
-                        } continue
+                        let (col, _) = self.from_index(index);
+                        let length = (self.width - col) as usize;
+                        for i in 0..length {
+                            let mut ch = Some(vec!['-'; length]);
+                            if i > 0 { ch = None }
+                            self.cell_buffer[index + i] = Some(Cell {
+                                glyph: ch,
+                                index: index,
+                                width: length,
+                                style: self.current_style
+                            })
+                        } index += length; continue
                     },
                     "\r\n" => {
                         index = (index / w) * w;
-                        let (_, r) = self.from_index(index);
-                        let stop = self.from_pos(0, r + 1);
-                        for _ in index..stop {
-                            self.cell_buffer.pop_back();
-                            self.cell_buffer.insert(index, None);
-                            index += 1;
-                        } continue
+                        let length = self.width as usize;
+                        for i in 0..length {
+                            let mut ch = Some(vec!['-'; length]);
+                            if i > 0 { ch = None }
+                            self.cell_buffer[index + i] = Some(Cell {
+                                glyph: ch,
+                                index: index,
+                                width: length,
+                                style: self.current_style
+                            })
+                        } index += length; continue
                     },
                     "\t" => {
-                        let stop = self.tabstop();
-                        let length = stop - col as usize;
-                        for i in (col as usize)..stop {
-                            let mut ch = Some(vec![' '; length]);
-                            if i > col as usize { ch = None }
+                        let (col, _) = self.from_index(index);
+                        let mut tabstop = (col / self.tabsize)
+                            * self.tabsize + self.tabsize;
+                        if tabstop > self.width - 1 {
+                            tabstop = self.width - 1
+                        }
+
+                        let length = (tabstop - col) as usize;
+                        for i in 0..length {
+                            let mut ch = Some(vec!['-'; length]);
+                            if i > 0 as usize { ch = None }
                             self.cell_buffer[index + i] =
                                 Some(Cell {
                                     glyph: ch,
@@ -313,8 +323,7 @@ impl Store {
                                     width: length,
                                     style: self.current_style
                                 });
-                        }
-                        index += length; continue
+                        } index += length; continue
                     },
                     _ => {
                         let c: Vec<char> = if ch == "\x1B"
