@@ -63,5 +63,5 @@ fn signal_scenario() {
 }
 
 fn main() {
-    signal_scenario();
+    direct_scenario();
 }

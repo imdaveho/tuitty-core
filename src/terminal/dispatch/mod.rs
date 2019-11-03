@@ -10,8 +10,8 @@ use std::{
 };
 use crate::common::{
     DELAY, enums::{
-        Action::{*, self}, InputEvent::{*, self},
-        Cmd, State, StoreEvent::*, Style
+        Action::{*, self}, InputEvent::{*, self}, Cmd,
+        State, StoreEvent::*, Style, Color::Reset, Effect
     }
 };
 
@@ -82,12 +82,12 @@ impl EventHandle {
         let _ = self.signal_tx.send(Cmd::Signal(action));
     }
 
-    pub fn pos(&self) -> (i16, i16) {
+    pub fn coord(&self) -> (i16, i16) {
         let _ = self.signal_tx.send(
-            Cmd::Request(State::Pos(self.id)));
+            Cmd::Request(State::Coord(self.id)));
         let mut iter = self.event_rx.iter();
         loop {
-            if let Some(Dispatch(Pos(col, row))) = iter.next() {
+            if let Some(Dispatch(Coord(col, row))) = iter.next() {
                 return (col, row)
             }
         }
@@ -111,6 +111,17 @@ impl EventHandle {
         // #[cfg(windows)]
         // let (w, h) = win32::size();
         // (w, h)
+    }
+
+    pub fn syspos(&self) -> (i16, i16) {
+        let _ = self.signal_tx.send(
+            Cmd::Request(State::SysPos(self.id)));
+        let mut iter = self.event_rx.iter();
+        loop {
+            if let Some(Dispatch(SysPos(col, row))) = iter.next() {
+                return (col, row)
+            }
+        }
     }
 }
 
@@ -235,119 +246,139 @@ impl Dispatcher {
                         Cmd::Signal(a) => match a {
                             // CURSOR
                             Goto(col, row) => {
-                                // #[cfg(unix)]
-                                // posix::goto(col, row);
-                                // #[cfg(windows)]
-                                // win32::goto(col, row, vte);
+                                #[cfg(unix)]
+                                posix::goto(col, row);
+                                #[cfg(windows)]
+                                win32::goto(col, row, vte);
+
                                 store.sync_goto(col, row);
                             },
                             Up(n) => {
-                                // #[cfg(unix)]
-                                // posix::up(n);
-                                // #[cfg(windows)]
-                                // win32::up(n, vte);
+                                #[cfg(unix)]
+                                posix::up(n);
+                                #[cfg(windows)]
+                                win32::up(n, vte);
+
                                 store.sync_up(n);
                             },
                             Down(n) => {
-                                // #[cfg(unix)]
-                                // posix::down(n);
-                                // #[cfg(windows)]
-                                // win32::down(n, vte);
+                                #[cfg(unix)]
+                                posix::down(n);
+                                #[cfg(windows)]
+                                win32::down(n, vte);
+
                                 store.sync_down(n);
                             },
                             Left(n) => {
-                                // #[cfg(unix)]
-                                // posix::left(n);
-                                // #[cfg(windows)]
-                                // win32::left(n, vte);
+                                #[cfg(unix)]
+                                posix::left(n);
+                                #[cfg(windows)]
+                                win32::left(n, vte);
+
                                 store.sync_left(n);
                             },
                             Right(n) => {
-                                // #[cfg(unix)]
-                                // posix::right(n);
-                                // #[cfg(windows)]
-                                // win32::right(n, vte);
+                                #[cfg(unix)]
+                                posix::right(n);
+                                #[cfg(windows)]
+                                win32::right(n, vte);
+
                                 store.sync_right(n);
                             },
                             // SCREEN/OUTPUT
                             Clear(clr) => {
-                                // #[cfg(unix)]
-                                // posix::clear(clr);
-                                // #[cfg(windows)]
-                                // win32::clear(clr, vte);
-                                store.clear_buffer(clr);
+                                #[cfg(unix)]
+                                posix::clear(clr);
+                                #[cfg(windows)]
+                                win32::clear(clr, vte);
+
+                                store.sync_clear(clr);
                             },
                             Prints(s) => {
-                                // #[cfg(unix)]
-                                // posix::prints(&s);
-                                // #[cfg(windows)]
-                                // win32::prints(&s, vte);
-                                store.upsert_buffer(&s);
+                                #[cfg(unix)]
+                                posix::prints(&s);
+                                #[cfg(windows)]
+                                win32::prints(&s, vte);
+
+                                store.sync_content(&s);
                             },
                             Printf(s) => {
-                                // #[cfg(unix)]
-                                // posix::printf(&s);
-                                // #[cfg(windows)]
-                                // win32::printf(&s, vte);
-                                store.upsert_buffer(&s);
-                            },
-                            Flush => {
-                                store.sync_goto(0, 0);
-                                let s = store.output_buffer();
                                 #[cfg(unix)]
                                 posix::printf(&s);
                                 #[cfg(windows)]
                                 win32::printf(&s, vte);
+
+                                store.sync_content(&s);
+                            },
+                            Flush => {
+                                // store.screen.sync_goto(0, 0);
+                                // let s = store.screen.output_buffer();
                                 // #[cfg(unix)]
-                                // posix::flush();
+                                // posix::printf(&s);
                                 // #[cfg(windows)]
-                                // win32::flush(vte);
+                                // win32::printf(&s, vte);
+                                #[cfg(unix)]
+                                posix::flush();
+                                #[cfg(windows)]
+                                win32::flush(vte);
+                            },
+                            Refresh => {
+                                #[cfg(unix)]
+                                posix::goto(0, 0);
+                                #[cfg(windows)]
+                                win32::goto(0, 0, vte);
+
+                                store.sync_goto(0, 0);
+                                let s = store.contents();
+
+                                #[cfg(unix)]
+                                posix::printf(&s);
+                                #[cfg(windows)]
+                                win32::printf(&s, vte);
                             },
                             // STYLE
-                            SetFx(ef) => {
-                                // #[cfg(unix)]
-                                // posix::set_fx(ef);
-                                // #[cfg(windows)]
-                                // win32::set_fx(ef, vte);
-                                store.sync_style(Style::Fx(ef));
+                            SetFx(fx) => {
+                                #[cfg(unix)]
+                                posix::set_fx(fx);
+                                #[cfg(windows)]
+                                win32::set_fx(fx, vte);
+
+                                store.sync_style(Style::Fx(fx));
                             },
                             SetFg(c) => {
-                                // #[cfg(unix)]
-                                // posix::set_fg(c);
-                                // #[cfg(windows)]
-                                // win32::set_fg(c, default, vte);
+                                #[cfg(unix)]
+                                posix::set_fg(c);
+                                #[cfg(windows)]
+                                win32::set_fg(c, default, vte);
+
                                 store.sync_style(Style::Fg(c));
                             },
                             SetBg(c) => {
-                                // #[cfg(unix)]
-                                // posix::set_bg(c);
-                                // #[cfg(windows)]
-                                // win32::set_bg(c, default, vte);
+                                #[cfg(unix)]
+                                posix::set_bg(c);
+                                #[cfg(windows)]
+                                win32::set_bg(c, default, vte);
+
                                 store.sync_style(Style::Bg(c));
                             },
-                            SetStyles(f, b, e) => {
-                                // #[cfg(unix)]
-                                // posix::set_styles(f, b, e);
-                                // #[cfg(windows)]
-                                // win32::set_styles(f, b, e, default, vte);
-                                store.sync_styles(f, b, e);
+                            SetStyles(f, b, fx) => {
+                                #[cfg(unix)]
+                                posix::set_styles(f, b, fx);
+                                #[cfg(windows)]
+                                win32::set_styles(f, b, fx, default, vte);
+
+                                store.sync_styles(f, b, fx);
                             },
                             ResetStyles => {
-                                // #[cfg(unix)]
-                                // posix::reset_styles();
-                                // #[cfg(windows)]
-                                // win32::reset_style(default, vte);
-                                store.reset_styles();
+                                #[cfg(unix)]
+                                posix::reset_styles();
+                                #[cfg(windows)]
+                                win32::reset_style(default, vte);
+
+                                let (c, fx) = (Reset, Effect::Reset as u32);
+                                store.sync_styles(c, c, fx);
                             },
                             // STATEFUL/MODES
-                            Resize(w, h) => {
-                                #[cfg(unix)]
-                                posix::resize(w, h);
-                                #[cfg(windows)]
-                                win32::resize(w, h, vte);
-
-                                store.set_size(w, h);
-                            },
                             HideCursor => {
                                 #[cfg(unix)]
                                 posix::hide_cursor();
@@ -385,16 +416,12 @@ impl Dispatcher {
                                 posix::enable_alt();
                                 #[cfg(windows)]
                                 win32::enable_alt(&screen, &initial, vte);
-
-                                // TODO: multiple screen support
                             },
                             DisableAlt => {
                                 #[cfg(unix)]
                                 posix::disable_alt();
                                 #[cfg(windows)]
                                 win32::disable_alt(vte);
-
-                                // TODO: multiple screen support
                             },
                             Raw => {
                                 #[cfg(unix)]
@@ -412,55 +439,30 @@ impl Dispatcher {
 
                                 store.sync_raw(false);
                             },
+                            SwitchTo(id) => {
+                                // TODO: ...
+                            },
+                            ToMain => {
+                                // TODO: ...
+                            },
+                            Resize => {
+                                #[cfg(unix)]
+                                let (w, h) = posix::size();
+                                #[cfg(windows)]
+                                let (w, h) = win32::size();
+
+                                store.sync_size(w, h);
+                            },
+                            SyncSize(w, h) => {
+                                #[cfg(unix)]
+                                posix::resize(w, h);
+                                #[cfg(windows)]
+                                win32::resize(w, h, vte);
+
+                                store.sync_size(w, h);
+                            },
                         }
                         Cmd::Request(s) => match s {
-                            // #[cfg(unix)]
-                            // State::Pos(id) => {
-                            //     // (imdaveho) TODO: InputEvent handling for
-                            //     // Pos() should only happen for syncing with
-                            //     // the store. Edit this Cmd to pull (col, row)
-                            //     // from the store instead.
-                            //     match lock_owner_arc.load(Ordering::SeqCst) {
-                            //         0 => lock_owner_arc
-                            //             .store(id, Ordering::SeqCst),
-                            //         _ => continue,
-                            //     }
-                            //     posix::pos();
-                            //     match lock_owner_arc.load(Ordering::SeqCst) {
-                            //         0 => continue,
-                            //         _ => lock_owner_arc
-                            //             .store(0, Ordering::SeqCst),
-                            //     }
-                            // },
-                            // #[cfg(windows)]
-                            // State::Pos(id) => {
-                            //     let roster = match emitters_arc.lock() {
-                            //         Ok(r) => r,
-                            //         Err(_) => match emitters_arc.lock() {
-                            //             Ok(r) => r,
-                            //             Err(_) => continue
-                            //         },
-                            //     };
-                            //     if let Some(tx) = roster.get(&id) {
-                            //         let (col, row) = win32::pos(vte);
-                            //         let _ = tx.event_tx.send(Dispatch(
-                            //             Pos(col, row)));
-                            //     }
-                            // },
-                            State::Pos(id) => {
-                                let roster = match emitters_arc.lock() {
-                                    Ok(r) => r,
-                                    Err(_) => match emitters_arc.lock() {
-                                        Ok(r) => r,
-                                        Err(_) => continue
-                                    },
-                                };
-                                if let Some(tx) = roster.get(&id) {
-                                    let (col, row) = store.pos();
-                                    let _ = tx.event_tx.send(Dispatch(
-                                        Pos(col, row)));
-                                }
-                            },
                             State::Size(id) => {
                                 let roster = match emitters_arc.lock() {
                                     Ok(r) => r,
@@ -470,13 +472,52 @@ impl Dispatcher {
                                     },
                                 };
                                 if let Some(tx) = roster.get(&id) {
-                                    // #[cfg(unix)]
-                                    // let (w, h) = posix::size();
-                                    // #[cfg(windows)]
-                                    // let (w, h) = win32::size();
                                     let (w, h) = store.size();
                                     let _ = tx.event_tx.send(Dispatch(
                                         Size(w, h)));
+                                }
+                            },
+                            State::Coord(id) => {
+                                let roster = match emitters_arc.lock() {
+                                    Ok(r) => r,
+                                    Err(_) => match emitters_arc.lock() {
+                                        Ok(r) => r,
+                                        Err(_) => continue
+                                    },
+                                };
+                                if let Some(tx) = roster.get(&id) {
+                                    let (col, row) = store.coord();
+                                    let _ = tx.event_tx.send(Dispatch(
+                                        Coord(col, row)));
+                                }
+                            },
+                            #[cfg(unix)]
+                            State::SysPos(id) => {
+                                match lock_owner_arc.load(Ordering::SeqCst) {
+                                    0 => lock_owner_arc
+                                        .store(id, Ordering::SeqCst),
+                                    _ => continue,
+                                }
+                                posix::pos();
+                                match lock_owner_arc.load(Ordering::SeqCst) {
+                                    0 => continue,
+                                    _ => lock_owner_arc
+                                        .store(0, Ordering::SeqCst),
+                                }
+                            },
+                            #[cfg(windows)]
+                            State::SysPos(id) => {
+                                let roster = match emitters_arc.lock() {
+                                    Ok(r) => r,
+                                    Err(_) => match emitters_arc.lock() {
+                                        Ok(r) => r,
+                                        Err(_) => continue
+                                    },
+                                };
+                                if let Some(tx) = roster.get(&id) {
+                                    let (col, row) = win32::pos(vte);
+                                    let _ = tx.event_tx.send(Dispatch(
+                                        Pos(col, row)));
                                 }
                             },
                         },

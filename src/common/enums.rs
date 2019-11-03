@@ -130,8 +130,9 @@ pub enum InputEvent {
 
 #[derive(Copy, Clone)]
 pub enum StoreEvent {
-    Pos(i16, i16),
     Size(i16, i16),
+    Coord(i16, i16),
+    SysPos(i16, i16),
 }
 
 #[derive(Copy, Clone)]
@@ -216,7 +217,6 @@ pub enum Action {
     SetStyles(Color, Color, u32),
     ResetStyles,
     // STATEFUL/MODES
-    Resize(i16, i16),
     HideCursor,
     ShowCursor,
     EnableMouse,
@@ -225,12 +225,20 @@ pub enum Action {
     DisableAlt,
     Raw,
     Cook,
-    // Size, (imdaveho) NOTE: Nowhere to return (i16, i16).
-    // Pos(usize),
+    // STORE OPS
+    Refresh,
+    SwitchTo(usize),
+    ToMain,
+    Resize,
+    SyncSize(i16, i16),
+    // SyncTab(usize),
 }
 
 
 pub enum State {
-    Pos(usize),
     Size(usize),
+    Coord(usize),
+    SysPos(usize),
+    // GetCh(usize),
+    // Tab(usize),
 }
