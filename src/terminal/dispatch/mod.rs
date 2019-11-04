@@ -490,7 +490,8 @@ impl Dispatcher {
                                     // Restore screen contents. Restore flushes.
                                     let s = store.contents();
                                     posix::goto(0, 0);
-                                    posix::printf(&s);
+                                    posix::prints(&s);
+                                    // Restore previous cursor position.
                                     let (col, row) = store.coord();
                                     posix::goto(col, row);
                                     posix::flush();
