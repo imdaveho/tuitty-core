@@ -117,9 +117,9 @@ impl BitAnd<Effect> for u32 {
     }
 }
 
-// (imdaveho) NOTE: Copy/Clone needed to send over channels.
-// See: crate::terminal::dispatch
-#[derive(Copy, Clone)]
+// (imdaveho) NOTE: Clone for moving parsed events over channels.
+// See: crate::terminal::dispatch::input_handle
+#[derive(Clone)]
 pub enum InputEvent {
     Keyboard(KeyEvent),
     Mouse(MouseEvent),
@@ -128,14 +128,15 @@ pub enum InputEvent {
 }
 
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum StoreEvent {
     Size(i16, i16),
     Coord(i16, i16),
     SysPos(i16, i16),
+    GetCh(String),
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum MouseEvent {
     Press(MouseButton, i16, i16),
     Release(i16, i16),
@@ -143,7 +144,7 @@ pub enum MouseEvent {
 }
 
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum MouseButton {
     Left,
     Right,
@@ -153,7 +154,7 @@ pub enum MouseButton {
 }
 
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub enum KeyEvent {
     Backspace,
     Enter,
@@ -227,11 +228,13 @@ pub enum Action {
     Cook,
     // STORE OPS
     Refresh,
+    Switch,
     SwitchTo(usize),
-    ToMain,
     Resize,
     SyncSize(i16, i16),
-    // SyncTab(usize),
+    SyncTabSize(usize),
+    SyncMarker(i16, i16),
+    Jump,
 }
 
 
@@ -239,6 +242,6 @@ pub enum State {
     Size(usize),
     Coord(usize),
     SysPos(usize),
-    // GetCh(usize),
-    // Tab(usize),
+    GetCh(usize),
+    // ScreenKey(usize),
 }

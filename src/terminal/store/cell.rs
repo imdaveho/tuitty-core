@@ -45,7 +45,7 @@ impl ScreenBuffer {
             cells: vec![None; capacity],
             capacity: capacity,
             window: (w, h),
-            tab_size: 4,
+            tab_size: 8,
             active_style: (Reset, Reset, Effect::Reset as u32),
         }
     }
@@ -98,27 +98,12 @@ impl ScreenBuffer {
         ((index % width), (index / width))
     }
 
-    fn decrement(&mut self) {
-        let cursor = self.cursor;
-        if cursor == 0 { return }
-        match &self.cells[cursor - 1] {
-            Some(cell) => match cell.is_part {
-                true => self.cursor -= 2,
-                false => self.cursor -= 1,
-            },
-            None => self.cursor -= 1,
-        }
-    }
+    // fn col(&self) -> i16 {
+    //     (self.cursor as i16) % self.window.0
+    // }
 
-    fn increment(&mut self) {
-        let cursor = self.cursor;
-        match &self.cells[cursor] {
-            Some(cell) => match cell.is_wide {
-                true => self.cursor += 2,
-                false =>  self.cursor += 1,
-            },
-            None => self.cursor += 1,
-        }
+    fn row(&self) -> i16 {
+        (self.cursor as i16) / self.window.0
     }
 
     pub fn sync_coord(&mut self, col: i16, row: i16) {
@@ -132,13 +117,23 @@ impl ScreenBuffer {
     pub fn sync_left(&mut self, n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
-        for _ in 0..n { self.decrement() }
+        let (mut col, row) = self.coord();
+        if n >= col { col = 0 } else { col -= n }
+
+        self.sync_coord(col, row);
     }
 
     pub fn sync_right(&mut self, n: i16) {
         let mut n = n;
         if n < 0 { n = n.abs() }
-        for _ in 0..n { self.increment() }
+        if let Some(cell) = &self.cells[self.cursor] {
+            if cell.is_wide { n += 1 }
+        }
+        let (mut col, row) = self.coord();
+        let width = self.width() - 1;
+        if col + n >= width { col = width } else { col += n }
+
+        self.sync_coord(col, row);
     }
 
     pub fn sync_up(&mut self, n: i16) {
@@ -179,16 +174,16 @@ impl ScreenBuffer {
         self.window
     }
 
-    pub fn width(&self) -> i16 {
+    fn width(&self) -> i16 {
         self.window.0
     }
 
-    pub fn height(&self) -> i16 {
+    fn height(&self) -> i16 {
         self.window.1
     }
 
-    pub fn sync_tab_size(&mut self, size: usize) {
-        self.tab_size = size;
+    pub fn sync_tab_size(&mut self, n: usize) {
+        self.tab_size = n;
     }
 
     pub fn sync_size(&mut self, w: i16, h: i16) {
@@ -197,7 +192,7 @@ impl ScreenBuffer {
         self.cells.resize(self.capacity, None);
     }
 
-    pub fn getch(&mut self) -> String {
+    pub fn getch(&self) -> String {
         let index = self.cursor;
         match &self.cells[index] {
             Some(cell) => cell.glyph.iter().collect(),
@@ -298,24 +293,22 @@ impl ScreenBuffer {
     fn set_ascii(&mut self, s: &str) {
         match s {
             "\x00" => (),
-            "\r" => {
-                let (_, row) = self.coord();
-                self.sync_coord(0, row);
-            },
-            "\n" | "\r\n" => {
-                let (_, row) = self.coord();
-                let (row, height) = (row + 1, self.height());
+            "\r" => self.sync_coord(0, self.row()),
+            "\n" => self.sync_down(1),
+            "\r\n" => {
+                let (row, height) = (self.row() + 1, self.height());
                 if height > row { self.sync_coord(0, row) }
                 else { self.sync_coord(0, height) }
             },
             "\t" => {
-                let (col, _) = self.coord();
-                let prev_tab = (col as usize / self.tab_size) * self.tab_size;
+                let (col, row) = self.coord();
+                let prev_tab =
+                    (col as usize / self.tab_size)
+                    * self.tab_size;
                 let mut new_tab = prev_tab + self.tab_size;
                 let width = self.width() as usize - 1;
                 if new_tab > width { new_tab = width }
-                self.cursor = new_tab;
-                self.cursor();
+                self.sync_coord(new_tab as i16, row)
             },
             _ => {
                 let ch = if s == "\x1B" { vec!['^'] }

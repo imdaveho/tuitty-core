@@ -4,7 +4,29 @@
 mod cell;
 use cell::ScreenBuffer;
 
-use crate::common::enums::{ Clear, Color::{*, self}, Effect, Style };
+use crate::common::enums::{ Clear, Color, Style };
+
+
+struct Screen {
+    // Screen mode settings
+    is_raw_enabled: bool,
+    is_mouse_enabled: bool,
+    is_cursor_visible: bool,
+    // Screen buffer
+    buffer: ScreenBuffer,
+}
+
+
+impl Screen {
+    pub fn new() -> Screen {
+        Screen {
+            is_raw_enabled: false,
+            is_mouse_enabled: false,
+            is_cursor_visible: true,
+            buffer: ScreenBuffer::new(),
+        }
+    }
+}
 
 
 pub struct Store {
@@ -17,6 +39,25 @@ impl Store {
         Store { id: 0, data: vec![Screen::new()] }
     }
 
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
+    pub fn exists(&self, id: usize) -> bool {
+        self.data.get(id).is_some()
+    }
+
+    pub fn set(&mut self, id: usize) {
+        if let Some(_) = self.data.get(id) {
+            self.id = id
+        }
+    }
+
+    pub fn new_screen(&mut self) {
+        self.id += 1;
+        self.data.push(Screen::new());
+    }
+
     pub fn coord(&self) -> (i16, i16) {
         if let Some(s) = self.data.get(self.id) {
             s.buffer.coord()
@@ -24,9 +65,16 @@ impl Store {
     }
 
     pub fn size(&self) -> (i16, i16) {
+        // TODO: tput size? see: crossterm/issue/276
         if let Some(s) = self.data.get(self.id) {
             s.buffer.size()
         } else { (0, 0) }
+    }
+
+    pub fn getch(&self) -> String {
+        if let Some(s) = self.data.get(self.id) {
+            s.buffer.getch()
+        } else { String::new() }
     }
 
     pub fn contents(&self) -> String {
@@ -35,16 +83,34 @@ impl Store {
         } else { String::new() }
     }
 
+    pub fn is_raw(&self) -> bool {
+        if let Some(s) = self.data.get(self.id) {
+            s.is_raw_enabled
+        } else { false }
+    }
+
     pub fn sync_raw(&mut self, state: bool) {
         if let Some(s) = self.data.get_mut(self.id) {
             s.is_raw_enabled = state;
         }
     }
 
+    pub fn is_cursor(&self) -> bool {
+        if let Some(s) = self.data.get(self.id) {
+            s.is_cursor_visible
+        } else { false }
+    }
+
     pub fn sync_cursor(&mut self, state: bool) {
         if let Some(s) = self.data.get_mut(self.id) {
             s.is_cursor_visible = state;
         }
+    }
+
+    pub fn is_mouse(&self) -> bool {
+        if let Some(s) = self.data.get(self.id) {
+            s.is_mouse_enabled
+        } else { false }
     }
 
     pub fn sync_mouse(&mut self, state: bool) {
@@ -83,9 +149,29 @@ impl Store {
         }
     }
 
+    pub fn jump(&mut self) {
+        if let Some(s) = self.data.get_mut(self.id) {
+            s.buffer.jump();
+        }
+    }
+
+    pub fn sync_marker(&mut self, col: i16, row: i16) {
+        if let Some(s) = self.data.get_mut(self.id) {
+            s.buffer.sync_marker(col, row);
+        }
+    }
+
     pub fn sync_size(&mut self, w: i16, h: i16) {
         if let Some(s) = self.data.get_mut(self.id) {
             s.buffer.sync_size(w, h);
+        }
+    }
+
+    pub fn sync_tab_size(&mut self, n: usize) {
+        // TODO: include a process Command into tabs
+        // to ensure that system tabs is aligned.
+        if let Some(s) = self.data.get_mut(self.id) {
+            s.buffer.sync_tab_size(n);
         }
     }
 
@@ -113,26 +199,3 @@ impl Store {
         }
     }
 }
-
-
-struct Screen {
-    // Screen mode settings
-    is_raw_enabled: bool,
-    is_mouse_enabled: bool,
-    is_cursor_visible: bool,
-    // Screen buffer
-    buffer: ScreenBuffer,
-}
-
-
-impl Screen {
-    pub fn new() -> Screen {
-        Screen {
-            is_raw_enabled: false,
-            is_mouse_enabled: false,
-            is_cursor_visible: true,
-            buffer: ScreenBuffer::new(),
-        }
-    }
-}
-

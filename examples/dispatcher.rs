@@ -2,7 +2,7 @@ extern crate tuitty;
 
 use std::{thread, time};
 use tuitty::common::DELAY;
-use tuitty::common::enums::{ InputEvent, KeyEvent, Action::* };
+use tuitty::common::enums::{ InputEvent, KeyEvent, Action::*, Clear::* };
 
 
 fn main() {
@@ -22,8 +22,54 @@ fn main() {
                                 break
                             }
                             listener.signal(Goto(0, 0));
-                            listener.signal(Printf(format!("char: {}\n\nhello", c)));
+                            listener.signal(Printf(format!("char: {}\n\nhello\r\n0\t\t㓘7", c)));
                         },
+                        KeyEvent::Left => {
+                            listener.signal(Left(1));
+                            listener.signal(Flush);
+                            let (col, row) = listener.coord();
+                            listener.signal(Goto(0, 11));
+                            listener.signal(Clear(NewLn));
+                            listener.signal(Printf(format!("col: {}, row: {}", col, row)));
+                            listener.signal(Goto(col, row));
+                            listener.signal(Flush);
+                        },
+                        KeyEvent::Right => {
+                            listener.signal(Right(1));
+                            listener.signal(Flush);
+                            let (col, row) = listener.coord();
+                            listener.signal(Goto(0, 11));
+                            listener.signal(Clear(NewLn));
+                            listener.signal(Printf(format!("col: {}, row: {}", col, row)));
+                            listener.signal(Goto(col, row));
+                            listener.signal(Flush);
+                        },
+                        KeyEvent::Up => {
+                            listener.signal(Up(1));
+                            listener.signal(Flush);
+                            let (col, row) = listener.coord();
+                            listener.signal(Goto(0, 11));
+                            listener.signal(Clear(NewLn));
+                            listener.signal(Printf(format!("col: {}, row: {}", col, row)));
+                            listener.signal(Goto(col, row));
+                            listener.signal(Flush);
+                        },
+                        KeyEvent::Down => {
+                            listener.signal(Down(1));
+                            listener.signal(Flush);
+                            let (col, row) = listener.coord();
+                            listener.signal(Goto(0, 11));
+                            listener.signal(Clear(NewLn));
+                            listener.signal(Printf(format!("col: {}, row: {}", col, row)));
+                            listener.signal(Goto(col, row));
+                            listener.signal(Flush);
+                        }
+                        KeyEvent::Enter => {
+                            let c = listener.getch();
+                            listener.signal(Goto(30, 10));
+                            listener.signal(Clear(NewLn));
+                            listener.signal(Printf(format!("ch: {}", c)));
+                        }
                         _ => ()
                     },
                     _ => ()

@@ -10,8 +10,8 @@ use std::{
 };
 use crate::common::{
     DELAY, enums::{
-        Action::{*, self}, InputEvent::{*, self}, Cmd,
-        State, StoreEvent::*, Style, Color::Reset, Effect
+        Action::{*, self}, InputEvent::{*, self}, Cmd, State,
+        StoreEvent::*, Style, Color::Reset, Effect, Clear
     }
 };
 
@@ -123,6 +123,17 @@ impl EventHandle {
             }
         }
     }
+
+    pub fn getch(&self) -> String {
+        let _ = self.signal_tx.send(
+            Cmd::Request(State::GetCh(self.id)));
+        let mut iter = self.event_rx.iter();
+        loop {
+            if let Some(Dispatch(GetCh(s))) = iter.next() {
+                return s
+            }
+        }
+    }
 }
 
 
@@ -158,19 +169,29 @@ impl Dispatcher {
         let is_running_arc = is_running.clone();
         let lock_owner_arc = lock_owner.clone();
 
-        // Fetch terminal state in main thread.
+        // Fetch terminal default state in main thread.
         #[cfg(unix)]
-        let initial = posix::get_mode();
-        #[cfg(windows)]
-        let initial = win32::get_mode();
-        #[cfg(windows)]
-        let default = win32::get_attrib();
+        let (initial, col, row, tab_size) = fetch_defaults();
+
+        // TODO: Windows --
+        // #[cfg(windows)]
+        // let initial = win32::get_mode();
+        // #[cfg(windows)]
+        // let default = win32::get_attrib();
+
+        // #[cfg(unix)]
+        // let tab_size = sys_tab_size(&initial);
+        // // TODO: Windows?
 
         // Start signal loop.
         let (signal_tx, signal_rx) = channel();
         let signal_handle = thread::spawn(move || {
             // Initialize the Store.
             let mut store = Store::new();
+            store.sync_tab_size(tab_size);
+            // Store inits with main screen buffer,
+            // so we align the main cursor position.
+            store.sync_goto(col, row);
 
             // Windows *mut c_void cannot be safely moved into thread. So
             // we create it within the thread.
@@ -311,30 +332,10 @@ impl Dispatcher {
                                 store.sync_content(&s);
                             },
                             Flush => {
-                                // store.screen.sync_goto(0, 0);
-                                // let s = store.screen.output_buffer();
-                                // #[cfg(unix)]
-                                // posix::printf(&s);
-                                // #[cfg(windows)]
-                                // win32::printf(&s, vte);
                                 #[cfg(unix)]
                                 posix::flush();
                                 #[cfg(windows)]
                                 win32::flush(vte);
-                            },
-                            Refresh => {
-                                #[cfg(unix)]
-                                posix::goto(0, 0);
-                                #[cfg(windows)]
-                                win32::goto(0, 0, vte);
-
-                                store.sync_goto(0, 0);
-                                let s = store.contents();
-
-                                #[cfg(unix)]
-                                posix::printf(&s);
-                                #[cfg(windows)]
-                                win32::printf(&s, vte);
                             },
                             // STYLE
                             SetFx(fx) => {
@@ -439,11 +440,71 @@ impl Dispatcher {
 
                                 store.sync_raw(false);
                             },
-                            SwitchTo(id) => {
-                                // TODO: ...
+                            // STORE OPS
+                            Refresh => {
+                                #[cfg(unix)]
+                                posix::goto(0, 0);
+                                #[cfg(windows)]
+                                win32::goto(0, 0, vte);
+
+                                store.sync_goto(0, 0);
+                                let s = store.contents();
+
+                                #[cfg(unix)]
+                                posix::printf(&s);
+                                #[cfg(windows)]
+                                win32::printf(&s, vte);
                             },
-                            ToMain => {
-                                // TODO: ...
+                            #[cfg(unix)]
+                            Switch => {
+                                if store.id() == 0 {
+                                    posix::enable_alt();
+                                } else {
+                                    posix::clear(Clear::All);
+                                }
+                                store.new_screen();
+                                posix::cook(&initial);
+                                posix::disable_mouse();
+                                posix::show_cursor();
+                                posix::reset_styles();
+                                posix::goto(0, 0);
+                                posix::flush();
+                            },
+                            #[cfg(unix)]
+                            SwitchTo(id) => {
+                                let current = store.id();
+                                // Bounds checking:
+                                if current == id { continue }
+                                if store.exists(id) { store.set(id) }
+                                else { continue }
+                                // Handle screen switch:
+                                if id == 0 {
+                                    // Disable if you are reverting back to main.
+                                    posix::disable_alt();
+                                } else {
+                                    if current == 0 {
+                                        // Enable as you are on the main screen switching to alternate.
+                                        posix::enable_alt();
+                                    }
+                                    posix::clear(Clear::All);
+                                    // Restore screen contents. Restore flushes.
+                                    let s = store.contents();
+                                    posix::goto(0, 0);
+                                    posix::printf(&s);
+                                    let (col, row) = store.coord();
+                                    posix::goto(col, row);
+                                    posix::flush();
+                                }
+                                let (raw, mouse, show) = (
+                                    store.is_raw(),
+                                    store.is_mouse(),
+                                    store.is_cursor(),
+                                );
+                                // Restore settings based on metadata.
+                                if raw { posix::raw() } else { posix::cook(&initial) }
+                                if mouse { posix::enable_mouse() } else { posix::disable_mouse() }
+                                if show { posix::show_cursor() } else { posix::hide_cursor() }
+                                posix::flush();
                             },
                             Resize => {
                                 #[cfg(unix)]
@@ -461,6 +522,9 @@ impl Dispatcher {
 
                                 store.sync_size(w, h);
                             },
+                            SyncTabSize(n) => store.sync_tab_size(n),
+                            SyncMarker(c,r) => store.sync_marker(c,r),
+                            Jump => store.jump(),
                         }
                         Cmd::Request(s) => match s {
                             State::Size(id) => {
@@ -493,12 +557,14 @@ impl Dispatcher {
                             },
                             #[cfg(unix)]
                             State::SysPos(id) => {
+                                // Lock the receiver that requested syspos:
                                 match lock_owner_arc.load(Ordering::SeqCst) {
                                     0 => lock_owner_arc
                                         .store(id, Ordering::SeqCst),
                                     _ => continue,
                                 }
                                 posix::pos();
+                                // Now unlock the receiver after syspos call:
                                 match lock_owner_arc.load(Ordering::SeqCst) {
                                     0 => continue,
                                     _ => lock_owner_arc
@@ -520,6 +586,21 @@ impl Dispatcher {
                                         Pos(col, row)));
                                 }
                             },
+                            State::GetCh(id) => {
+                                let roster = match emitters_arc.lock() {
+                                    Ok(r) => r,
+                                    Err(_) => match emitters_arc.lock() {
+                                        Ok(r) => r,
+                                        Err(_) => continue
+                                    },
+                                };
+                                if let Some(tx) = roster.get(&id) {
+                                    // TODO: Windows?
+                                    let s = store.getch();
+                                    let _ = tx.event_tx.send(Dispatch(
+                                        GetCh(s)));
+                                }
+                            }
                         },
                     },
                     Err(e) => match e {
@@ -590,11 +671,11 @@ impl Dispatcher {
                     0 => {
                         for (_, tx) in roster.iter() {
                             if tx.is_suspend { continue }
-                            let _ = tx.event_tx.send(evt);
+                            let _ = tx.event_tx.send(evt.clone());
                         }
                     },
                     id => match roster.get(&id) {
-                        Some(tx) => { let _ = tx.event_tx.send(evt); },
+                        Some(tx) => { let _ = tx.event_tx.send(evt.clone()); },
                         None => lock_owner.store(0, Ordering::SeqCst),
                     }
                 }
@@ -625,11 +706,11 @@ impl Dispatcher {
                         0 => {
                             for (_, tx) in roster.iter() {
                                 if tx.is_suspend { continue }
-                                let _ = tx.event_tx.send(evt);
+                                let _ = tx.event_tx.send(evt.clone());
                             }
                         },
                         id => match roster.get(&id) {
-                            Some(tx) => { let _ = tx.event_tx.send(evt); },
+                            Some(tx) => { let _ = tx.event_tx.send(evt.clone()); },
                             None => lock_owner.store(0, Ordering::SeqCst),
                         }
                     }
@@ -709,4 +790,68 @@ impl Drop for Dispatcher {
     fn drop(&mut self) {
         self.shutdown().expect("Error on shutdown")
     }
+}
+
+
+#[cfg(unix)]
+use std::io::{ Write, BufRead };
+#[cfg(unix)]
+use libc::termios as Termios;
+
+#[cfg(unix)]
+fn fetch_defaults() -> (Termios, i16, i16, usize) {
+    // Raw mode is needed to fetch cursor report.
+    let initial = posix::get_mode();
+    posix::raw();
+    let mut stdout = std::io::stdout();
+    let stdin = std::io::stdin();
+
+    // Get original position.
+    stdout.write_all(b"\x1B[6n").expect("Error writing cursor report");
+    stdout.flush().expect("Error flushing cursor report");
+    stdin.lock().read_until(b'[', &mut vec![]).expect("Error reading");
+    let mut row = vec![];
+    stdin.lock().read_until(b';', &mut row).expect("Error reading row");
+    let mut col = vec![];
+    stdin.lock().read_until(b'R', &mut col).expect("Error reading col");
+
+    row.pop(); col.pop();
+
+    let origin_row: i16 = row.into_iter()
+        .map(|b| (b as char))
+        .fold(String::new(), |mut acc, n| {
+            acc.push(n);
+            acc
+        }).parse().expect("Error parsing origin row");
+    let origin_col: i16 = col.into_iter()
+        .map(|b| (b as char))
+        .fold(String::new(), |mut acc, n| {
+            acc.push(n);
+            acc
+        }).parse().expect("Error parsing origin col");
+
+    // Get tabbed column position.
+    stdout.write_all(b"\t\x1B[6n").expect("Error writing tab cursor report");
+    stdout.flush().expect("Error flushing tab cursor report");
+    stdin.lock().read_until(b'[', &mut vec![]).expect("Error reading tab");
+    let mut row = vec![];
+    stdin.lock().read_until(b';', &mut row).expect("Error reading tab row");
+    let mut col = vec![];
+    stdin.lock().read_until(b'R', &mut col).expect("Error reading tab col");
+
+    col.pop();
+
+    let tabbed_col: i16 = col.into_iter()
+        .map(|b| (b as char))
+        .fold(String::new(), |mut acc, n| {
+            acc.push(n);
+            acc
+        }).parse().expect("Error parsing tabbed col");
+    let tab_size = (tabbed_col - origin_col) as usize;
+
+    // Revert back to original mode.
+    posix::cook(&initial);
+    posix::printf("\r");
+
+    (initial, origin_col - 1, origin_row - 1, tab_size)
 }
