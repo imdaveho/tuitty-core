@@ -441,20 +441,7 @@ impl Dispatcher {
                                 store.sync_raw(false);
                             },
                             // STORE OPS
-                            Refresh => {
-                                #[cfg(unix)]
-                                posix::goto(0, 0);
-                                #[cfg(windows)]
-                                win32::goto(0, 0, vte);
-
-                                store.sync_goto(0, 0);
-                                let s = store.contents();
-
-                                #[cfg(unix)]
-                                posix::printf(&s);
-                                #[cfg(windows)]
-                                win32::printf(&s, vte);
-                            },
+                            Refresh => store.refresh(),
                             #[cfg(unix)]
                             Switch => {
                                 if store.id() == 0 {
@@ -611,7 +598,27 @@ impl Dispatcher {
                     }
                 }
             }
-            // Close the alternate screen.
+            // Shutdown sequence:
+            // Reset to terminal defaults.
+            // On Unix
+            #[cfg(unix)]
+            posix::disable_alt();
+            #[cfg(unix)]
+            posix::show_cursor();
+            #[cfg(unix)]
+            posix::cook(&initial);
+            #[cfg(unix)]
+            posix::disable_mouse();
+            // On Windows
+            #[cfg(windows)]
+            win32::disable_alt(vte);
+            #[cfg(windows)]
+            win32::show_cursor();
+            #[cfg(windows)]
+            win32::cook();
+            #[cfg(windows)]
+            win32::disable_mouse();
+            // Close the alternate screen on Windows.
             #[cfg(windows)]
             let _ = screen.close();
         });
@@ -770,18 +777,24 @@ impl Dispatcher {
 
     fn shutdown(&mut self) -> std::thread::Result<()> {
         self.is_running.store(false, Ordering::SeqCst);
+        // (imdaveho) TODO: Since reading /dev/tty is blocking
+        // we ignore this for now as it will clean up when the
+        // program ends (and Dispatcher is dropped). HOWEVER!
+        // This should updated when Async/.Await gets released.
         // if let Some(t) = self.input_handle.take() { t.join()? }
+
+        // Clear the emitters registery.
         let lock_err = "Error obtaining emitters lock";
         let mut roster = self.emitters.lock().expect(lock_err);
         roster.clear();
         if let Some(t) = self.signal_handle.take() { t.join()? }
 
         #[cfg(unix)]
-        posix::printf("\r");
+        posix::printf("\r\n");
         #[cfg(windows)]
         let vte = is_ansi_enabled();
         #[cfg(windows)]
-        win32::printf("\r", vte);
+        win32::printf("\r\n", vte);
 
         Ok(())
     }

@@ -1,128 +1,66 @@
 extern crate tuitty;
 
 use std::{ thread, time::Duration };
-use tuitty::common::enums::{ InputEvent, KeyEvent };
+use tuitty::common::DELAY;
+use tuitty::common::enums::{ InputEvent, KeyEvent, Action::*, Color, Clear };
 
-// #[cfg(unix)]
+#[cfg(unix)]
 use tuitty::terminal::actions::posix;
+
 
 #[cfg(unix)]
 fn main() {
     let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
-
-    let original_mode = posix::get_mode();
-    posix::enable_alt();
-    posix::raw();
-    posix::hide_cursor();
-
-    // posix::goto(5, 5);
-    // posix::prints("Hello");
-    // thread::sleep(Duration::from_secs(2));
-
-    // posix::flush();
-
-    // let _ = dispatch.signal(EnableAlt);
-    // let _ = dispatch.signal(Raw);
-    // let _ = dispatch.signal(HideCursor);
-    // let _ = dispatch.signal(Flush);
+    let _ = dispatch.signal(EnableAlt);
+    let _ = dispatch.signal(Raw);
+    let _ = dispatch.signal(EnableMouse);
+    let _ = dispatch.signal(HideCursor);
+    // posix::enable_alt();
+    // let initial = posix::get_mode();
+    // posix::raw();
 
     let listener = dispatch.listen();
-    let listener_handle = thread::spawn(move || {
-        loop {
-            match listener.poll_latest_async() {
-                Some(evt) => match evt {
-                    InputEvent::Keyboard(kv) => match kv {
-                        KeyEvent::Char(c) => {
-                            if c == 'q' {
-                                break
-                            }
-                            // listener.signal(Goto(0, 0));
-                            // listener.signal(Prints(format!("char: {}\n", c)));
-                            posix::goto(0, 0);
-                            posix::prints(&format!("char: {}\n", c));
-                        },
-                        _ => ()
+    let mut counter = 0;
+    loop {
+        let (col, row) = listener.coord();
+        listener.signal(Goto(10, 10));
+        listener.signal(Prints(format!("Counter: (")));
+        listener.signal(SetFg(Color::Red));
+        listener.signal(Prints(format!("{}", counter)));
+        listener.signal(SetFg(Color::Reset));
+        listener.signal(Prints(format!(")")));
+        listener.signal(Clear(Clear::NewLn));
+        listener.signal(Goto(col, row));
+        thread::sleep(Duration::from_millis(DELAY));
+        counter += 1;
+        if counter > 5000 { counter = 0 }
+        listener.signal(Refresh);
+        if let Some(evt) = listener.poll_latest_async() {
+            if let InputEvent::Keyboard(kv) = evt {
+                match kv {
+                    KeyEvent::Left => {
+                        listener.signal(Left(1));
                     },
-                    _ => ()
-                },
-                None => (),
-            }
-            posix::flush();
-            thread::sleep(Duration::from_millis(10));
-        }
-        // listener.signal(ShowCursor);
-        posix::show_cursor();
-    });
-
-    let counter = dispatch.listen(); // works as spawn or listen!
-    let counter_handle = thread::spawn(move || {
-        let mut i = 0;
-        loop {
-            // counter.signal(Goto(10,10));
-            posix::goto(10, 10);
-            let content = format!("count: {}", i);
-            // counter.signal(Printf(content));
-            posix::prints(&content);
-            i += 1;
-            match counter.poll_latest_async() {
-                Some(evt) => match evt {
-                    InputEvent::Keyboard(kv) => match kv {
-                        KeyEvent::Char(c) => {
-                            if c == ';' { break }
-                        },
-                        _ => (),
+                    KeyEvent::Right => {
+                        listener.signal(Right(1));
                     },
+                    KeyEvent::Up => {
+                        listener.signal(Up(1));
+                    },
+                    KeyEvent::Down => {
+                        listener.signal(Down(1));
+                    },
+                    KeyEvent::Char(c) => if c == 'q' {
+                        // posix::cook(&initial);
+                        // posix::disable_alt();
+                        let _ = listener.signal(Cook);
+                        let _ = listener.signal(DisableAlt);
+                        break
+                    },
+                    KeyEvent::Enter => listener.signal(Refresh),
                     _ => (),
-                },
-                None => (),
+                }
             }
-            thread::sleep(Duration::from_millis(400));
         }
-    });
-
-    // let _ = dispatch.signal(Goto(14, 16));
-    // let _ = dispatch.signal(Flush);
-    // let (col, row) = listener.pos();
-    // let _ = dispatch.signal(Goto(5, 3));
-    // let _ = dispatch.signal(Printf(format!()));
-
-    let listen = dispatch.listen();
-    let listen_handle = thread::spawn(move || {
-        thread::sleep(Duration::from_millis(2000));
-        posix::goto(14, 16);
-        // posix::flush();
-        // listen.signal(Goto(14, 16));
-        // listen.signal(Flush);
-        let (col, row) = listen.pos();
-        thread::sleep(Duration::from_millis(200));
-        posix::goto(5, 3);
-        posix::prints(&format!("col: {}, row: {}", col, row));
-        // listen.signal(Goto(5, 3));
-        // let st = format!("col: {}, row: {}", col, row);
-        // listen.signal(Printf(st));
-        thread::sleep(Duration::from_millis(1000));
-        posix::goto(14, 16);
-        // posix::flush();
-        let (w, h) = listen.size();
-        thread::sleep(Duration::from_millis(200));
-        // posix::goto(5, 4);
-        posix::prints(&format!("w: {}, h: {}", w, h));
-    });
-
-
-    listen_handle.join().expect("Counter failed to join");
-    counter_handle.join().expect("Counter failed to join");
-    listener_handle.join().expect("Counter failed to join");
-
-    posix::show_cursor();
-    posix::cook(&original_mode);
-    posix::disable_alt();
-    // posix::flush();
-
-    // let _ = dispatch.signal(ShowCursor);
-    // let _ = dispatch.signal(Cook);
-    // let _ = dispatch.signal(DisableAlt);
-    // let _ = dispatch.signal(Flush);
-
-    thread::sleep(Duration::from_secs(2));
+    }
 }

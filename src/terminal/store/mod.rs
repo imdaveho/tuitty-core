@@ -71,6 +71,12 @@ impl Store {
         } else { (0, 0) }
     }
 
+    pub fn refresh(&self) {
+        if let Some(s) = self.data.get(self.id) {
+            s.buffer.refresh()
+        }
+    }
+
     pub fn getch(&self) -> String {
         if let Some(s) = self.data.get(self.id) {
             s.buffer.getch()

@@ -368,6 +368,64 @@ impl ScreenBuffer {
         chars.iter().collect()
     }
 
+    #[cfg(unix)]
+    pub fn refresh(&self) {
+        posix::goto(0, 0);
+        let default = (Reset, Reset, Effect::Reset as u32);
+        let mut style = (Reset, Reset, Effect::Reset as u32);
+        let mut chunk = String::with_capacity(self.capacity);
+        for cell in &self.cells { match cell {
+            Some(c) => {
+                if c.is_part { continue }
+                // Complete reset.
+                if style != c.style && c.style == default {
+                    posix::reset_styles();
+                    style = default;
+                    posix::prints(&chunk);
+                    chunk.clear();
+                    for ch in &c.glyph { chunk.push(*ch) }
+                }
+                // Some styles are different.
+                else if style != c.style {
+                    // Different Fg.
+                    if style.0 != c.style.0 {
+                        posix::set_fg(c.style.0);
+                        style.0 = c.style.0;
+                    }
+                    // Different Bg.
+                    if style.1 != c.style.1 {
+                        posix::set_bg(c.style.1);
+                        style.1 = c.style.1;
+                    }
+                    // Different Fx.
+                    if style.2 != c.style.2 {
+                        posix::set_fx(c.style.2);
+                        style.2 = c.style.2;
+                    }
+                    posix::prints(&chunk);
+                    chunk.clear();
+                    for ch in &c.glyph { chunk.push(*ch) }
+                }
+                // Current style remains. Expand chunk.
+                else { for ch in &c.glyph { chunk.push(*ch) }}
+            },
+            None => {
+                // Already default style.
+                if style == default { chunk.push(' ') }
+                // Reset the previous style.
+                else {
+                    posix::reset_styles();
+                    style = default;
+                    posix::prints(&chunk);
+                    chunk.clear();
+                    chunk.push(' ');
+                }
+            }
+        }}
+        if chunk.len() > 0 { posix::prints(&chunk) }
+        posix::flush();
+    }
+
     pub fn sync_clear(&mut self, clr: Clear) {
         match clr {
             Clear::All => {
