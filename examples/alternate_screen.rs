@@ -59,7 +59,7 @@ fn signal_scenario() {
 
     dispatch.signal(Cook);
     dispatch.signal(DisableAlt);
-    thread::sleep(Duration::from_secs(1));
+    // thread::sleep(Duration::from_secs(1));
 }
 
 #[cfg(windows)]
@@ -67,7 +67,7 @@ fn raw_scenario() {
     // let initial = win32::get_mode();
     let vte = win32::is_ansi_enabled();
     // let screen = win32::Handle::buffer()
-    //     .expect("Error creating alternate Console buffer"); 
+    //     .expect("Error creating alternate Console buffer");
     // win32::printf("\x1B[?1049h", true);
     // win32::printf("Hello, alt.", true);
     // thread::sleep(Duration::from_secs(2));
@@ -84,5 +84,8 @@ fn raw_scenario() {
 }
 
 fn main() {
+    #[cfg(windows)]
     raw_scenario();
+
+    signal_scenario();
 }

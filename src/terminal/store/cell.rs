@@ -508,7 +508,6 @@ impl ScreenBuffer {
 
     #[cfg(test)]
     fn contents(&self) -> String {
-        // TODO: This currently doesn't support style strings
         let mut chars: Vec<char> = Vec::with_capacity(self.capacity);
         let mut length = 0;
         for c in self.cells.iter() {
@@ -572,31 +571,68 @@ mod tests {
         assert_eq!(output, " ".repeat(10));
 
         // Insert \n char:
+        // NOTE: Difference between Unix and Windows \n handling.
         buffer.sync_content("a\n㓘z");
         assert_eq!(buffer.cells.len(), 10);
         let output = buffer.contents();
+        #[cfg(unix)]
         assert_eq!(output, format!(
             "a{}{}{}",
+            // (1, 0) => (1, 1) = (1 * 5 + 1)
+            // | a | x | x | x | x |
+            // | x |   㓘  | z | x |
+            " ".repeat(5),
+            "㓘z",
+            " ".repeat(1)));
+        #[cfg(windows)]
+        assert_eq!(output, format!(
+            "a{}{}{}",
+            // (1, 0) => (1, 1) = (1 * 5 + 1)
+            // | a | x | x | x | x |
+            // |   㓘  | z | x | x |
             " ".repeat(4),
             "㓘z",
             " ".repeat(2)));
+
         assert_eq!(output.width(), 10);
 
         // Overwrite \n char:
         buffer.sync_coord(0, 0);
         buffer.sync_content("a\n$z");
         let output = buffer.contents();
+        #[cfg(unix)]
+        assert_eq!(output, format!(
+            "a{}{}{}",
+            " ".repeat(5),
+            "$ z",
+            " ".repeat(1)));
+        #[cfg(windows)]
         assert_eq!(output, format!(
             "a{}{}{}",
             " ".repeat(4),
             "$ z",
             " ".repeat(2)));
-
         // Clear cursor to new line.
+
+        // Unix \n shifts row down. So $ is at (1, 1)
+        // Since Clear::NewLn would remove "$ z  ",
+        // check Clear:NewLn @ (1, 0).
+        #[cfg(unix)]
+        buffer.sync_coord(1, 0);
+
+        // Windows \n is like \r\n '$' would be at (0, 1)
+        // So Clear::NewLn would just remove " z  ".
+        #[cfg(windows)]
         buffer.sync_coord(1, 1);
+
         buffer.sync_clear(Clear::NewLn);
         let output = buffer.contents();
+
+        #[cfg(unix)]
+        assert_eq!(output, format!("a{}$ z{}", " ".repeat(5), " ".repeat(1)));
+        #[cfg(windows)]
         assert_eq!(output, format!("a{}${}", " ".repeat(4), " ".repeat(4)));
+
         // Clear current line
         buffer.sync_coord(1, 1);
         buffer.sync_clear(Clear::CurrentLn);
@@ -626,7 +662,7 @@ mod tests {
             // 1 + 3 + 2 + 2 + 5 + 1 + 1 = 15
             rest=" ".repeat(15)));
         assert_eq!(output.width(), 30);
-        
+
         // NOTE: when tab_size = 8 (default on most platforms);
         buffer.tab_size = 8;
         buffer.sync_clear(Clear::All);
@@ -759,12 +795,19 @@ mod tests {
         buffer_a.sync_size(5, 2);
         buffer_a.sync_content("a\r\n㓘z");
         let output_a = buffer_a.contents();
-        
+
         let mut buffer_b = ScreenBuffer::new();
         buffer_b.sync_size(5, 2);
         buffer_b.sync_content("a\n㓘z");
         let output_b = buffer_b.contents();
 
+        // NOTE: This demonstrates the difference
+        // in OS specific ways of handling \n and \r\n.
+
+        #[cfg(unix)]
+        assert_ne!(output_a, output_b);
+
+        #[cfg(windows)]
         assert_eq!(output_a, output_b);
     }
 
