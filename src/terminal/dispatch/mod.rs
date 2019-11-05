@@ -511,8 +511,8 @@ impl Dispatcher {
                                     // switching to alternate.
                                     if current == 0 { posix::enable_alt() }
                                     posix::clear(Clear::All);
-                                    store.render();
                                 }
+                                store.render();
                                 // Restore settings based on metadata.
                                 let (raw, mouse, show) = (
                                     store.is_raw(),
@@ -541,13 +541,21 @@ impl Dispatcher {
                                 else {
                                     // Enable as you are on the main screen
                                     // switching to alternate.
-                                    if current == 0 {
+                                    if vte { if current == 0 {
                                         win32::enable_alt(
-                                            &screen, &initial, vte)
+                                            &screen, &initial, true)
+                                    }} else {
+                                        // (imdaveho) NOTE: For unknown reason
+                                        // that needs to be investigated TODO,
+                                        // we need to activate the alternate
+                                        // console handle as active every time
+                                        // on Windows Console.
+                                        win32::enable_alt(
+                                            &screen, &initial, false)
                                     }
                                     win32::clear(Clear::All, vte);
-                                    store.render(default, vte);
                                 }
+                                store.render(default, vte);
                                 // Restore settings based on metadata.
                                 let (raw, mouse, show) = (
                                     store.is_raw(),

@@ -295,13 +295,16 @@ impl ScreenBuffer {
             "\x00" => (),
             "\r" => self.sync_coord(0, self.row()),
             "\n" => {
+                // (imdaveho) NOTE: Windows handles \n as if it were
+                // \r\n on Unix systems. This is regardless of ConPTY
+                // or classic (cmd.exe) consoles. (Eg. behavior is the
+                // same on git-bash, powershell, and Windows Terminal)
                 #[cfg(unix)] { self.sync_down(1) }
                 #[cfg(windows)] {
                     let (row, height) = (self.row() + 1, self.height());
                     if height > row { self.sync_coord(0, row) }
                     else { self.sync_coord(0, height - 1) }
                 }
-
             },
             "\r\n" => {
                 let (row, height) = (self.row() + 1, self.height());
@@ -462,6 +465,7 @@ impl ScreenBuffer {
                 }
             }
         }}
+        chunk.pop(); // Windows Console offsets at capacity.
         if chunk.len() > 0 { win32::prints(&chunk, vte) }
         win32::goto(col, row, vte);
     }

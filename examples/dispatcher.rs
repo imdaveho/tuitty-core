@@ -123,6 +123,4 @@ fn main() {
 
     dispatch.signal(Cook);
     dispatch.signal(DisableAlt);
-
-    thread::sleep(time::Duration::from_millis(2000));
 }

@@ -232,7 +232,7 @@ pub mod win32 {
     }
 
     pub fn enable_alt(screen: &Handle, initial: &u32, vte: bool) {
-        if vte { ansi::output::prints(
+        if vte { ansi::output::printf(
             &ansi::screen::enable_alt()); return }
         let err_msg = "Error initializing alternate screen settings";
         screen.set_mode(initial).expect(err_msg);
@@ -240,7 +240,7 @@ pub mod win32 {
     }
 
     pub fn disable_alt(vte: bool) {
-        if vte { ansi::output::prints(
+        if vte { ansi::output::printf(
             &ansi::screen::disable_alt()); return }
         let err_msg = "Error switching back to $STDOUT";
         wincon::screen::disable_alt().expect(err_msg);
@@ -301,14 +301,14 @@ pub mod win32 {
         if vte { ansi::output::prints(
             &ansi::style::set_style(Style::Fg(color))); return }
         let err_msg = "Error setting console foreground";
-        wincon::style::set_style(Style::Fg(color), reset);
+        wincon::style::set_style(Style::Fg(color), reset).expect(err_msg);
     }
 
     pub fn set_bg(color: Color, reset: u16, vte: bool) {
         if vte { ansi::output::prints(
             &ansi::style::set_style(Style::Bg(color))); return }
         let err_msg = "Error setting console background";
-        wincon::style::set_style(Style::Bg(color), reset);
+        wincon::style::set_style(Style::Bg(color), reset).expect(err_msg);
     }
 
     pub fn set_styles(fg: Color, bg: Color, fx: u32, reset: u16, vte: bool) {
