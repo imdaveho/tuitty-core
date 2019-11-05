@@ -299,25 +299,25 @@ pub mod win32 {
         wincon::style::set_style(Style::Fx(effects), 0).expect(err_msg);
     }
 
-    pub fn set_fg(color: Color, reset_style: u16, vte: bool) {
+    pub fn set_fg(color: Color, reset: u16, vte: bool) {
         if vte { ansi::output::prints(
             &ansi::style::set_style(Style::Fg(color))); return }
         let err_msg = "Error setting console foreground";
-        wincon::style::set_style(Style::Fg(color), reset_style);
+        wincon::style::set_style(Style::Fg(color), reset);
     }
 
-    pub fn set_bg(color: Color, reset_style: u16, vte: bool) {
+    pub fn set_bg(color: Color, reset: u16, vte: bool) {
         if vte { ansi::output::prints(
             &ansi::style::set_style(Style::Bg(color))); return }
         let err_msg = "Error setting console background";
-        wincon::style::set_style(Style::Bg(color), reset_style);
+        wincon::style::set_style(Style::Bg(color), reset);
     }
 
-    pub fn set_styles(fg: Color, bg: Color, fx: u32, reset_style: u16, vte: bool) {
+    pub fn set_styles(fg: Color, bg: Color, fx: u32, reset: u16, vte: bool) {
         if vte { ansi::output::prints(
             &ansi::style::set_styles(fg, bg, fx)); return }
         let err_msg = "Error setting multiple console styles";
-        wincon::style::set_styles(fg, bg, fx, reset_style).expect(err_msg);
+        wincon::style::set_styles(fg, bg, fx, reset).expect(err_msg);
     }
 
     pub fn reset_style(reset: u16, vte: bool) {

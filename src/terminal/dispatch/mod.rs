@@ -162,16 +162,8 @@ impl Dispatcher {
         #[cfg(unix)]
         let (initial, col, row, tab_size) = fetch_defaults();
 
-        // TODO: Windows --
-        // let (initial, default, col, row, tab_size) = fetch_defaults();
-        // #[cfg(windows)]
-        // let initial = win32::get_mode();
-        // #[cfg(windows)]
-        // let default = win32::get_attrib();
-
-        // #[cfg(unix)]
-        // let tab_size = sys_tab_size(&initial);
-        // // TODO: Windows?
+        #[cfg(windows)]
+        let (initial, default, vte, col, row, tab_size) = fetch_defaults();
 
         // Start signal loop.
         let (signal_tx, signal_rx) = channel();
@@ -188,8 +180,6 @@ impl Dispatcher {
             #[cfg(windows)]
             let screen = win32::Handle::buffer()
                 .expect("Error creating alternate Console buffer");
-            #[cfg(windows)]
-            let vte = win32::is_ansi_enabled();
 
             // (imdaveho) TODO: Shutdown until all signals are all consumed.
             // Eg. When dropping Dispatcher, is_running immediately halts
@@ -450,6 +440,22 @@ impl Dispatcher {
                                 posix::goto(0, 0);
                                 posix::flush();
                             },
+                            #[cfg(windows)]
+                            Switch => {
+                                if store.id() == 0 {
+                                    win32::enable_alt(
+                                        &screen, &initial, vte);
+                                    win32::clear(Clear::All, vte);
+                                } else {
+                                    win32::clear(Clear::All, vte);
+                                }
+                                store.new_screen();
+                                win32::cook();
+                                win32::disable_mouse(vte);
+                                win32::show_cursor(vte);
+                                win32::reset_styles(default, vte);
+                                win32::goto(0, 0, vte);
+                            },
                             #[cfg(unix)]
                             SwitchTo(id) => {
                                 let current = store.id();
@@ -458,27 +464,61 @@ impl Dispatcher {
                                 if store.exists(id) { store.set(id) }
                                 else { continue }
                                 // Handle screen switch:
-                                if id == 0 {
-                                    // Disable if you are reverting back to main.
-                                    posix::disable_alt();
-                                } else {
-                                    if current == 0 {
-                                        // Enable as you are on the main screen switching to alternate.
-                                        posix::enable_alt();
-                                    }
+                                // Disable if you are reverting back to main.
+                                if id == 0 { posix::disable_alt() }
+                                else {
+                                    // Enable as you are on the main screen
+                                    // switching to alternate.
+                                    if current == 0 { posix::enable_alt() }
                                     posix::clear(Clear::All);
                                     store.render();
                                 }
+                                // Restore settings based on metadata.
                                 let (raw, mouse, show) = (
                                     store.is_raw(),
                                     store.is_mouse(),
-                                    store.is_cursor(),
-                                );
-                                // Restore settings based on metadata.
-                                if raw { posix::raw() } else { posix::cook(&initial) }
-                                if mouse { posix::enable_mouse() } else { posix::disable_mouse() }
-                                if show { posix::show_cursor() } else { posix::hide_cursor() }
+                                    store.is_cursor() );
+
+                                if raw { posix::raw() }
+                                else { posix::cook(&initial) }
+                                if mouse { posix::enable_mouse() }
+                                else { posix::disable_mouse() }
+                                if show { posix::show_cursor() }
+                                else { posix::hide_cursor() }
+
                                 posix::flush();
+                            },
+                            #[cfg(windows)]
+                            SwitchTo(id) => {
+                                let current = store.id();
+                                // Bounds checking:
+                                if current == id { continue }
+                                if store.exists(id) { store.set(id) }
+                                else { continue }
+                                // Handle screen switch:
+                                // Disable if you are reverting back to main.
+                                if id == 0 { win32::disable_alt(vte) }
+                                else {
+                                    // Enable as you are on the main screen
+                                    // switching to alternate.
+                                    if current == 0 {
+                                        win32::enable_alt(
+                                            &screen, &initial, vte)
+                                    }
+                                    win32::clear(Clear::All, vte);
+                                    store.render(default, vte);
+                                }
+                                // Restore settings based on metadata.
+                                let (raw, mouse, show) = (
+                                    store.is_raw(),
+                                    store.is_mouse(),
+                                    store.is_cursor() );
+
+                                if raw { win32::raw() } else { win32::cook() }
+                                if mouse { win32::enable_mouse(vte) }
+                                else { win32::disable_mouse(vte) }
+                                if show { win32::show_cursor(vte) }
+                                else { win32::hide_cursor(vte) }
                             },
                             Resize => {
                                 #[cfg(unix)]
@@ -774,12 +814,7 @@ impl Drop for Dispatcher {
 
 
 #[cfg(unix)]
-use std::io::{ Write, BufRead };
-#[cfg(unix)]
-use libc::termios as Termios;
-
-#[cfg(unix)]
-fn fetch_defaults() -> (Termios, i16, i16, usize) {
+fn fetch_defaults() -> (libc::termios, i16, i16, usize) {
     // Raw mode is needed to fetch cursor report.
     let initial = posix::get_mode();
     posix::raw();
@@ -787,13 +822,18 @@ fn fetch_defaults() -> (Termios, i16, i16, usize) {
     let stdin = std::io::stdin();
 
     // Get original position.
-    stdout.write_all(b"\x1B[6n").expect("Error writing cursor report");
-    stdout.flush().expect("Error flushing cursor report");
-    stdin.lock().read_until(b'[', &mut vec![]).expect("Error reading");
+    std::io::Write::write_all(&mut stdout, b"\x1B[6n")
+        .expect("Error writing cursor report");
+    std::io::Write::flush(&mut stdout)
+        .expect("Error flushing cursor report");
+    std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])
+        .expect("Error reading");
     let mut row = vec![];
-    stdin.lock().read_until(b';', &mut row).expect("Error reading row");
+    std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut row)
+        .expect("Error reading row");
     let mut col = vec![];
-    stdin.lock().read_until(b'R', &mut col).expect("Error reading col");
+    std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut col)
+        .expect("Error reading col");
 
     row.pop(); col.pop();
 
@@ -811,13 +851,18 @@ fn fetch_defaults() -> (Termios, i16, i16, usize) {
         }).parse().expect("Error parsing origin col");
 
     // Get tabbed column position.
-    stdout.write_all(b"\t\x1B[6n").expect("Error writing tab cursor report");
-    stdout.flush().expect("Error flushing tab cursor report");
-    stdin.lock().read_until(b'[', &mut vec![]).expect("Error reading tab");
+    std::io::Write::write_all(&mut stdout, b"\t\x1B[6n")
+        .expect("Error writing tab cursor report");
+    std::io::Write::flush(&mut stdout)
+        .expect("Error flushing tab cursor report");
+    std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])
+        .expect("Error reading tab report");
     let mut row = vec![];
-    stdin.lock().read_until(b';', &mut row).expect("Error reading tab row");
+    std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut row)
+        .expect("Error reading tab report row");
     let mut col = vec![];
-    stdin.lock().read_until(b'R', &mut col).expect("Error reading tab col");
+    std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut col)
+        .expect("Error reading tab report col");
 
     col.pop();
 
@@ -834,4 +879,18 @@ fn fetch_defaults() -> (Termios, i16, i16, usize) {
     posix::printf("\r");
 
     (initial, origin_col - 1, origin_row - 1, tab_size)
+}
+
+#[cfg(windows)]
+fn fetch_defaults() -> (u32, u16, bool, i16, i16, usize) {
+    let initial = win32::get_mode();
+    let default = win32::get_attrib();
+    let vte = win32::is_ansi_enabled();
+    let (origin_col, origin_row) = win32::pos(vte);
+    win32::printf("\t", vte);
+    let (tabbed_col, _) = win32::pos(vte);
+    let tab_size = (tabbed_col - origin_col) as usize;
+    win32::printf("\r", vte);
+
+    (initial, default, vte, origin_col, origin_row, tab_size)
 }

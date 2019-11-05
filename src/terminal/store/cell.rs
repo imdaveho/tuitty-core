@@ -399,6 +399,65 @@ impl ScreenBuffer {
         posix::flush();
     }
 
+    #[cfg(windows)]
+    pub fn render(&self, reset: u16, vte: bool) {
+        let (col, row) = self.coord();
+        win32::goto(0, 0, vte);
+        let default = (Reset, Reset, Effect::Reset as u32);
+        let mut style = (Reset, Reset, Effect::Reset as u32);
+        let mut chunk = String::with_capacity(self.capacity);
+        for cell in &self.cells { match cell {
+            Some(c) => {
+                if c.is_part { continue }
+                // Complete reset.
+                if style != c.style && c.style == default {
+                    win32::prints(&chunk, vte);
+                    chunk.clear();
+                    win32::reset_styles(reset, vte);
+                    style = default;
+                    for ch in &c.glyph { chunk.push(*ch) }
+                }
+                // Some styles are different.
+                else if style != c.style {
+                    win32::prints(&chunk, vte);
+                    chunk.clear();
+                    // Different Fg.
+                    if style.0 != c.style.0 {
+                        win32::set_fg(c.style.0, reset, vte);
+                        style.0 = c.style.0;
+                    }
+                    // Different Bg.
+                    if style.1 != c.style.1 {
+                        win32::set_bg(c.style.1, reset, vte);
+                        style.1 = c.style.1;
+                    }
+                    // Different Fx.
+                    if style.2 != c.style.2 {
+                        win32::set_fx(c.style.2, vte);
+                        style.2 = c.style.2;
+                    }
+                    for ch in &c.glyph { chunk.push(*ch) }
+                }
+                // Current style remains. Expand chunk.
+                else { for ch in &c.glyph { chunk.push(*ch) }}
+            },
+            None => {
+                // Already default style.
+                if style == default { chunk.push(' ') }
+                // Reset the previous style.
+                else {
+                    win32::prints(&chunk, vte);
+                    chunk.clear();
+                    win32::reset_styles(reset, vte);
+                    style = default;
+                    chunk.push(' ');
+                }
+            }
+        }}
+        if chunk.len() > 0 { win32::prints(&chunk, vte) }
+        win32::goto(col, row, vte);
+    }
+
     pub fn sync_clear(&mut self, clr: Clear) {
         match clr {
             Clear::All => {

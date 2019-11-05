@@ -71,9 +71,17 @@ impl Store {
         } else { (0, 0) }
     }
 
+    #[cfg(unix)]
     pub fn render(&self) {
         if let Some(s) = self.data.get(self.id) {
             s.buffer.render()
+        }
+    }
+
+    #[cfg(windows)]
+    pub fn render(&self, reset: u16, vte: bool) {
+        if let Some(s) = self.data.get(self.id) {
+            s.buffer.render(reset, vte)
         }
     }
 
