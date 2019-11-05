@@ -298,7 +298,7 @@ impl ScreenBuffer {
             "\r\n" => {
                 let (row, height) = (self.row() + 1, self.height());
                 if height > row { self.sync_coord(0, row) }
-                else { self.sync_coord(0, height) }
+                else { self.sync_coord(0, height - 1) }
             },
             "\t" => {
                 let (col, row) = self.coord();
@@ -718,6 +718,25 @@ mod tests {
         buffer.delch();
         let output = buffer.contents();
         assert_eq!(output, "Heo, क्‍ष   ");
+        assert_eq!(output.width(), 10);
+    }
+
+    #[test]
+    fn test_win_newline() {
+        let mut buffer = ScreenBuffer::new();
+        buffer.sync_size(5, 2);
+        let output = buffer.contents();
+        assert_eq!(output, " ".repeat(10));
+
+        // Insert \n char:
+        buffer.sync_content("a\r\n㓘z");
+        assert_eq!(buffer.cells.len(), 10);
+        let output = buffer.contents();
+        assert_eq!(output, format!(
+            "a{}{}{}",
+            " ".repeat(4),
+            "㓘z",
+            " ".repeat(2)));
         assert_eq!(output.width(), 10);
     }
 }

@@ -168,8 +168,6 @@ impl Dispatcher {
 
         #[cfg(windows)]
         let (initial, default, col, row, tab_size) = fetch_defaults(vte);
-        // let (initial, default, col, row, tab_size) = if vte {
-        //     fetch_vte_defaults(true) } else { fetch_win_defaults(false) };
 
         // Start signal loop.
         let (signal_tx, signal_rx) = channel();
@@ -257,6 +255,14 @@ impl Dispatcher {
                         Cmd::Signal(a) => match a {
                             // CURSOR
                             Goto(col, row) => {
+                                // Prevent out-of-bounds.
+                                let (w, h) = store.size();
+                                let (mut col, mut row) = (col, row);
+                                if col < 0 { col = 0 }
+                                if col >= w { col = w - 1 }
+                                if row < 0 { row = 0 }
+                                if row >= h { row = h - 1 }
+                                
                                 #[cfg(unix)]
                                 posix::goto(col, row);
                                 #[cfg(windows)]
@@ -265,34 +271,62 @@ impl Dispatcher {
                                 store.sync_goto(col, row);
                             },
                             Up(n) => {
-                                #[cfg(unix)]
+                                #[cfg(unix)]                         
                                 posix::up(n);
-                                #[cfg(windows)]
-                                win32::up(n, vte);
-
+                                // Prevent out-of-bounds
+                                // on winapi cursor movement.
+                                #[cfg(windows)] {
+                                    let (_, r) = store.coord();
+                                    let mut n = n;
+                                    if r - n < 0 { n = r }
+                                    #[cfg(windows)]
+                                    win32::up(n, vte);
+                                }
                                 store.sync_up(n);
                             },
                             Down(n) => {
                                 #[cfg(unix)]
                                 posix::down(n);
-                                #[cfg(windows)]
-                                win32::down(n, vte);
-
+                                // Prevent out-of-bounds
+                                // on winapi cursor movement.
+                                #[cfg(windows)] {
+                                    let (_, h) = store.size();
+                                    let (_, r) = store.coord();
+                                    let mut n = n;
+                                    if r + n >= h { n = (h - r) - 1 }
+                                    #[cfg(windows)]
+                                    win32::down(n, vte);
+                                }
                                 store.sync_down(n);
                             },
                             Left(n) => {
                                 #[cfg(unix)]
                                 posix::left(n);
-                                #[cfg(windows)]
-                                win32::left(n, vte);
+                                // Prevent out-of-bounds
+                                // on winapi cursor movement.
+                                #[cfg(windows)] {
+                                    let (c, _) = store.coord();
+                                    let mut n = n;
+                                    if c - n < 0 { n = c }
+                                    #[cfg(windows)]
+                                    win32::left(n, vte);
+                                }
 
                                 store.sync_left(n);
                             },
                             Right(n) => {
                                 #[cfg(unix)]
                                 posix::right(n);
-                                #[cfg(windows)]
-                                win32::right(n, vte);
+                                // Prevent out-of-bounds
+                                // on winapi cursor movement.
+                                #[cfg(windows)] {
+                                    let (w, _) = store.size();
+                                    let (c, _) = store.coord();
+                                    let mut n = n;
+                                    if c + n >= w { n = (w - c) - 1 }
+                                    #[cfg(windows)]
+                                    win32::right(n, vte);
+                                }
 
                                 store.sync_right(n);
                             },
