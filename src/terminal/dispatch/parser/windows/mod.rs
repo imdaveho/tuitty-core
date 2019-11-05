@@ -93,17 +93,17 @@ use crate::common::enums::{ InputEvent, KeyEvent, MouseEvent, MouseButton };
 //     }
 // }
 
-pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
+pub fn read_input_events() -> (u32, Vec<InputEvent>) {
     let conin = match Handle::conin() {
         Ok(h) => h,
-        Err(_) => return (0, InputEvent::Unsupported),
-    }
+        Err(_) => return (0, vec![InputEvent::Unsupported]),
+    };
 
     let mut buf_len: DWORD = 0;
     if unsafe {
         GetNumberOfConsoleInputEvents(conin.0, &mut buf_len)
     } == 0 {
-        return InputEvent::Unsupported;
+        return (0, vec![InputEvent::Unsupported])
     }
     // Fast-skipping all the code below if there is nothing to read at all
     if buf_len == 0 {
@@ -116,7 +116,7 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
     if unsafe {
         ReadConsoleInputW(conin.0, buf.as_mut_ptr(), buf_len, &mut size)
     } == 0 {
-        return InputEvent::Unsupported;
+        return (0, vec![InputEvent::Unsupported])
     } else {
         unsafe {
             buf.set_len(buf_len as usize);
@@ -148,8 +148,7 @@ pub fn read_input_events() -> Result<(u32, Vec<InputEvent>)> {
                 let mouse_event = unsafe {
                     MouseEventRecord::from(*input.event.MouseEvent())
                 };
-                let event = InputEvent::Mouse(
-                    parse_mouse_event(&mouse_event));
+                let event = parse_mouse_event(&mouse_event);
                 events.push(event)
             }
             // TODO implement terminal resize event
@@ -314,7 +313,7 @@ fn parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
     }
 }
 
-fn parse_mouse_event(mevt: &MouseEventRecord) -> MouseEvent {
+fn parse_mouse_event(mevt: &MouseEventRecord) -> InputEvent {
     // NOTE (@imdaveho): xterm emulation takes the digits of the coords and
     // passes them individually as bytes into a buffer; the below cxbs and cybs
     // replicates that and mimicks the behavior; additionally, in xterm, mouse
@@ -330,41 +329,46 @@ fn parse_mouse_event(mevt: &MouseEventRecord) -> MouseEvent {
             match mevt.button_state {
                 ButtonState::Release => {
                     // format!("\x1B[<3;{};{};M", xpos, ypos)
-                    MouseEvent::Release(xpos, ypos)
+                    InputEvent::Mouse(
+                        MouseEvent::Release(xpos, ypos))
                 }
                 ButtonState::FromLeft1stButtonPressed => {
                     // format!("\x1B[<0;{};{};M", xpos, ypos)
-                    MouseEvent::Press(MouseButton::Left, xpos, ypos)
+                    InputEvent::Mouse(
+                        MouseEvent::Press(MouseButton::Left, xpos, ypos))
                 }
                 ButtonState::RightmostButtonPressed => {
                     // format!("\x1B[<2;{};{};M", xpos, ypos)
-                    MouseEvent::Press(
-                        MouseButton::Right, xpos, ypos)
+                    InputEvent::Mouse(
+                        MouseEvent::Press(MouseButton::Right, xpos, ypos))
                 }
                 ButtonState::FromLeft2ndButtonPressed => {
                     // format!("\x1B[<1;{};{};M", xpos, ypos)
-                    MouseEvent::Press(MouseButton::Middle, xpos, ypos)
+                    InputEvent::Mouse(
+                        MouseEvent::Press(MouseButton::Middle, xpos, ypos))
                 }
-                _ => MouseEvent::Unknown
+                _ => InputEvent::Unsupported
             }
         }
         EventFlags::MouseMoved => {
             // Only register when the mouse is not released.
             if mevt.button_state != ButtonState::Release {
                 // format!("\x1B[<32;{};{};M", xpos, ypos)
-                MouseEvent::Hold(xpos, ypos)
-            } else { MouseEvent::Unknown }
+                InputEvent::Mouse(MouseEvent::Hold(xpos, ypos))
+            } else { InputEvent::Unsupported }
         }
         EventFlags::MouseWheeled => {
             if mevt.button_state != ButtonState::Negative {
                 // format!("\x1B[<64;{};{};M")
-                MouseEvent::Press(MouseButton::WheelUp, xpos, ypos)
+                InputEvent::Mouse(
+                    MouseEvent::Press(MouseButton::WheelUp, xpos, ypos))
             } else {
                 // format!("\x1B[<65;{};{};M")
-                MouseEvent::Press(MouseButton::WheelDown, xpos, ypos)
+                InputEvent::Mouse(
+                    MouseEvent::Press(MouseButton::WheelDown, xpos, ypos))
             }
         }
-        EventFlags::DoubleClick => MouseEvent::Unknown,
-        EventFlags::MouseHwheeled => MouseEvent::Unknown,
+        EventFlags::DoubleClick => InputEvent::Unsupported,
+        EventFlags::MouseHwheeled => InputEvent::Unsupported,
     }
 }

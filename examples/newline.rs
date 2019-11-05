@@ -4,18 +4,14 @@ use std::{thread, time};
 use tuitty::common::DELAY;
 use tuitty::common::enums::{ InputEvent, KeyEvent, Action::*, Clear };
 
-#[cfg(unix)]
-use tuitty::terminal::actions::posix;
 
 fn main() {
     let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
 
     // dispatch.signal(EnableAlt).expect("Error signaling dispatch - alt");
-    dispatch.signal(Raw).expect("Error signaling dispatch - raw");
-    // dispatch.signal(ShowCursor);
-    // dispatch.signal(Flush);
-    posix::show_cursor();
-    posix::flush();
+    dispatch.signal(Raw);
+    dispatch.signal(ShowCursor);
+    dispatch.signal(Flush);
 
 
     dispatch.signal(Goto(10, 10));
@@ -49,7 +45,7 @@ fn main() {
         thread::sleep(time::Duration::from_millis(DELAY));
     }
 
-    dispatch.signal(Cook).expect("Error signaling dispatch - cook");
+    dispatch.signal(Cook);
     // dispatch.signal(DisableAlt).expect("Error signaling dispatch - stdout");
 
     thread::sleep(time::Duration::from_millis(2000));

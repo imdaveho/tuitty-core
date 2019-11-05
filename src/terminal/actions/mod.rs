@@ -193,11 +193,9 @@ pub mod win32 {
         wincon::cursor::move_right(n).expect(&err_msg);
     }
 
-    pub fn pos(vte: bool) {
-        if vte { ansi::output::prints(
-            &ansi::cursor::pos()); return }
+    pub fn pos() -> (i16, i16) {
         let err_msg = "Error getting cursor positions";
-        wincon::cursor::pos().expect(err_msg);
+        wincon::cursor::pos().expect(err_msg)
     }
 
     pub fn hide_cursor(vte: bool) {
@@ -320,7 +318,7 @@ pub mod win32 {
         wincon::style::set_styles(fg, bg, fx, reset).expect(err_msg);
     }
 
-    pub fn reset_style(reset: u16, vte: bool) {
+    pub fn reset_styles(reset: u16, vte: bool) {
         if vte { ansi::output::prints(
             &ansi::style::reset()); return }
         let err_msg = "Error unsetting console styles";

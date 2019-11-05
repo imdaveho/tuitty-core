@@ -50,15 +50,15 @@ use tuitty::terminal::dispatch::Dispatcher;
 
 fn signal_scenario() {
     let dispatch = Dispatcher::init();
-    dispatch.signal(EnableAlt).expect("Error -- enable_alt");
-    dispatch.signal(Raw).expect("Error -- raw");
+    dispatch.signal(EnableAlt);
+    dispatch.signal(Raw);
 
-    dispatch.signal(Goto(0, 0)).expect("Error -- goto(0, 0)");
-    dispatch.signal(Printf(format!("Hello, world!"))).expect("Error -- printf");
+    dispatch.signal(Goto(0, 0));
+    dispatch.signal(Printf(format!("Hello, world!")));
     thread::sleep(Duration::from_secs(2));
 
-    dispatch.signal(Cook).expect("Error -- cook");
-    dispatch.signal(DisableAlt).expect("Error -- disable_alt");
+    dispatch.signal(Cook);
+    dispatch.signal(DisableAlt);
     thread::sleep(Duration::from_secs(1));
 }
 

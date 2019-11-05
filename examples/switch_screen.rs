@@ -12,7 +12,8 @@ use tuitty::terminal::actions::posix;
 fn main() {
     let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
     let listener = dispatch.listen();
-    let (col, row) = listener.coord();
+    // let (col, row) = listener.coord();
+    let (col, row) = listener.size();
     dispatch.signal(SetBg(Color::Yellow));
     dispatch.signal(Printf(format!("Main screen check at: {}, {}", col, row)));
     dispatch.signal(SetBg(Color::Reset));

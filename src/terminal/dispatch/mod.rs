@@ -144,6 +144,8 @@ pub struct Dispatcher {
     signal_handle: Option<thread::JoinHandle<()>>,
     // Handle graceful shutdown and clean up.
     is_running: Arc<AtomicBool>,
+    #[cfg(windows)]
+    vt_enabled: bool,
 }
 
 impl Dispatcher {
@@ -152,6 +154,8 @@ impl Dispatcher {
         let emitters = Arc::new(Mutex::new(HashMap::with_capacity(8)));
         let is_running = Arc::new(AtomicBool::new(true));
         let lock_owner = Arc::new(AtomicUsize::new(0));
+        #[cfg(windows)]
+        let vte = win32::is_ansi_enabled();
 
         // Setup Arc's to move into thread.
         let emitters_arc = emitters.clone();
@@ -163,7 +167,9 @@ impl Dispatcher {
         let (initial, col, row, tab_size) = fetch_defaults();
 
         #[cfg(windows)]
-        let (initial, default, vte, col, row, tab_size) = fetch_defaults();
+        let (initial, default, col, row, tab_size) = fetch_defaults(vte);
+        // let (initial, default, col, row, tab_size) = if vte {
+        //     fetch_vte_defaults(true) } else { fetch_win_defaults(false) };
 
         // Start signal loop.
         let (signal_tx, signal_rx) = channel();
@@ -358,7 +364,7 @@ impl Dispatcher {
                                 #[cfg(unix)]
                                 posix::reset_styles();
                                 #[cfg(windows)]
-                                win32::reset_style(default, vte);
+                                win32::reset_styles(default, vte);
 
                                 let (c, fx) = (Reset, Effect::Reset as u32);
                                 store.sync_styles(c, c, fx);
@@ -595,9 +601,9 @@ impl Dispatcher {
                                     },
                                 };
                                 if let Some(tx) = roster.get(&id) {
-                                    let (col, row) = win32::pos(vte);
+                                    let (col, row) = win32::pos();
                                     let _ = tx.event_tx.send(Dispatch(
-                                        Pos(col, row)));
+                                        SysPos(col, row)));
                                 }
                             },
                             State::GetCh(id) => {
@@ -636,6 +642,8 @@ impl Dispatcher {
             signal_tx: signal_tx,
             signal_handle: Some(signal_handle),
             is_running: is_running,
+            #[cfg(windows)]
+            vt_enabled: vte,
         }
     }
 
@@ -798,9 +806,7 @@ impl Dispatcher {
         #[cfg(unix)]
         posix::printf("\r\n");
         #[cfg(windows)]
-        let vte = is_ansi_enabled();
-        #[cfg(windows)]
-        win32::printf("\r\n", vte);
+        win32::printf("\r\n", self.vt_enabled);
 
         Ok(())
     }
@@ -882,15 +888,14 @@ fn fetch_defaults() -> (libc::termios, i16, i16, usize) {
 }
 
 #[cfg(windows)]
-fn fetch_defaults() -> (u32, u16, bool, i16, i16, usize) {
+fn fetch_defaults(vte: bool) -> (u32, u16, i16, i16, usize) {
     let initial = win32::get_mode();
     let default = win32::get_attrib();
-    let vte = win32::is_ansi_enabled();
-    let (origin_col, origin_row) = win32::pos(vte);
+    let (origin_col, origin_row) = win32::pos();
     win32::printf("\t", vte);
-    let (tabbed_col, _) = win32::pos(vte);
+    let (tabbed_col, _) = win32::pos();
     let tab_size = (tabbed_col - origin_col) as usize;
     win32::printf("\r", vte);
 
-    (initial, default, vte, origin_col, origin_row, tab_size)
+    (initial, default, origin_col, origin_row, tab_size)
 }
