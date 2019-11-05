@@ -339,37 +339,9 @@ impl ScreenBuffer {
         }
     }
 
-    pub fn contents(&self) -> String {
-        // TODO: This currently doesn't support style strings
-        let mut chars: Vec<char> = Vec::with_capacity(self.capacity);
-        let mut length = 0;
-        for c in self.cells.iter() {
-            match c {
-                Some(cell) => {
-                    if cell.is_part { continue }
-                    let width = if cell.is_wide { 2 } else { 1 };
-                    if length + width > self.capacity { break }
-                    for c in &cell.glyph {
-                        chars.push(*c)
-                    }
-                    length += width;
-                },
-                None => {
-                    if length + 1 > self.capacity { break }
-                    chars.push(' ');
-                    length += 1;
-                },
-            }
-        }
-        while length < self.capacity {
-            chars.push(' ');
-            length += 1;
-        }
-        chars.iter().collect()
-    }
-
     #[cfg(unix)]
-    pub fn refresh(&self) {
+    pub fn render(&self) {
+        let (col, row) = self.coord();
         posix::goto(0, 0);
         let default = (Reset, Reset, Effect::Reset as u32);
         let mut style = (Reset, Reset, Effect::Reset as u32);
@@ -379,14 +351,16 @@ impl ScreenBuffer {
                 if c.is_part { continue }
                 // Complete reset.
                 if style != c.style && c.style == default {
-                    posix::reset_styles();
-                    style = default;
                     posix::prints(&chunk);
                     chunk.clear();
+                    posix::reset_styles();
+                    style = default;
                     for ch in &c.glyph { chunk.push(*ch) }
                 }
                 // Some styles are different.
                 else if style != c.style {
+                    posix::prints(&chunk);
+                    chunk.clear();
                     // Different Fg.
                     if style.0 != c.style.0 {
                         posix::set_fg(c.style.0);
@@ -402,8 +376,6 @@ impl ScreenBuffer {
                         posix::set_fx(c.style.2);
                         style.2 = c.style.2;
                     }
-                    posix::prints(&chunk);
-                    chunk.clear();
                     for ch in &c.glyph { chunk.push(*ch) }
                 }
                 // Current style remains. Expand chunk.
@@ -414,15 +386,16 @@ impl ScreenBuffer {
                 if style == default { chunk.push(' ') }
                 // Reset the previous style.
                 else {
-                    posix::reset_styles();
-                    style = default;
                     posix::prints(&chunk);
                     chunk.clear();
+                    posix::reset_styles();
+                    style = default;
                     chunk.push(' ');
                 }
             }
         }}
         if chunk.len() > 0 { posix::prints(&chunk) }
+        posix::goto(col, row);
         posix::flush();
     }
 
@@ -460,6 +433,36 @@ impl ScreenBuffer {
                 for i in start..stop { self.cells[i] = None }
             }
         }
+    }
+
+    #[cfg(test)]
+    fn contents(&self) -> String {
+        // TODO: This currently doesn't support style strings
+        let mut chars: Vec<char> = Vec::with_capacity(self.capacity);
+        let mut length = 0;
+        for c in self.cells.iter() {
+            match c {
+                Some(cell) => {
+                    if cell.is_part { continue }
+                    let width = if cell.is_wide { 2 } else { 1 };
+                    if length + width > self.capacity { break }
+                    for c in &cell.glyph {
+                        chars.push(*c)
+                    }
+                    length += width;
+                },
+                None => {
+                    if length + 1 > self.capacity { break }
+                    chars.push(' ');
+                    length += 1;
+                },
+            }
+        }
+        while length < self.capacity {
+            chars.push(' ');
+            length += 1;
+        }
+        chars.iter().collect()
     }
 }
 

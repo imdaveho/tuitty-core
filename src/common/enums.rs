@@ -227,7 +227,6 @@ pub enum Action {
     Raw,
     Cook,
     // STORE OPS
-    Refresh,
     Switch,
     SwitchTo(usize),
     Resize,

@@ -5,8 +5,9 @@ use std::{
     thread, collections::HashMap,
     time::{ SystemTime, UNIX_EPOCH, Duration },
     sync::{
+        mpsc::{ channel, Sender, Receiver, TryRecvError },
         Arc, Mutex, atomic::{ AtomicBool, AtomicUsize, Ordering },
-        mpsc::{ channel, Sender, Receiver, TryRecvError, SendError }},
+    },
 };
 use crate::common::{
     DELAY, enums::{
@@ -63,12 +64,8 @@ impl EventHandle {
     }
 
     pub fn poll_latest_async(&self) -> Option<InputEvent> {
-        let mut iterator = self.event_rx.try_iter();
-        let mut result = Vec::with_capacity(8);
-        while let Some(evt) = iterator.next() {
-            result.push(evt)
-        }
-        result.pop()
+        let iterator = self.event_rx.try_iter();
+        iterator.last()
     }
 
     pub fn poll_sync(&self) -> Option<InputEvent> {
@@ -102,15 +99,6 @@ impl EventHandle {
                 return (w, h)
             }
         }
-        // (imdvaeho) TODO: this should still call the top
-        // since it will pull from the store. But there will
-        // have to be a sync with store call to get updated
-        // size esp. on SIGWINCH.
-        // #[cfg(unix)]
-        // let (w, h) = posix::size();
-        // #[cfg(windows)]
-        // let (w, h) = win32::size();
-        // (w, h)
     }
 
     pub fn syspos(&self) -> (i16, i16) {
@@ -174,6 +162,7 @@ impl Dispatcher {
         let (initial, col, row, tab_size) = fetch_defaults();
 
         // TODO: Windows --
+        // let (initial, default, col, row, tab_size) = fetch_defaults();
         // #[cfg(windows)]
         // let initial = win32::get_mode();
         // #[cfg(windows)]
@@ -201,7 +190,11 @@ impl Dispatcher {
             #[cfg(windows)]
             let vte = win32::is_ansi_enabled();
 
-            while is_running_arc.load(Ordering::SeqCst) {
+            // (imdaveho) TODO: Shutdown until all signals are all consumed.
+            // Eg. When dropping Dispatcher, is_running immediately halts
+            // and signals that might be cleaning up (DisableAlt / Cook) get
+            // ignored during shutdown.
+            loop {
                 // Include minor delay so the thread isn't blindly using CPU.
                 thread::sleep(Duration::from_millis(DELAY));
                 // Handle signal commands.
@@ -441,7 +434,6 @@ impl Dispatcher {
                                 store.sync_raw(false);
                             },
                             // STORE OPS
-                            Refresh => store.refresh(),
                             #[cfg(unix)]
                             Switch => {
                                 if store.id() == 0 {
@@ -474,14 +466,7 @@ impl Dispatcher {
                                         posix::enable_alt();
                                     }
                                     posix::clear(Clear::All);
-                                    // Restore screen contents. Restore flushes.
-                                    let s = store.contents();
-                                    posix::goto(0, 0);
-                                    posix::prints(&s);
-                                    // Restore previous cursor position.
-                                    let (col, row) = store.coord();
-                                    posix::goto(col, row);
-                                    posix::flush();
+                                    store.render();
                                 }
                                 let (raw, mouse, show) = (
                                     store.is_raw(),
@@ -592,33 +577,13 @@ impl Dispatcher {
                         },
                     },
                     Err(e) => match e {
-                        TryRecvError::Empty => (),
+                        TryRecvError::Empty => if !is_running_arc
+                            .load(Ordering::SeqCst) { break },
                         TryRecvError::Disconnected => is_running_arc
                             .store(false, Ordering::SeqCst),
                     }
                 }
             }
-            // Shutdown sequence:
-            // Reset to terminal defaults.
-            // On Unix
-            #[cfg(unix)]
-            posix::disable_alt();
-            #[cfg(unix)]
-            posix::show_cursor();
-            #[cfg(unix)]
-            posix::cook(&initial);
-            #[cfg(unix)]
-            posix::disable_mouse();
-            // On Windows
-            #[cfg(windows)]
-            win32::disable_alt(vte);
-            #[cfg(windows)]
-            win32::show_cursor();
-            #[cfg(windows)]
-            win32::cook();
-            #[cfg(windows)]
-            win32::disable_mouse();
-            // Close the alternate screen on Windows.
             #[cfg(windows)]
             let _ = screen.close();
         });
@@ -771,8 +736,8 @@ impl Dispatcher {
         }
     }
 
-    pub fn signal(&self, action: Action) -> Result<(), SendError<Cmd>> {
-        self.signal_tx.send(Cmd::Signal(action))
+    pub fn signal(&self, action: Action) {
+        let _ = self.signal_tx.send(Cmd::Signal(action));
     }
 
     fn shutdown(&mut self) -> std::thread::Result<()> {

@@ -2,7 +2,9 @@ extern crate tuitty;
 
 use std::{ thread, time::Duration };
 use tuitty::common::DELAY;
-use tuitty::common::enums::{ InputEvent, KeyEvent, Action::*, Clear::* };
+use tuitty::common::enums::{
+    InputEvent, KeyEvent, Action::*, Clear::*, Color
+};
 
 #[cfg(unix)]
 use tuitty::terminal::actions::posix;
@@ -11,8 +13,10 @@ fn main() {
     let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
     let listener = dispatch.listen();
     let (col, row) = listener.coord();
-    let _ = dispatch.signal(Printf(format!("Main screen check at: {}, {}", col, row)));
-    let _ = dispatch.signal(Raw);
+    dispatch.signal(SetBg(Color::Yellow));
+    dispatch.signal(Printf(format!("Main screen check at: {}, {}", col, row)));
+    dispatch.signal(SetBg(Color::Reset));
+    dispatch.signal(Raw);
     loop {
         if let Some(evt) = listener.poll_latest_async() {
             if let InputEvent::Keyboard(kv) = evt {
@@ -91,7 +95,9 @@ fn main() {
                             listener.signal(Goto(10, 3));
                             listener.signal(Flush);
                             let (col, row) = listener.coord();
+                            dispatch.signal(SetFg(Color::Green));
                             listener.signal(Printf(format!("Alternate Screen 2 @ {}, {}", col, row)));
+                            dispatch.signal(SetFg(Color::Reset));
                             listener.signal(Goto(col, row));
                             listener.signal(Flush);
                         }
@@ -107,7 +113,7 @@ fn main() {
     }
 
     listener.signal(SwitchTo(0));
-    let _ = dispatch.signal(Cook);
+    dispatch.signal(Cook);
 
     thread::sleep(Duration::from_millis(2000));
 }

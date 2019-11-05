@@ -71,21 +71,15 @@ impl Store {
         } else { (0, 0) }
     }
 
-    pub fn refresh(&self) {
+    pub fn render(&self) {
         if let Some(s) = self.data.get(self.id) {
-            s.buffer.refresh()
+            s.buffer.render()
         }
     }
 
     pub fn getch(&self) -> String {
         if let Some(s) = self.data.get(self.id) {
             s.buffer.getch()
-        } else { String::new() }
-    }
-
-    pub fn contents(&self) -> String {
-        if let Some(s) = self.data.get(self.id) {
-            s.buffer.contents()
         } else { String::new() }
     }
 

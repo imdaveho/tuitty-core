@@ -8,8 +8,8 @@ use tuitty::common::enums::{ InputEvent, KeyEvent, Action::*, Clear::* };
 fn main() {
     let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
 
-    dispatch.signal(EnableAlt).expect("Error signaling dispatch - alt");
-    dispatch.signal(Raw).expect("Error signaling dispatch - raw");
+    dispatch.signal(EnableAlt);
+    dispatch.signal(Raw);
 
     let listener = dispatch.listen();
     let listener_handle = thread::spawn(move || {
@@ -85,13 +85,17 @@ fn main() {
     let counter_handle = thread::spawn(move || {
         let mut i = 0;
         // counter.signal(HideCursor);
-        counter.lock();
+        // counter.lock();
         loop {
             counter.signal(Goto(10,10));
             let content = format!("count: {}", i);
             counter.signal(Printf(content));
             counter.signal(Flush);
             i += 1;
+            // (imdaveho) NOTE: this is why we need poll_latest_async
+            // so that simultaneous listeners don't get bogged down by
+            // a backlog of events filled by other threads that iterate
+            // over events much more quickly.
             match counter.poll_latest_async() {
                 Some(evt) => match evt {
                     InputEvent::Keyboard(kv) => match kv {
@@ -106,19 +110,19 @@ fn main() {
             }
             thread::sleep(time::Duration::from_millis(400));
         }
-        counter.unlock();
+        // counter.unlock();
     });
 
     listener_handle.join().expect("Listener failed to join");
     counter_handle.join().expect("Counter failed to join");
 
-    dispatch.signal(Goto(10, 10)).expect("Error goto");
-    dispatch.signal(Printf("Hello, World".to_string())).expect("Error printf");
+    dispatch.signal(Goto(10, 10));
+    dispatch.signal(Printf("Hello, World".to_string()));
 
     thread::sleep(time::Duration::from_millis(2000));
 
-    dispatch.signal(Cook).expect("Error signaling dispatch - cook");
-    dispatch.signal(DisableAlt).expect("Error signaling dispatch - stdout");
+    dispatch.signal(Cook);
+    dispatch.signal(DisableAlt);
 
     thread::sleep(time::Duration::from_millis(2000));
 }
