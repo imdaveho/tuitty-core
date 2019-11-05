@@ -9,6 +9,19 @@ use std::{
         Arc, Mutex, atomic::{ AtomicBool, AtomicUsize, Ordering },
     },
 };
+
+mod parser;
+
+#[cfg(unix)]
+use parser::unix;
+#[cfg(unix)]
+use crate::terminal::actions::posix;
+
+#[cfg(windows)]
+use parser::windows;
+#[cfg(windows)]
+use crate::terminal::actions::win32;
+
 use crate::common::{
     DELAY, enums::{
         Action::{*, self}, InputEvent::{*, self}, Cmd, State,
@@ -17,18 +30,6 @@ use crate::common::{
 };
 
 use crate::terminal::store::Store;
-
-#[cfg(unix)]
-pub mod unix;
-#[cfg(unix)]
-use std::{ fs, io::{ Read, BufReader } };
-#[cfg(unix)]
-use crate::terminal::actions::posix;
-
-#[cfg(windows)]
-mod windows;
-#[cfg(windows)]
-use crate::terminal::actions::win32;
 
 
 pub struct EventHandle {
@@ -612,15 +613,15 @@ impl Dispatcher {
         #[cfg(unix)] {
         self.input_handle = Some(thread::spawn(move || {
             while is_running.load(Ordering::SeqCst) {
-                let tty = match fs::OpenOptions::new()
+                let tty = match std::fs::OpenOptions::new()
                     .read(true).write(true).open("/dev/tty")
                 {
-                    Ok(f) => BufReader::new(f),
+                    Ok(f) => std::io::BufReader::new(f),
                     Err(_) => continue
                 };
-
-                let (mut input, mut taken) = ([0; 12], tty.take(12));
-                let _ = taken.read(&mut input);
+                let (mut input, mut taken) = (
+                    [0; 12], std::io::Read::take(tty, 12));
+                let _ = std::io::Read::read(&mut taken, &mut input);
 
                 // Emitters clean up.
                 let mut roster = match emitters_arc.lock() {
@@ -638,7 +639,7 @@ impl Dispatcher {
                 // Parse the user input from /dev/tty.
                 let item = input[0];
                 let mut rest = input[1..].to_vec().into_iter();
-                let evt = unix::parser::parse_event(item, &mut rest);
+                let evt = unix::parse_event(item, &mut rest);
                 // Push user input event.
                 match lock_owner.load(Ordering::SeqCst) {
                     0 => {
@@ -659,7 +660,7 @@ impl Dispatcher {
         #[cfg(windows)] {
         self.input_handle = Some(thread::spawn(move || {
             while is_running.load(Ordering::SeqCst) {
-                let (_, evts) = windows::parser::read_input_events();
+                let (_, evts) = windows::read_input_events();
                 for evt in evts {
                     // Emitters clean up.
                     let mut roster = match emitters_arc.lock() {
