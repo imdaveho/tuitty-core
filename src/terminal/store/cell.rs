@@ -294,7 +294,15 @@ impl ScreenBuffer {
         match s {
             "\x00" => (),
             "\r" => self.sync_coord(0, self.row()),
-            "\n" => self.sync_down(1),
+            "\n" => {
+                #[cfg(unix)] { self.sync_down(1) }
+                #[cfg(windows)] {
+                    let (row, height) = (self.row() + 1, self.height());
+                    if height > row { self.sync_coord(0, row) }
+                    else { self.sync_coord(0, height - 1) }
+                }
+
+            },
             "\r\n" => {
                 let (row, height) = (self.row() + 1, self.height());
                 if height > row { self.sync_coord(0, row) }
@@ -723,20 +731,30 @@ mod tests {
 
     #[test]
     fn test_win_newline() {
-        let mut buffer = ScreenBuffer::new();
-        buffer.sync_size(5, 2);
-        let output = buffer.contents();
-        assert_eq!(output, " ".repeat(10));
+        let mut buffer_a = ScreenBuffer::new();
+        buffer_a.sync_size(5, 2);
+        buffer_a.sync_content("a\r\n㓘z");
+        let output_a = buffer_a.contents();
+        
+        let mut buffer_b = ScreenBuffer::new();
+        buffer_b.sync_size(5, 2);
+        buffer_b.sync_content("a\n㓘z");
+        let output_b = buffer_b.contents();
 
-        // Insert \n char:
-        buffer.sync_content("a\r\n㓘z");
-        assert_eq!(buffer.cells.len(), 10);
-        let output = buffer.contents();
-        assert_eq!(output, format!(
-            "a{}{}{}",
-            " ".repeat(4),
-            "㓘z",
-            " ".repeat(2)));
-        assert_eq!(output.width(), 10);
+        assert_ne!(output_a, output_b);
+    }
+
+    #[test]
+    fn test_win_grapheme() {
+        let content_a = "a\r\n㓘z";
+        let content_b = "a\n㓘z";
+
+        let segments_a: Vec<&str> = UnicodeGraphemes
+            ::graphemes(content_a, true).collect();
+
+        let segments_b: Vec<&str> = UnicodeGraphemes
+            ::graphemes(content_b, true).collect();
+
+        assert_ne!(segments_a, segments_b);
     }
 }
