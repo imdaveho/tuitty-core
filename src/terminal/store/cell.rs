@@ -613,6 +613,8 @@ mod tests {
         assert_eq!(output, " ".repeat(30));
 
         // Insert tabs char:
+        // NOTE: when tab_size = 4;
+        buffer.tab_size = 4;
         buffer.sync_content("a\t㓘\tzebra\t\t\t&");
         assert_eq!(buffer.cells.len(), 30);
         let output = buffer.contents();
@@ -620,11 +622,29 @@ mod tests {
             "a{tab1}㓘{tab2}zebra{tab3}&{rest}",
             tab1=" ".repeat(3),
             tab2=" ".repeat(2),
-            // despite 3 \t chars, there is only 1 space
-            // between the `a`` in zebra and the `&`
             tab3=" ",
             // 1 + 3 + 2 + 2 + 5 + 1 + 1 = 15
             rest=" ".repeat(15)));
+        assert_eq!(output.width(), 30);
+        
+        // NOTE: when tab_size = 8 (default on most platforms);
+        buffer.tab_size = 8;
+        buffer.sync_clear(Clear::All);
+        buffer.sync_content("a\t㓘\tzebra\t\t\t&");
+        assert_eq!(buffer.cells.len(), 30);
+        let output = buffer.contents();
+        assert_eq!(output, format!(
+            "a{tab1}㓘{tab2}zebra{tab3}&{rest}",
+            tab1=" ".repeat(7),
+            tab2=" ".repeat(4), // NOTE: why is this 4?
+            // despite 3 \t chars, after zebra, there is only
+            // enough space for 2 tabstops ending at capacity
+            // and & would end content because of how cursor
+            // and the cell buffer works (where it will continue)
+            // to overwrite the last character until done. 
+            tab3=" ".repeat(8 + 2),
+            // 1 + 7 + 2 + 5 + 5 + 8 + 2 = 30
+            rest=""));
         assert_eq!(output.width(), 30);
     }
 
@@ -745,7 +765,7 @@ mod tests {
         buffer_b.sync_content("a\n㓘z");
         let output_b = buffer_b.contents();
 
-        assert_ne!(output_a, output_b);
+        assert_eq!(output_a, output_b);
     }
 
     #[test]

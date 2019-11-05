@@ -4,7 +4,6 @@ use std::{ thread, time::Duration, sync::{ Arc, atomic::{ AtomicBool, Ordering }
 use tuitty::common::enums::{ InputEvent, KeyEvent, Action::*, Color, Clear };
 
 
-#[cfg(unix)]
 fn main() {
     let mut dispatch = tuitty::terminal::dispatch::Dispatcher::init();
     dispatch.signal(EnableAlt);
