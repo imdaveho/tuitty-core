@@ -136,15 +136,38 @@ pub enum StoreEvent {
     GetCh(String),
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum MouseEvent {
     Press(MouseButton, i16, i16),
     Release(i16, i16),
     Hold(i16, i16),
 }
 
+impl MouseEvent {
+    pub fn enumerate(self) -> u8 {
+        match self {
+            Self::Press(btn, _, _) => match btn {
+                MouseButton::Left => 28,
+                MouseButton::Right => 29,
+                MouseButton::Middle => 30,
+                MouseButton::WheelUp => 31,
+                MouseButton::WheelDown => 32,
+            },
+            Self::Release(_, _) => 33,
+            Self::Hold(_, _) => 34,
+        }
+    }
 
-#[derive(Clone)]
+    pub fn values(self) -> u32 {
+        match self {
+            Self::Press(_, col, row) => ((col as u32) << 16) | row as u32,
+            Self::Release(col, row) => ((col as u32) << 16) | row as u32,
+            Self::Hold(col, row) => ((col as u32) << 16) | row as u32,
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
 pub enum MouseButton {
     Left,
     Right,
@@ -154,8 +177,9 @@ pub enum MouseButton {
 }
 
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum KeyEvent {
+    Null,
     Backspace,
     Enter,
     Left,
@@ -174,16 +198,60 @@ pub enum KeyEvent {
     Char(char),
     Alt(char),
     Ctrl(char),
-    Null,
     Esc,
+    CtrlLeft,
+    CtrlRight,
     CtrlUp,
     CtrlDown,
-    CtrlRight,
-    CtrlLeft,
+    ShiftLeft,
+    ShiftRight,
     ShiftUp,
     ShiftDown,
-    ShiftRight,
-    ShiftLeft,
+}
+
+impl KeyEvent {
+    pub fn enumerate(self) -> u8 {
+        match self {
+            Self::Null => 0,
+            Self::Backspace => 1,
+            Self::Enter => 2,
+            Self::Left => 3,
+            Self::Right => 4,
+            Self::Up => 5,
+            Self::Down => 6,
+            Self::Home => 7,
+            Self::End => 8,
+            Self::PageUp => 9,
+            Self::PageDown => 10,
+            Self::Tab => 11,
+            Self::BackTab => 12,
+            Self::Delete => 13,
+            Self::Insert => 14,
+            Self::F(_) => 15,
+            Self::Char(_) => 16,
+            Self::Alt(_) => 17,
+            Self::Ctrl(_) => 18,
+            Self::Esc => 19,
+            Self::CtrlLeft => 20,
+            Self::CtrlRight => 21,
+            Self::CtrlUp => 22,
+            Self::CtrlDown => 23,
+            Self::ShiftLeft => 24,
+            Self::ShiftRight => 25,
+            Self::ShiftUp => 26,
+            Self::ShiftDown => 27,
+        }
+    }
+
+    pub fn values(self) -> u32 {
+        match self {
+            Self::F(n) => n as u32,
+            Self::Char(c) => c as u32,
+            Self::Alt(c) => c as u32,
+            Self::Ctrl(c) => c as u32,
+            _ => 0,
+        }
+    }
 }
 
 
@@ -211,6 +279,7 @@ pub enum Action {
     Prints(String),
     Printf(String),
     Flush,
+    Resize(i16, i16),
     // STYLE
     SetFx(u32),
     SetFg(Color),
@@ -229,11 +298,10 @@ pub enum Action {
     // STORE OPS
     Switch,
     SwitchTo(usize),
-    Resize,
-    SyncSize(i16, i16),
-    SyncTabSize(usize),
+    Resized,
     SyncMarker(i16, i16),
     Jump,
+    SyncTabSize(usize),
 }
 
 

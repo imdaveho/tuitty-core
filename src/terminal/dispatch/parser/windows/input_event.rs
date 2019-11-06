@@ -1,5 +1,5 @@
 use winapi::shared::minwindef::{ WORD, DWORD };
-use winapi::um::wincon::{ 
+use winapi::um::wincon::{
     KEY_EVENT, MOUSE_EVENT,
     WINDOW_BUFFER_SIZE_EVENT,
     INPUT_RECORD, INPUT_RECORD_Event,

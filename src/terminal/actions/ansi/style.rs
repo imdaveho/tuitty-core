@@ -39,7 +39,7 @@ pub fn set_style(style: Style) -> String {
 
 pub fn set_styles(fg: Color, bg: Color, fx: u32) -> String {
     format!(
-        "{fg}{bg}{fx}", 
+        "{fg}{bg}{fx}",
         fg=set_style(Style::Fg(fg)),
         bg=set_style(Style::Bg(bg)),
         fx=set_style(Style::Fx(fx)))

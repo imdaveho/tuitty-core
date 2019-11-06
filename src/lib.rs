@@ -1,147 +1,809 @@
-// //! `tuitty` is a cross platform library that is meant for FFI.
+//! `tuitty` is a cross platform, interoperable, simplfied terminal library
+//! that is meant to be wrapped by multiple languages.
 
-// use std::ffi::CStr;
-// use std::os::raw::c_char;
+use std::ffi::CString;
+use std::os::raw::c_char;
 
 pub mod terminal;
 pub mod common;
 
-// pub use terminal::{
-//     actions::TerminalAction,
-// };
+use terminal::dispatch::{ Dispatcher, EventHandle };
+use common::enums::{ Clear::*, Color, Action::*, InputEvent };
 
 
-// #[no_mangle]
-// pub extern fn actions() -> *const TerminalAction {
-//     Box::into_raw(Box::new(TerminalAction::new()))
-// }
+// Initialization of Dispatcher and Event Handles
+#[no_mangle]
+pub extern fn dispatcher() -> *mut Dispatcher {
+    Box::into_raw(Box::new(Dispatcher::init()))
+}
 
-// #[no_mangle]
-// pub extern fn free_actions(ptr: *mut TerminalAction) {
-//     unsafe {
-//         if ptr.is_null() { return }
-//         assert!(!ptr.is_null());
-//         Box::from_raw(ptr);
-//     }
-// }
+#[no_mangle]
+pub extern fn dispatcher_free(ptr: *mut Dispatcher) {
+    if ptr.is_null() { return }
+    unsafe { Box::from_raw(ptr); }
+}
+
+#[no_mangle]
+pub extern fn dispatcher_listen(ptr: *mut Dispatcher) -> *const EventHandle {
+    unsafe {
+        assert!(!ptr.is_null());
+        Box::into_raw(Box::new((&mut *ptr).listen()))
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatcher_spawn(ptr: *mut Dispatcher) -> *const EventHandle {
+    unsafe {
+        assert!(!ptr.is_null());
+        Box::into_raw(Box::new((&mut *ptr).spawn()))
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_free(ptr: *mut EventHandle) {
+    if ptr.is_null() { return }
+    unsafe { Box::from_raw(ptr); }
+}
+
+// Cursor Signals
+#[no_mangle]
+pub extern fn dispatch_goto(ptr: *mut Dispatcher, col: i16, row: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Goto(col, row));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_goto(ptr: *const EventHandle, col: i16, row: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Goto(col, row));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_up(ptr: *mut Dispatcher, n: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Up(n));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_up(ptr: *const EventHandle, n: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Up(n));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_down(ptr: *mut Dispatcher, n: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Down(n));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_down(ptr: *const EventHandle, n: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Down(n));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_left(ptr: *mut Dispatcher, n: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Left(n));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_left(ptr: *const EventHandle, n: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Left(n));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_right(ptr: *mut Dispatcher, n: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Right(n));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_right(ptr: *const EventHandle, n: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Right(n));
+    }
+}
+
+// Screen/Output Signals
+#[no_mangle]
+pub extern fn dispatch_clear(ptr: *mut Dispatcher, clr: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        match clr {
+            0 => (&mut *ptr).signal(Clear(All)),
+            1 => (&mut *ptr).signal(Clear(CursorDn)),
+            2 => (&mut *ptr).signal(Clear(CursorUp)),
+            3 => (&mut *ptr).signal(Clear(CurrentLn)),
+            4 => (&mut *ptr).signal(Clear(NewLn)),
+            _ => ()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_clear(ptr: *const EventHandle, clr: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        match clr {
+            0 => (&*ptr).signal(Clear(All)),
+            1 => (&*ptr).signal(Clear(CursorDn)),
+            2 => (&*ptr).signal(Clear(CursorUp)),
+            3 => (&*ptr).signal(Clear(CurrentLn)),
+            4 => (&*ptr).signal(Clear(NewLn)),
+            _ => ()
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_resize(ptr: *mut Dispatcher, w: i16, h: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Resize(w, h));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_resize(ptr: *const EventHandle, w: i16, h: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Resize(w, h));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_prints(ptr: *mut Dispatcher, c_str: *mut c_char) {
+    unsafe {
+        assert!(!ptr.is_null());
+        assert!(!c_str.is_null());
+        let r_str = CString::from_raw(c_str).into_string();
+        if let Ok(s) = r_str { (&mut *ptr).signal(Prints(s)) }
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_prints(ptr: *const EventHandle, c_str: *mut c_char) {
+    unsafe {
+        assert!(!ptr.is_null());
+        assert!(!c_str.is_null());
+        let r_str = CString::from_raw(c_str).into_string();
+        if let Ok(s) = r_str { (&*ptr).signal(Prints(s)) }
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_printf(ptr: *mut Dispatcher, c_str: *mut c_char) {
+    unsafe {
+        assert!(!ptr.is_null());
+        assert!(!c_str.is_null());
+        let r_str = CString::from_raw(c_str).into_string();
+        if let Ok(s) = r_str { (&mut *ptr).signal(Printf(s)) }
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_printf(ptr: *const EventHandle, c_str: *mut c_char) {
+    unsafe {
+        assert!(!ptr.is_null());
+        assert!(!c_str.is_null());
+        let r_str = CString::from_raw(c_str).into_string();
+        if let Ok(s) = r_str { (&*ptr).signal(Printf(s)) }
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_flush(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Flush);
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_flush(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Flush);
+    }
+}
+
+// Style Signals
+#[no_mangle]
+pub extern fn dispatch_set_basic_fg(ptr: *mut Dispatcher, fg: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        if let Some(c) = colorize(fg) {
+            (&mut *ptr).signal(SetFg(c))
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_set_basic_fg(ptr: *const EventHandle, fg: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        if let Some(c) = colorize(fg) {
+            (&*ptr).signal(SetFg(c))
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_set_ansi_fg(ptr: *mut Dispatcher, fg: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(SetFg(Color::AnsiValue(fg)));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_set_ansi_fg(ptr: *const EventHandle, fg: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(SetFg(Color::AnsiValue(fg)));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_set_rgb_fg(ptr: *mut Dispatcher, r: u8, g: u8, b: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(SetFg(Color::Rgb{r: r, g: g, b: b}));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_set_rgb_fg(ptr: *const EventHandle, r: u8, g: u8, b: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(SetFg(Color::Rgb{r: r, g: g, b: b}));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_set_basic_bg(ptr: *mut Dispatcher, bg: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        if let Some(c) = colorize(bg) {
+            (&mut *ptr).signal(SetBg(c))
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_set_basic_bg(ptr: *const EventHandle, bg: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        if let Some(c) = colorize(bg) {
+            (&*ptr).signal(SetBg(c))
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_set_ansi_bg(ptr: *mut Dispatcher, bg: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(SetBg(Color::AnsiValue(bg)));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_set_ansi_bg(ptr: *const EventHandle, bg: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(SetBg(Color::AnsiValue(bg)));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_set_rgb_bg(ptr: *mut Dispatcher, r: u8, g: u8, b: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(SetBg(Color::Rgb{r: r, g: g, b: b}));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_set_rgb_bg(ptr: *const EventHandle, r: u8, g: u8, b: u8) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(SetBg(Color::Rgb{r: r, g: g, b: b}));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_set_fx(ptr: *mut Dispatcher, fx: u32) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(SetFx(fx));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_set_fx(ptr: *const EventHandle, fx: u32) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(SetFx(fx));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_set_styles(
+    ptr: *mut Dispatcher, fg: u8, bg: u8, fx: u32) {
+    match (colorize(fg), colorize(bg)) {
+        (Some(fg), Some(bg)) => {
+            unsafe {
+                assert!(!ptr.is_null());
+                (&mut *ptr).signal(SetStyles(fg, bg, fx));
+            }
+        },
+        (None, None) => {
+            unsafe {
+                assert!(!ptr.is_null());
+                (&mut *ptr).signal(SetFx(fx));
+            }
+        },
+        (Some(fg), None) => {
+            unsafe {
+                assert!(!ptr.is_null());
+                (&mut *ptr).signal(SetFg(fg));
+                (&mut *ptr).signal(SetFx(fx));
+            }
+        },
+        (None, Some(bg)) => {
+            unsafe {
+                assert!(!ptr.is_null());
+                (&mut *ptr).signal(SetBg(bg));
+                (&mut *ptr).signal(SetFx(fx));
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_set_styles(
+    ptr: *const EventHandle, fg: u8, bg: u8, fx: u32) {
+    match (colorize(fg), colorize(bg)) {
+        (Some(fg), Some(bg)) => {
+            unsafe {
+                assert!(!ptr.is_null());
+                (&*ptr).signal(SetStyles(fg, bg, fx));
+            }
+        },
+        (None, None) => {
+            unsafe {
+                assert!(!ptr.is_null());
+                (&*ptr).signal(SetFx(fx));
+            }
+        },
+        (Some(fg), None) => {
+            unsafe {
+                assert!(!ptr.is_null());
+                (&*ptr).signal(SetFg(fg));
+                (&*ptr).signal(SetFx(fx));
+            }
+        },
+        (None, Some(bg)) => {
+            unsafe {
+                assert!(!ptr.is_null());
+                (&*ptr).signal(SetBg(bg));
+                (&*ptr).signal(SetFx(fx));
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_reset_styles(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(ResetStyles);
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_reset_styles(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(ResetStyles);
+    }
+}
+
+// Toggle Mode Signals
+#[no_mangle]
+pub extern fn dispatch_show_cursor(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(ShowCursor);
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_show_cursor(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(ShowCursor);
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_hide_cursor(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(HideCursor);
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_hide_cursor(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(HideCursor);
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_enable_mouse(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(EnableMouse);
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_enable_mouse(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(EnableMouse);
+    }
+}
 
 
-// pub mod interface;
+#[no_mangle]
+pub extern fn dispatch_disable_mouse(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(DisableMouse);
+    }
+}
 
-// mod tty;
-// use tty::{
-//     Tty, AsyncReader, SyncReader,
-//     InputEvent, KeyEvent, MouseEvent, MouseButton
-// };
+#[no_mangle]
+pub extern fn event_handle_disable_mouse(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(DisableMouse);
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatch_enable_alt(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(EnableAlt);
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_enable_alt(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(EnableAlt);
+    }
+}
 
 
-// #[no_mangle]
-// pub extern fn init() -> *mut Tty {
-//     Box::into_raw(Box::new(Tty::init()))
-// }
+#[no_mangle]
+pub extern fn dispatch_disable_alt(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(DisableAlt);
+    }
+}
 
-// #[no_mangle]
-// pub extern fn manual(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).manual();
-//     }
-// }
+#[no_mangle]
+pub extern fn event_handle_disable_alt(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(DisableAlt);
+    }
+}
 
-// #[no_mangle]
-// pub extern fn automatic(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).automatic();
-//     }
-// }
+#[no_mangle]
+pub extern fn dispatch_raw(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Raw);
+    }
+}
 
-// #[no_mangle]
-// pub extern fn terminate(ptr: *mut Tty) {
-//     unsafe {
-//         if ptr.is_null() { return }
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).terminate();
-//         Box::from_raw(ptr);
-//     }
-// }
+#[no_mangle]
+pub extern fn event_handle_raw(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Raw);
+    }
+}
 
-// // #[no_mangle]
-// // pub extern fn size(ptr: *mut Tty) -> u32 {
-// //     // NOTE: instead of a Tuple, we are sending a u32
-// //     // that has the first 16 bits containing `w: i16`
-// //     // and the second 16 bits containing `h: i16`.
-// //     unsafe {
-// //         assert!(!ptr.is_null());
-// //         let (w, h) = (&mut *ptr).size();
-// //         ((w as u32) << 16) | h as u32
-// //     }
-// // }
 
-// #[no_mangle]
-// pub extern fn screen_size(ptr: *mut Tty) -> u32 {
-//     // NOTE: instead of a Tuple, we are sending a u32
-//     // that has the first 16 bits containing `w: i16`
-//     // and the second 16 bits containing `h: i16`.
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         let (w, h) = (&mut *ptr).screen_size();
-//         ((w as u32) << 16) | h as u32
-//     }
-// }
+#[no_mangle]
+pub extern fn dispatch_cook(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Cook);
+    }
+}
 
-// #[no_mangle]
-// pub extern fn raw(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).raw();
-//     }
-// }
+#[no_mangle]
+pub extern fn event_handle_cook(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Cook);
+    }
+}
 
-// #[no_mangle]
-// pub extern fn cook(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).cook();
-//     }
-// }
+// Store Operation Signals
+#[no_mangle]
+pub extern fn dispatcher_switch(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Switch);
+    }
+}
 
-// #[no_mangle]
-// pub extern fn enable_mouse(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).enable_mouse();
-//     }
-// }
+#[no_mangle]
+pub extern fn event_handle_switch(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Switch);
+    }
+}
 
-// #[no_mangle]
-// pub extern fn disable_mouse(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).disable_mouse();
-//     }
-// }
+#[no_mangle]
+pub extern fn dispatcher_switch_to(ptr: *mut Dispatcher, id: usize) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(SwitchTo(id));
+    }
+}
 
-// #[no_mangle]
-// pub extern fn read_char(ptr: *mut Tty) -> u32 {
-//     // NOTE: Since Rust char and C char are different implementations from each
-//     // other, instead we send a u32 over the FFI boundary. This allows for
-//     // flexibility in the implemenation language to transform the u32 as a
-//     // byte array of [u8; 4] and decode as the application expects.
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).read_char() as u32
-//     }
-// }
+#[no_mangle]
+pub extern fn event_handle_switch_to(ptr: *const EventHandle, id: usize) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(SwitchTo(id));
+    }
+}
 
-// #[no_mangle]
-// pub extern fn read_sync(ptr: *mut Tty) -> *mut SyncReader {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         Box::into_raw(Box::new((&mut *ptr).read_sync()))
-//     }
-// }
+#[no_mangle]
+pub extern fn dispatcher_resized(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Resized);
+    }
+}
 
+#[no_mangle]
+pub extern fn event_handle_resized(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Resized);
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatcher_mark(ptr: *mut Dispatcher, col: i16, row: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(SyncMarker(col, row));
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_mark(ptr: *const EventHandle, col: i16, row: i16) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(SyncMarker(col, row));
+    }
+}
+
+#[no_mangle]
+pub extern fn dispatcher_jump(ptr: *mut Dispatcher) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(Jump);
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_jump(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(Jump);
+    }
+}
+
+// (imdaveho) NOTE: Subject to change.
+#[no_mangle]
+pub extern fn dispatcher_sync_tab_size(ptr: *mut Dispatcher, n: usize) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&mut *ptr).signal(SyncTabSize(n));
+    }
+}
+
+// (imdaveho) NOTE: Subject to change.
+#[no_mangle]
+pub extern fn event_handle_sync_tab_size(ptr: *const EventHandle, n: usize) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).signal(SyncTabSize(n));
+    }
+}
+
+
+// Store Requests (EventHandle Only)
+#[no_mangle]
+pub extern fn event_handle_size(ptr: *const EventHandle) -> u32 {
+    // NOTE: instead of a Tuple, we are sending a u32
+    // that has the first 16 bits containing `w: i16`
+    // and the second 16 bits containing `h: i16`.
+    unsafe {
+        assert!(!ptr.is_null());
+        let (w, h) = (&*ptr).size();
+        ((w as u32) << 16) | h as u32
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_coord(ptr: *const EventHandle) -> u32 {
+    // NOTE: instead of a Tuple, we are sending a u32
+    // that has the first 16 bits containing `col: i16`
+    // and the second 16 bits containing `row: i16`.
+    unsafe {
+        assert!(!ptr.is_null());
+        let (col, row) = (&*ptr).coord();
+        ((col as u32) << 16) | row as u32
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_syspos(ptr: *const EventHandle) -> u32 {
+    // NOTE: instead of a Tuple, we are sending a u32
+    // that has the first 16 bits containing `col: i16`
+    // and the second 16 bits containing `row: i16`.
+    unsafe {
+        assert!(!ptr.is_null());
+        let (col, row) = (&*ptr).syspos();
+        ((col as u32) << 16) | row as u32
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_getch(ptr: *const EventHandle) -> *mut c_char {
+    unsafe {
+        assert!(!ptr.is_null());
+        let r_str = (&*ptr).getch();
+        let c_str = CString::new(r_str).unwrap_or(
+            // NOTE: If a NUL byte is found, handle
+            // by creating an empty CString from "".
+            CString::new("").unwrap());
+        c_str.into_raw()
+    }
+}
+
+#[no_mangle]
+pub extern fn gotch_free(ptr: *mut c_char) {
+    unsafe {
+        if ptr.is_null() { return }
+        CString::from_raw(ptr);
+    }
+}
+
+// (imdaveho) NOTE: Subject to change.
+#[no_mangle]
+pub extern fn event_handle_poll_async(
+    ptr: *const EventHandle, meta: &mut Eventmeta) -> bool {
+    unsafe {
+        assert!(!ptr.is_null());
+        if let Some(evt) = (&*ptr).poll_async() {
+            meta.metastasize(evt);
+            true
+        } else { false }
+    }
+}
+
+// (imdaveho) NOTE: Subject to change.
+#[no_mangle]
+pub extern fn event_handle_poll_latest_async(
+    ptr: *const EventHandle, meta: &mut Eventmeta) -> bool {
+    unsafe {
+        assert!(!ptr.is_null());
+        if let Some(evt) = (&*ptr).poll_latest_async() {
+            meta.metastasize(evt);
+            true
+        } else { false }
+    }
+}
+
+// (imdaveho) NOTE: Subject to change.
+#[no_mangle]
+pub extern fn event_handle_poll_sync(
+    ptr: *const EventHandle, meta: &mut Eventmeta) {
+    unsafe {
+        assert!(!ptr.is_null());
+        if let Some(evt) = (&*ptr).poll_sync() {
+            meta.metastasize(evt);
+        }
+    }
+}
+
+
+// Event Handle Commands
+#[no_mangle]
+pub extern fn event_handle_suspend(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).suspend();
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_transmit(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).transmit();
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_stop(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).stop();
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_lock(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).lock();
+    }
+}
+
+#[no_mangle]
+pub extern fn event_handle_unlock(ptr: *const EventHandle) {
+    unsafe {
+        assert!(!ptr.is_null());
+        (&*ptr).unlock();
+    }
+}
+
+
+// Previous Implementation References:
 // #[no_mangle]
 // pub extern fn sync_next(ptr: *mut SyncReader, event: &mut Event) {
 //     let stdin = unsafe {
@@ -151,28 +813,6 @@ pub mod common;
 
 //     if let Some(evt) = stdin.next() {
 //         c_event(evt, event);
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn sync_free(ptr: *mut SyncReader) {
-//     if ptr.is_null() { return }
-//     unsafe { Box::from_raw(ptr); }
-// }
-
-// #[no_mangle]
-// pub extern fn read_async(ptr: *mut Tty) -> *mut AsyncReader {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         Box::into_raw(Box::new((&mut *ptr).read_async()))
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn read_until_async(ptr: *mut Tty, d: u8) -> *mut AsyncReader {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         Box::into_raw(Box::new((&mut *ptr).read_until_async(d)))
 //     }
 // }
 
@@ -189,332 +829,49 @@ pub mod common;
 //     } else { return false }
 // }
 
-// #[no_mangle]
-// pub extern fn async_free(ptr: *mut AsyncReader) {
-//     if ptr.is_null() { return }
-//     unsafe { Box::from_raw(ptr); }
-// }
+// Helper function to convert ffi style
+// arguments into the corresponding Color.
+fn colorize(num: u8) -> Option<Color> {
+    match num {
+        0 => Some(Color::Reset),
+        1 => Some(Color::Black),
+        2 => Some(Color::DarkGrey),
+        3 => Some(Color::Red),
+        4 => Some(Color::DarkRed),
+        5 => Some(Color::Green),
+        6 => Some(Color::DarkGreen),
+        7 => Some(Color::Yellow),
+        8 => Some(Color::DarkYellow),
+        9 => Some(Color::Blue),
+        10 => Some(Color::DarkBlue),
+        11 => Some(Color::Magenta),
+        12 => Some(Color::DarkMagenta),
+        13 => Some(Color::Cyan),
+        14 => Some(Color::DarkCyan),
+        15 => Some(Color::White),
+        16 => Some(Color::Grey),
+        _ => None,
+    }
+}
 
-// #[no_mangle]
-// pub extern fn clear(ptr: *mut Tty, c_str: *const c_char) {
-//     unsafe {
-//         assert!(!c_str.is_null());
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).clear(
-//             CStr::from_ptr(c_str).to_str().unwrap());
-//     }
-// }
+// Helper struct to pass along data regarding
+// InputEvents parsed by the Dispatcher.
+#[repr(C)]
+pub struct Eventmeta { _kind: u8, _data: u32 }
 
-// #[no_mangle]
-// pub extern fn resize(ptr: *mut Tty, w: i16, h: i16) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).resize(w, h);
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn switch(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).switch();
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn to_main(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).to_main();
-//     };
-// }
-
-// #[no_mangle]
-// pub extern fn switch_to(ptr: *mut Tty, index: usize) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).switch_to(index);
-//     }
-// }
-
-
-// #[no_mangle]
-// pub extern fn goto(ptr: *mut Tty, col: i16, row: i16) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).goto(col, row);
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn up(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).up();
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn dn(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).dn();
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn left(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).left();
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn right(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).right();
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn dpad(ptr: *mut Tty, c_str: *const c_char, n: i16) {
-//     unsafe {
-//         assert!(!c_str.is_null());
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).dpad(
-//             CStr::from_ptr(c_str).to_str().unwrap(), n);
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn pos(ptr: *mut Tty) -> u32 {
-//     // NOTE: instead of a Tuple, we are sending a u32
-//     // that has the first 16 bits containing `col: i16`
-//     // and the second 16 bits containing `row: i16`.
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         let (col, row) = (&mut *ptr).pos();
-//         ((col as u32) << 16) | row as u32
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn mark(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).mark();
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn load(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).load();
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn hide_cursor(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).hide_cursor();
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn show_cursor(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).show_cursor();
-//     }
-// }
-
-// // #[no_mangle]
-// // pub extern fn set_fgcol(ptr: *mut Tty, c_str: *const c_char) {
-// //     unsafe {
-// //         assert!(!c_str.is_null());
-// //         assert!(!ptr.is_null());
-// //         (&mut *ptr).set_fgcol(
-// //             CStr::from_ptr(c_str).to_str().unwrap());
-// //     }
-// // }
-
-// // #[no_mangle]
-// // pub extern fn set_bgcol(ptr: *mut Tty, c_str: *const c_char) {
-// //     unsafe {
-// //         assert!(!ptr.is_null());
-// //         (&mut *ptr).set_bgcol(
-// //             CStr::from_ptr(c_str).to_str().unwrap());
-// //     };
-// // }
-
-// // #[no_mangle]
-// // pub extern fn set_txfmt(ptr: *mut Tty, c_str: *const c_char) {
-// //     unsafe {
-// //         assert!(!c_str.is_null());
-// //         assert!(!ptr.is_null());
-// //         (&mut *ptr).set_txfmt(
-// //             CStr::from_ptr(c_str).to_str().unwrap());
-// //     }
-// // }
-
-// // #[no_mangle]
-// // pub extern fn set_fg_rgb(ptr: *mut Tty, r: u8, g: u8, b: u8) {
-// //     unsafe {
-// //         assert!(!ptr.is_null());
-// //         (&mut *ptr).set_fg_rgb(r, g, b);
-// //     }
-// // }
-
-// // #[no_mangle]
-// // pub extern fn set_bg_rgb(ptr: *mut Tty, r: u8, g: u8, b: u8) {
-// //     unsafe {
-// //         assert!(!ptr.is_null());
-// //         (&mut *ptr).set_bg_rgb(r, g, b);
-// //     }
-// // }
-
-// // #[no_mangle]
-// // pub extern fn set_fg_ansi(ptr: *mut Tty, value: u8) {
-// //     unsafe {
-// //         assert!(!ptr.is_null());
-// //         (&mut *ptr).set_fg_ansi(value);
-// //     }
-// // }
-
-// // #[no_mangle]
-// // pub extern fn set_bg_ansi(ptr: *mut Tty, value: u8) {
-// //     unsafe {
-// //         assert!(!ptr.is_null());
-// //         (&mut *ptr).set_bg_ansi(value);
-// //     }
-// // }
-
-// // #[no_mangle]
-// // pub extern fn set_style(
-// //     ptr: *mut Tty,
-// //     fg: *const c_char,
-// //     bg: *const c_char,
-// //     fmts: *const c_char) {
-// //     unsafe {
-// //         assert!(!fg.is_null());
-// //         assert!(!bg.is_null());
-// //         assert!(!fmts.is_null());
-// //         assert!(!ptr.is_null());
-// //         (&mut *ptr).set_style(
-// //             CStr::from_ptr(fg).to_str().unwrap(),
-// //             CStr::from_ptr(bg).to_str().unwrap(),
-// //             CStr::from_ptr(fmts).to_str().unwrap());
-// //     }
-// // }
-
-// #[no_mangle]
-// pub extern fn reset(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).reset();
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn prints(ptr: *mut Tty, c_str: *const c_char) {
-//     unsafe {
-//         assert!(!c_str.is_null());
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).prints(
-//             CStr::from_ptr(c_str).to_str().unwrap());
-//     }
-// }
-
-// #[no_mangle]
-// pub extern fn flush(ptr: *mut Tty) {
-//     unsafe {
-//         assert!(!ptr.is_null());
-//         (&mut *ptr).flush();
-//     }
-// }
-
-
-// // Struct to facilitate FFI for InputEvents.
-
-// #[repr(C)]
-// pub struct Event {
-//     _kind: u8,
-//     _data: u32,
-// }
-
-
-// fn c_event(input: InputEvent, event: &mut Event) {
-//     match input {
-//         InputEvent::Keyboard(kb) => {
-//             match kb {
-//                 KeyEvent::Null => event._kind = 0,
-//                 KeyEvent::Backspace => event._kind = 1,
-//                 KeyEvent::Left => event._kind = 2,
-//                 KeyEvent::Right => event._kind = 3,
-//                 KeyEvent::Up => event._kind = 4,
-//                 KeyEvent::Dn => event._kind = 5,
-//                 KeyEvent::Home => event._kind = 6,
-//                 KeyEvent::End => event._kind = 7,
-//                 KeyEvent::PageUp => event._kind = 8,
-//                 KeyEvent::PageDn => event._kind = 9,
-//                 KeyEvent::BackTab => event._kind = 10,
-//                 KeyEvent::Delete => event._kind = 11,
-//                 KeyEvent::Insert => event._kind = 12,
-//                 KeyEvent::F(n) => {
-//                     event._kind = 13;
-//                     event._data = n as u32;
-//                 },
-//                 KeyEvent::Char(c) => {
-//                     event._kind = 14;
-//                     event._data = c as u32;
-//                 },
-//                 KeyEvent::Alt(c) => {
-//                     event._kind = 15;
-//                     event._data = c as u32;
-//                 },
-//                 KeyEvent::Ctrl(c) => {
-//                     event._kind = 16;
-//                     event._data = c as u32;
-//                 },
-//                 KeyEvent::Esc => event._kind = 17,
-//                 KeyEvent::CtrlUp => event._kind = 18,
-//                 KeyEvent::CtrlDn => event._kind = 19,
-//                 KeyEvent::CtrlRight => event._kind = 20,
-//                 KeyEvent::CtrlLeft => event._kind = 21,
-//                 KeyEvent::ShiftUp => event._kind = 22,
-//                 KeyEvent::ShiftDn => event._kind = 23,
-//                 KeyEvent::ShiftRight => event._kind = 24,
-//                 KeyEvent::ShiftLeft => event._kind = 25,
-//             }
-//         },
-//         InputEvent::Mouse(ms) => {
-//             match ms {
-//                 MouseEvent::Press(btn, col, row) => {
-//                     match btn {
-//                         MouseButton::Left => event._kind = 26,
-//                         MouseButton::Right => event._kind = 27,
-//                         MouseButton::Middle => event._kind = 28,
-//                         MouseButton::WheelUp => event._kind = 29,
-//                         MouseButton::WheelDn => event._kind = 30,
-//                     }
-//                     event._data = ((col as u32) << 16) | row as u32;
-//                 },
-//                 MouseEvent::Hold(col, row) => {
-//                     event._kind = 31;
-//                     event._data = ((col as u32) << 16) | row as u32;
-//                 }
-//                 MouseEvent::Release(col, row) => {
-//                     event._kind = 32;
-//                     event._data = ((col as u32) << 16) | row as u32;
-//                 },
-//                 MouseEvent::Unknown => event._kind = 0,
-//             }
-//         },
-//         InputEvent::Unknown => event._kind = 0,
-//         _ => event._kind = 0,
-//     }
-// }
+impl Eventmeta {
+    fn metastasize(&mut self, input: InputEvent) {
+        match input {
+            InputEvent::Keyboard(kv) => {
+                self._kind = kv.enumerate();
+                self._data = kv.values();
+            },
+            InputEvent::Mouse(mv) => {
+                self._kind = mv.enumerate();
+                self._data = mv.values();
+            },
+            InputEvent::Unsupported => self._kind = 0,
+            _ => self._kind = 0,
+        }
+    }
+}

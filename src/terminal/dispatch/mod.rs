@@ -74,8 +74,6 @@ impl EventHandle {
         iterator.next()
     }
 
-    // (imdaveho) TODO: convert to specific methods,
-    // or ignore certain methods that shouldn't run, like Pos.
     pub fn signal(&self, action: Action) {
         let _ = self.signal_tx.send(Cmd::Signal(action));
     }
@@ -335,6 +333,14 @@ impl Dispatcher {
 
                                 store.sync_clear(clr);
                             },
+                            Resize(w, h) => {
+                                #[cfg(unix)]
+                                posix::resize(w, h);
+                                #[cfg(windows)]
+                                win32::resize(w, h, vte);
+
+                                store.sync_size(w, h);
+                            },
                             Prints(s) => {
                                 #[cfg(unix)]
                                 posix::prints(&s);
@@ -564,7 +570,7 @@ impl Dispatcher {
                                 if show { win32::show_cursor(vte) }
                                 else { win32::hide_cursor(vte) }
                             },
-                            Resize => {
+                            Resized => {
                                 #[cfg(unix)]
                                 let (w, h) = posix::size();
                                 #[cfg(windows)]
@@ -572,17 +578,9 @@ impl Dispatcher {
 
                                 store.sync_size(w, h);
                             },
-                            SyncSize(w, h) => {
-                                #[cfg(unix)]
-                                posix::resize(w, h);
-                                #[cfg(windows)]
-                                win32::resize(w, h, vte);
-
-                                store.sync_size(w, h);
-                            },
-                            SyncTabSize(n) => store.sync_tab_size(n),
                             SyncMarker(c,r) => store.sync_marker(c,r),
                             Jump => store.jump(),
+                            SyncTabSize(n) => store.sync_tab_size(n),
                         }
                         Cmd::Request(s) => match s {
                             State::Size(id) => {
