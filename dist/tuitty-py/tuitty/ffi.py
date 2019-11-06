@@ -5,6 +5,7 @@ from enum import Enum, auto
 from ctypes import c_uint, c_uint8, c_int16, c_uint32, \
     cdll, c_bool, c_char_p, c_void_p, \
     Structure, POINTER, byref
+from typing import Callable
 
 
 prefix = {'win32': ''}.get(sys.platform, 'lib')
@@ -178,32 +179,32 @@ class Dispatcher:
     def __exit__(self, exception_type, exception_value, traceback):
         lib.dispatcher_free(self.ptr)
 
-    def listen(self) -> EventHandle:
+    def listen(self) -> 'EventHandle':
         event_handle_ptr = lib.dispatcher_listen(self.ptr)
         return EventHandle(event_handle_ptr)
 
-    def spawn(self) -> EventHandle:
+    def spawn(self) -> 'EventHandle':
         event_handle_ptr = lib.dispatcher_spawn(self.ptr)
         return EventHandle(event_handle_ptr)
 
 
 class EventHandle:
-    def __init__(self, ptr: str):
-        self.ptr = ptr
+    def __init__(self, event_handle_ptr):
+        self.ptr = event_handle_ptr
 
 
 
-## FFI #########################################################################
+# # FFI ########################################################################
 
 # Dispatch initialization.
 lib.dispatcher.restype = POINTER(_Dispatcher)
 
 # Event Handle initialization and creation.
 lib.dispatcher_listen.argtypes = (POINTER(_Dispatcher),)
-lib.dispatcher_listen.restype = (POINTER(_EventHandle),)
+lib.dispatcher_listen.restype = POINTER(_EventHandle)
 
 lib.dispatcher_spawn.argtypes = (POINTER(_Dispatcher),)
-lib.dispatcher_spawn.restype = (POINTER(_EventHandle),)
+lib.dispatcher_spawn.restype = POINTER(_EventHandle)
 
 # Memory management of FFI Objects
 lib.dispatcher_free.argtypes = (POINTER(_Dispatcher), )
