@@ -47,7 +47,7 @@ pub extern fn event_handle_free(ptr: *mut EventHandle) {
 
 // Cursor Signals
 #[no_mangle]
-pub extern fn dispatch_goto(ptr: *mut Dispatcher, col: i16, row: i16) {
+pub extern fn dispatcher_goto(ptr: *mut Dispatcher, col: i16, row: i16) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(Goto(col, row));
@@ -63,7 +63,7 @@ pub extern fn event_handle_goto(ptr: *const EventHandle, col: i16, row: i16) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_up(ptr: *mut Dispatcher, n: i16) {
+pub extern fn dispatcher_up(ptr: *mut Dispatcher, n: i16) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(Up(n));
@@ -79,7 +79,7 @@ pub extern fn event_handle_up(ptr: *const EventHandle, n: i16) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_down(ptr: *mut Dispatcher, n: i16) {
+pub extern fn dispatcher_down(ptr: *mut Dispatcher, n: i16) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(Down(n));
@@ -95,7 +95,7 @@ pub extern fn event_handle_down(ptr: *const EventHandle, n: i16) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_left(ptr: *mut Dispatcher, n: i16) {
+pub extern fn dispatcher_left(ptr: *mut Dispatcher, n: i16) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(Left(n));
@@ -111,7 +111,7 @@ pub extern fn event_handle_left(ptr: *const EventHandle, n: i16) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_right(ptr: *mut Dispatcher, n: i16) {
+pub extern fn dispatcher_right(ptr: *mut Dispatcher, n: i16) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(Right(n));
@@ -128,7 +128,7 @@ pub extern fn event_handle_right(ptr: *const EventHandle, n: i16) {
 
 // Screen/Output Signals
 #[no_mangle]
-pub extern fn dispatch_clear(ptr: *mut Dispatcher, clr: u8) {
+pub extern fn dispatcher_clear(ptr: *mut Dispatcher, clr: u8) {
     unsafe {
         assert!(!ptr.is_null());
         match clr {
@@ -158,7 +158,7 @@ pub extern fn event_handle_clear(ptr: *const EventHandle, clr: u8) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_resize(ptr: *mut Dispatcher, w: i16, h: i16) {
+pub extern fn dispatcher_resize(ptr: *mut Dispatcher, w: i16, h: i16) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(Resize(w, h));
@@ -174,7 +174,7 @@ pub extern fn event_handle_resize(ptr: *const EventHandle, w: i16, h: i16) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_prints(ptr: *mut Dispatcher, c_str: *mut c_char) {
+pub extern fn dispatcher_prints(ptr: *mut Dispatcher, c_str: *mut c_char) {
     unsafe {
         assert!(!ptr.is_null());
         assert!(!c_str.is_null());
@@ -194,7 +194,7 @@ pub extern fn event_handle_prints(ptr: *const EventHandle, c_str: *mut c_char) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_printf(ptr: *mut Dispatcher, c_str: *mut c_char) {
+pub extern fn dispatcher_printf(ptr: *mut Dispatcher, c_str: *mut c_char) {
     unsafe {
         assert!(!ptr.is_null());
         assert!(!c_str.is_null());
@@ -214,7 +214,7 @@ pub extern fn event_handle_printf(ptr: *const EventHandle, c_str: *mut c_char) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_flush(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_flush(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(Flush);
@@ -231,7 +231,7 @@ pub extern fn event_handle_flush(ptr: *const EventHandle) {
 
 // Style Signals
 #[no_mangle]
-pub extern fn dispatch_set_basic_fg(ptr: *mut Dispatcher, fg: u8) {
+pub extern fn dispatcher_set_basic_fg(ptr: *mut Dispatcher, fg: u8) {
     unsafe {
         assert!(!ptr.is_null());
         if let Some(c) = colorize(fg) {
@@ -251,7 +251,7 @@ pub extern fn event_handle_set_basic_fg(ptr: *const EventHandle, fg: u8) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_set_ansi_fg(ptr: *mut Dispatcher, fg: u8) {
+pub extern fn dispatcher_set_ansi_fg(ptr: *mut Dispatcher, fg: u8) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(SetFg(Color::AnsiValue(fg)));
@@ -267,7 +267,7 @@ pub extern fn event_handle_set_ansi_fg(ptr: *const EventHandle, fg: u8) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_set_rgb_fg(ptr: *mut Dispatcher, r: u8, g: u8, b: u8) {
+pub extern fn dispatcher_set_rgb_fg(ptr: *mut Dispatcher, r: u8, g: u8, b: u8) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(SetFg(Color::Rgb{r: r, g: g, b: b}));
@@ -283,7 +283,7 @@ pub extern fn event_handle_set_rgb_fg(ptr: *const EventHandle, r: u8, g: u8, b: 
 }
 
 #[no_mangle]
-pub extern fn dispatch_set_basic_bg(ptr: *mut Dispatcher, bg: u8) {
+pub extern fn dispatcher_set_basic_bg(ptr: *mut Dispatcher, bg: u8) {
     unsafe {
         assert!(!ptr.is_null());
         if let Some(c) = colorize(bg) {
@@ -303,7 +303,7 @@ pub extern fn event_handle_set_basic_bg(ptr: *const EventHandle, bg: u8) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_set_ansi_bg(ptr: *mut Dispatcher, bg: u8) {
+pub extern fn dispatcher_set_ansi_bg(ptr: *mut Dispatcher, bg: u8) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(SetBg(Color::AnsiValue(bg)));
@@ -319,7 +319,7 @@ pub extern fn event_handle_set_ansi_bg(ptr: *const EventHandle, bg: u8) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_set_rgb_bg(ptr: *mut Dispatcher, r: u8, g: u8, b: u8) {
+pub extern fn dispatcher_set_rgb_bg(ptr: *mut Dispatcher, r: u8, g: u8, b: u8) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(SetBg(Color::Rgb{r: r, g: g, b: b}));
@@ -335,7 +335,7 @@ pub extern fn event_handle_set_rgb_bg(ptr: *const EventHandle, r: u8, g: u8, b: 
 }
 
 #[no_mangle]
-pub extern fn dispatch_set_fx(ptr: *mut Dispatcher, fx: u32) {
+pub extern fn dispatcher_set_fx(ptr: *mut Dispatcher, fx: u32) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(SetFx(fx));
@@ -351,7 +351,7 @@ pub extern fn event_handle_set_fx(ptr: *const EventHandle, fx: u32) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_set_styles(
+pub extern fn dispatcher_set_styles(
     ptr: *mut Dispatcher, fg: u8, bg: u8, fx: u32) {
     match (colorize(fg), colorize(bg)) {
         (Some(fg), Some(bg)) => {
@@ -417,7 +417,7 @@ pub extern fn event_handle_set_styles(
 }
 
 #[no_mangle]
-pub extern fn dispatch_reset_styles(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_reset_styles(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(ResetStyles);
@@ -434,7 +434,7 @@ pub extern fn event_handle_reset_styles(ptr: *const EventHandle) {
 
 // Toggle Mode Signals
 #[no_mangle]
-pub extern fn dispatch_show_cursor(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_show_cursor(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(ShowCursor);
@@ -450,7 +450,7 @@ pub extern fn event_handle_show_cursor(ptr: *const EventHandle) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_hide_cursor(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_hide_cursor(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(HideCursor);
@@ -466,7 +466,7 @@ pub extern fn event_handle_hide_cursor(ptr: *const EventHandle) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_enable_mouse(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_enable_mouse(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(EnableMouse);
@@ -483,7 +483,7 @@ pub extern fn event_handle_enable_mouse(ptr: *const EventHandle) {
 
 
 #[no_mangle]
-pub extern fn dispatch_disable_mouse(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_disable_mouse(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(DisableMouse);
@@ -499,7 +499,7 @@ pub extern fn event_handle_disable_mouse(ptr: *const EventHandle) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_enable_alt(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_enable_alt(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(EnableAlt);
@@ -516,7 +516,7 @@ pub extern fn event_handle_enable_alt(ptr: *const EventHandle) {
 
 
 #[no_mangle]
-pub extern fn dispatch_disable_alt(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_disable_alt(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(DisableAlt);
@@ -532,7 +532,7 @@ pub extern fn event_handle_disable_alt(ptr: *const EventHandle) {
 }
 
 #[no_mangle]
-pub extern fn dispatch_raw(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_raw(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(Raw);
@@ -549,7 +549,7 @@ pub extern fn event_handle_raw(ptr: *const EventHandle) {
 
 
 #[no_mangle]
-pub extern fn dispatch_cook(ptr: *mut Dispatcher) {
+pub extern fn dispatcher_cook(ptr: *mut Dispatcher) {
     unsafe {
         assert!(!ptr.is_null());
         (&mut *ptr).signal(Cook);

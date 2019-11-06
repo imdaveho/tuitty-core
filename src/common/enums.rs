@@ -13,6 +13,7 @@ use std::ops::{ BitAnd, BitOr };
 
 
 #[derive(Copy, Clone)]
+// TODO: change Dn -> Down and Ln -> Line
 pub enum Clear {
     /// clear all cells in terminal
     All,
