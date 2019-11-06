@@ -2,7 +2,7 @@
 
 use std::io::{Error, ErrorKind, Result};
 use winapi::um::wincon::{
-    SetConsoleCursorInfo, 
+    SetConsoleCursorInfo,
     SetConsoleCursorPosition,
     COORD, CONSOLE_CURSOR_INFO,
 };

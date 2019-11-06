@@ -8,8 +8,8 @@ fn test_unicode_width() {
 
     let hangul = "ㅁㅂㅃㅄㅅㅆㅇㅈㅉㅊ";
     assert_eq!(super::unicode::wcwidth::UnicodeWidthStr::width(hangul), 20);
-    
-    
+
+
     let putong = "㓐㓒㓓㓕㓗㓘㓙㓚㓝㓞";
     assert_eq!(super::unicode::wcwidth::UnicodeWidthStr::width(putong), 20);
 
@@ -46,7 +46,7 @@ fn test_unicode_grapheme() {
     counter.push(["|\u{200d}\u{fe0f}", "|"].len());
     counter.push(["寬", "\u{2060}", "帶", "|"].len());
     counter.push(["f", "a", "\u{0}", "m", "i", "l", "y", "|"].len());
-    
+
     assert_eq!(cluster.len(), counter.iter().fold(0, |agg, n| agg + n));
 }
 

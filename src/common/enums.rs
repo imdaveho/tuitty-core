@@ -117,23 +117,34 @@ impl BitAnd<Effect> for u32 {
     }
 }
 
-
+// (imdaveho) NOTE: Clone for moving parsed events over channels.
+// See: crate::terminal::dispatch::input_handle
+#[derive(Clone)]
 pub enum InputEvent {
     Keyboard(KeyEvent),
     Mouse(MouseEvent),
-    Unknown,
-    // Unsupported(Vec<u8>),
+    Dispatch(StoreEvent),
+    Unsupported,
 }
 
 
+#[derive(Clone)]
+pub enum StoreEvent {
+    Size(i16, i16),
+    Coord(i16, i16),
+    SysPos(i16, i16),
+    GetCh(String),
+}
+
+#[derive(Clone)]
 pub enum MouseEvent {
     Press(MouseButton, i16, i16),
     Release(i16, i16),
     Hold(i16, i16),
-    Unknown,
 }
 
 
+#[derive(Clone)]
 pub enum MouseButton {
     Left,
     Right,
@@ -143,6 +154,7 @@ pub enum MouseButton {
 }
 
 
+#[derive(Clone)]
 pub enum KeyEvent {
     Backspace,
     Enter,
@@ -174,9 +186,61 @@ pub enum KeyEvent {
     ShiftLeft,
 }
 
-pub enum Direction {
+
+pub enum Cmd {
+    Continue,
+    Suspend(usize),
+    Transmit(usize),
+    Stop(usize),
+    Lock(usize),
+    Unlock,
+    Signal(Action),
+    Request(State)
+}
+
+
+pub enum Action {
+    // CURSOR
+    Goto(i16, i16),
     Up(i16),
     Down(i16),
     Left(i16),
     Right(i16),
+    // SCREEN/OUTPUT
+    Clear(Clear),
+    Prints(String),
+    Printf(String),
+    Flush,
+    // STYLE
+    SetFx(u32),
+    SetFg(Color),
+    SetBg(Color),
+    SetStyles(Color, Color, u32),
+    ResetStyles,
+    // STATEFUL/MODES
+    HideCursor,
+    ShowCursor,
+    EnableMouse,
+    DisableMouse,
+    EnableAlt,
+    DisableAlt,
+    Raw,
+    Cook,
+    // STORE OPS
+    Switch,
+    SwitchTo(usize),
+    Resize,
+    SyncSize(i16, i16),
+    SyncTabSize(usize),
+    SyncMarker(i16, i16),
+    Jump,
+}
+
+
+pub enum State {
+    Size(usize),
+    Coord(usize),
+    SysPos(usize),
+    GetCh(usize),
+    // ScreenKey(usize),
 }
