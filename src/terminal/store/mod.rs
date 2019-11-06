@@ -54,8 +54,8 @@ impl Store {
     }
 
     pub fn new_screen(&mut self) {
-        self.id += 1;
         self.data.push(Screen::new());
+        self.id = self.data.len() - 1;
     }
 
     pub fn coord(&self) -> (i16, i16) {

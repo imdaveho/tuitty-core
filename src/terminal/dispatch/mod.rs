@@ -185,10 +185,6 @@ impl Dispatcher {
             let screen = win32::Handle::buffer()
                 .expect("Error creating alternate Console buffer");
 
-            // (imdaveho) TODO: Shutdown until all signals are all consumed.
-            // Eg. When dropping Dispatcher, is_running immediately halts
-            // and signals that might be cleaning up (DisableAlt / Cook) get
-            // ignored during shutdown.
             loop {
                 // Include minor delay so the thread isn't blindly using CPU.
                 thread::sleep(Duration::from_millis(DELAY));
@@ -262,7 +258,7 @@ impl Dispatcher {
                                 if col >= w { col = w - 1 }
                                 if row < 0 { row = 0 }
                                 if row >= h { row = h - 1 }
-                                
+
                                 #[cfg(unix)]
                                 posix::goto(col, row);
                                 #[cfg(windows)]
@@ -271,7 +267,7 @@ impl Dispatcher {
                                 store.sync_goto(col, row);
                             },
                             Up(n) => {
-                                #[cfg(unix)]                         
+                                #[cfg(unix)]
                                 posix::up(n);
                                 // Prevent out-of-bounds
                                 // on winapi cursor movement.
