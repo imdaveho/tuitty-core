@@ -4,8 +4,7 @@ import platform
 from enum import Enum, auto
 from ctypes import c_uint, c_uint8, c_int16, c_uint32, \
     cdll, c_bool, c_char_p, c_void_p, \
-    Structure, POINTER, byref
-from typing import Callable
+    Structure, POINTER, byref, cast
 
 
 prefix = {'win32': ''}.get(sys.platform, 'lib')
@@ -178,7 +177,7 @@ class Dispatcher:
 
     def __exit__(self, exception_type, exception_value, traceback):
         lib.dispatcher_free(self.ptr)
-
+    
     def listen(self) -> 'EventHandle':
         event_handle_ptr = lib.dispatcher_listen(self.ptr)
         return EventHandle(event_handle_ptr)
@@ -186,12 +185,291 @@ class Dispatcher:
     def spawn(self) -> 'EventHandle':
         event_handle_ptr = lib.dispatcher_spawn(self.ptr)
         return EventHandle(event_handle_ptr)
+    
+    # Cursor Actions
+    def goto(self, col: int, row: int):
+        lib.dispatcher_goto(self.ptr, col, row)
+    
+    def up(self, n: int):
+        lib.dispatcher_up(self.ptr, n)
+    
+    def down(self, n: int):
+        lib.dispatcher_down(self.ptr, n)
+    
+    def left(self, n: int):
+        lib.dispatcher_left(self.ptr, n)
+    
+    def right(self, n: int):
+        lib.dispatcher_right(self.ptr, n)
+    
+    # Screen Actions
+    def clear(self, clr: Clear):
+        lib.dispatcher_clear(self.ptr, clr.value)
+    
+    def resize(self, w: int, h: int):
+        lib.dispatcher_resize(self.ptr, w, h)
+    
+    def prints(self, content: str):
+        lib.dispatcher_prints(self.ptr, content.encode('utf-8'))
+    
+    def printf(self, content: str):
+        lib.dispatcher_printf(self.ptr, content.encode('utf-8'))
+    
+    def flush(self):
+        lib.dispatcher_flush(self.ptr)
+
+    # Style Actions
+    def set_fg(self, color = None, ansi = None, rgb = None):
+        if color is not None and isinstance(color, Color):
+            lib.dispatcher_set_basic_fg(self.ptr, color.value)
+        if ansi is not None and isinstance(ansi, int) and ansi < 256:
+            lib.dispatcher_set_ansi_fg(self.ptr, ansi)
+        if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
+            lib.dispatcher_set_rgb_fg(self.ptr, rgb[0], rgb[1], rgb[2])
+    
+    def set_bg(self, color = None, ansi = None, rgb = None):
+        if color is not None and isinstance(color, Color):
+            lib.dispatcher_set_basic_bg(self.ptr, color.value)
+        if ansi is not None and isinstance(ansi, int) and ansi < 256:
+            lib.dispatcher_set_ansi_bg(self.ptr, ansi)
+        if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
+            lib.dispatcher_set_rgb_bg(self.ptr, rgb[0], rgb[1], rgb[2])
+    
+    def set_fx(self, fx: int):
+        lib.dispatcher_set_fx(self.ptr, fx)
+    
+    def set_styles(self, fg: int, bg: int, fx: int):
+        lib.dispatcher_set_styles(self.ptr, fg, bg, fx)
+    
+    def reset_styles(self):
+        lib.dispatcher_reset_styles(self.ptr)
+    
+    # Toggle Mode Actions
+    def show_cursor(self):
+        lib.dispatcher_show_cursor(self.ptr)
+    
+    def hide_cursor(self):
+        lib.dispatcher_hide_cursor(self.ptr)
+    
+    def enable_mouse(self):
+        lib.dispatcher_enable_mouse(self.ptr)
+    
+    def disable_mouse(self):
+        lib.dispatcher_disable_mouse(self.ptr)
+
+    def enable_alt(self):
+        lib.dispatcher_enable_alt(self.ptr)
+    
+    def disable_alt(self):
+        lib.dispatcher_disable_alt(self.ptr)
+    
+    def raw(self):
+        lib.dispatcher_raw(self.ptr)
+    
+    def cook(self):
+        lib.dispatcher_cook(self.ptr)
+
+    # Store Operation Actions
+    def switch(self):
+        lib.dispatcher_switch(self.ptr)
+    
+    def switch_to(self, id: int):
+        lib.dispatcher_switch_to(self.ptr, id)
+    
+    def resized(self):
+        lib.dispatcher_resized(self.ptr)
+    
+    def mark(self, col: int, row: int):
+        lib.dispatcher_mark(self.ptr, col, row)
+    
+    def jump(self):
+        lib.dispatcher_jump(self.ptr)
+    
+    def sync_tab_size(self):
+        lib.dispatcher_sync_tab_size(self.ptr)
+    
+    # Manual cleanup (if not using with statement)
+    def close(self):
+        lib.dispatcher_free(self.ptr)
 
 
 class EventHandle:
     def __init__(self, event_handle_ptr):
         self.ptr = event_handle_ptr
+        self.evt = Eventmeta()
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exception_type, exception_value, traceback):
+        lib.event_handle_free(self.ptr)
+    
+    # Cursor Actions
+    def goto(self, col: int, row: int):
+        lib.event_handle_goto(self.ptr, col, row)
+    
+    def up(self, n: int):
+        lib.event_handle_up(self.ptr, n)
+    
+    def down(self, n: int):
+        lib.event_handle_down(self.ptr, n)
+    
+    def left(self, n: int):
+        lib.event_handle_left(self.ptr, n)
+    
+    def right(self, n: int):
+        lib.event_handle_right(self.ptr, n)
+    
+    # Screen Actions
+    def clear(self, clr: Clear):
+        lib.event_handle_clear(self.ptr, clr.value)
+    
+    def resize(self, w: int, h: int):
+        lib.event_handle_resize(self.ptr, w, h)
+    
+    def prints(self, content: str):
+        lib.event_handle_prints(self.ptr, content.encode('utf-8'))
+    
+    def printf(self, content: str):
+        lib.event_handle_printf(self.ptr, content.encode('utf-8'))
+    
+    def flush(self):
+        lib.event_handle_flush(self.ptr)
 
+    # Style Actions
+    def set_fg(self, color = None, ansi = None, rgb = None):
+        if color is not None and isinstance(color, Color):
+            lib.event_handle_set_basic_fg(self.ptr, color.value)
+        if ansi is not None and isinstance(ansi, int) and ansi < 256:
+            lib.event_handle_set_ansi_fg(self.ptr, ansi)
+        if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
+            lib.event_handle_set_rgb_fg(self.ptr, rgb[0], rgb[1], rgb[2])
+    
+    def set_bg(self, color = None, ansi = None, rgb = None):
+        if color is not None and isinstance(color, Color):
+            lib.event_handle_set_basic_bg(self.ptr, color.value)
+        if ansi is not None and isinstance(ansi, int) and ansi < 256:
+            lib.event_handle_set_ansi_bg(self.ptr, ansi)
+        if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
+            lib.event_handle_set_rgb_bg(self.ptr, rgb[0], rgb[1], rgb[2])
+    
+    def set_fx(self, fx: int):
+        lib.event_handle_set_fx(self.ptr, fx)
+    
+    def set_styles(self, fg: int, bg: int, fx: int):
+        lib.event_handle_set_styles(self.ptr, fg, bg, fx)
+    
+    def reset_styles(self):
+        lib.event_handle_reset_styles(self.ptr)
+    
+    # Toggle Mode Actions
+    def show_cursor(self):
+        lib.event_handle_show_cursor(self.ptr)
+    
+    def hide_cursor(self):
+        lib.event_handle_hide_cursor(self.ptr)
+    
+    def enable_mouse(self):
+        lib.event_handle_enable_mouse(self.ptr)
+    
+    def disable_mouse(self):
+        lib.event_handle_disable_mouse(self.ptr)
+
+    def enable_alt(self):
+        lib.event_handle_enable_alt(self.ptr)
+    
+    def disable_alt(self):
+        lib.event_handle_disable_alt(self.ptr)
+    
+    def raw(self):
+        lib.event_handle_raw(self.ptr)
+    
+    def cook(self):
+        lib.event_handle_cook(self.ptr)
+
+    # Store Operation Actions
+    def switch(self):
+        lib.event_handle_switch(self.ptr)
+    
+    def switch_to(self, id: int):
+        lib.event_handle_switch_to(self.ptr, id)
+    
+    def resized(self):
+        lib.event_handle_resized(self.ptr)
+    
+    def mark(self, col: int, row: int):
+        lib.event_handle_mark(self.ptr, col, row)
+    
+    def jump(self):
+        lib.event_handle_jump(self.ptr)
+    
+    def sync_tab_size(self):
+        lib.event_handle_sync_tab_size(self.ptr)
+    
+    # Store Requests (EventHandle Only)
+    def size(self):
+        size = lib.event_handle_size(self.ptr)
+        return ((size >> 16), (size & 0xffff))
+
+    def coord(self):
+        coord = lib.event_handle_coord(self.ptr)
+        return ((coord >> 16), (coord & 0xffff))
+
+    def syspos(self):
+        syspos = lib.event_handle_syspos(self.ptr)
+        return ((syspos >> 16), (syspos &0xffff))
+
+    def getch(self):
+        ptr = lib.event_handle_getch(self.ptr)
+        try:
+            return cast(ptr, c_char_p).value.decode('utf-8')
+        finally:
+            lib.gotch_free(ptr)
+        
+    def poll_async(self):
+        finished_polling = lib.event_handle_poll_async(
+            self.ptr, byref(self.evt))
+        if finished_polling:
+            return self.evt
+        else:
+            return None
+    
+    def poll_latest_async(self):
+        finished_polling = lib.event_handle_poll_latest_async(
+            self.ptr, byref(self.evt))
+        if finished_polling:
+            return self.evt
+        else:
+            return None
+    
+    def poll_sync(self):
+        lib.event_handle_poll_sync(self.ptr, byref(self.evt))
+        return self.evt
+
+    # Event Handle Commands
+    def suspend(self):
+        lib.event_handle_suspend(self.ptr)
+    
+    def transmit(self):
+        lib.event_handle_transmit(self.ptr)
+    
+    def stop(self):
+        # NOTE: This removes the Sender. This would cause the Receiver to
+        # close; thus dropping the Channel (in idiomatic Rust). Since we
+        # converted the object into a raw pointer, does the above still
+        # hold true? If so, we have a problem that now the held pointer
+        # might be pointing to garbage and present unsafe memory problems.
+        lib.event_handle_stop(self.ptr)
+    
+    def lock(self):
+        lib.event_handle_lock(self.ptr)
+    
+    def unlock(self):
+        lib.event_handle_unlock(self.ptr)
+
+    # Manual cleanup (if not using with statement)
+    def close(self):
+        lib.event_handle_free(self.ptr)
 
 
 # # FFI ########################################################################
@@ -265,6 +543,9 @@ lib.dispatcher_set_styles.argtypes = (
 lib.event_handle_set_styles.argtypes = (
     POINTER(_EventHandle), c_uint8, c_uint8, c_uint32)
 
+lib.dispatcher_reset_styles.argtypes = (POINTER(_Dispatcher),)
+lib.event_handle_reset_styles.argtypes = (POINTER(_EventHandle),)
+
 
 # Toggle Mode Signals
 lib.dispatcher_show_cursor.argtypes = (POINTER(_Dispatcher),)
@@ -301,209 +582,30 @@ lib.event_handle_sync_tab_size.argtypes = (POINTER(_EventHandle), c_uint)
 
 
 # Store Requests (EventHandle Only)
-lib.dispatcher_size.argtypes = (POINTER(_Dispatcher),)
 lib.event_handle_size.argtypes = (POINTER(_EventHandle),)
-lib.dispatcher_size.restype = c_uint32
 lib.event_handle_size.restype = c_uint32
 
-lib.dispatcher_coord.argtypes = (POINTER(_Dispatcher),)
 lib.event_handle_coord.argtypes = (POINTER(_EventHandle),)
-lib.dispatcher_coord.restype = c_uint32
 lib.event_handle_coord.restype = c_uint32
 
-lib.dispatcher_syspos.argtypes = (POINTER(_Dispatcher),)
 lib.event_handle_syspos.argtypes = (POINTER(_EventHandle),)
-lib.dispatcher_syspos.restype = c_uint32
 lib.event_handle_syspos.restype = c_uint32
 
-lib.dispatcher_getch.argtypes = (POINTER(_Dispatcher),)
 lib.event_handle_getch.argtypes = (POINTER(_EventHandle),)
-lib.dispatcher_getch.restype = c_void_p
 lib.event_handle_getch.restype = c_void_p
+lib.gotch_free.argtypes = (c_void_p,)
 
-lib.dispatcher_gotch_free.argtypes = (c_void_p,)
-lib.event_handle_gotch_free.argtypes = (c_void_p,)
-
-lib.dispatcher_poll_async.argtypes = (POINTER(_Dispatcher), POINTER(Eventmeta))
 lib.event_handle_poll_async.argtypes = (POINTER(_EventHandle), POINTER(Eventmeta))
-lib.dispatcher_poll_async.restype = c_bool
 lib.event_handle_poll_async.restype = c_bool
-
-lib.dispatcher_poll_latest_async.argtypes = (POINTER(_Dispatcher), POINTER(Eventmeta))
 lib.event_handle_poll_latest_async.argtypes = (POINTER(_EventHandle), POINTER(Eventmeta))
-lib.dispatcher_poll_latest_async.restype = c_bool
 lib.event_handle_poll_latest_async.restype = c_bool
-
-lib.dispatcher_poll_sync.argtypes = (POINTER(_Dispatcher), POINTER(Eventmeta))
 lib.event_handle_poll_sync.argtypes = (POINTER(_EventHandle), POINTER(Eventmeta))
 
 
+# Event Handle Commands
+lib.event_handle_suspend.argtypes = (POINTER(_EventHandle),)
+lib.event_handle_transmit.argtypes = (POINTER(_EventHandle),)
+lib.event_handle_stop.argtypes = (POINTER(_EventHandle),)
+lib.event_handle_lock.argtypes = (POINTER(_EventHandle),)
+lib.event_handle_unlock.argtypes = (POINTER(_EventHandle),)
 
-# class Tty:
-#     def __init__(self):
-#         self.tty = lib.init()
-
-#     def __enter__(self):
-#         return self
-
-#     def __exit__(self, exception_type, exception_value, traceback):
-#         lib.terminate(self.tty)
-
-#     def terminate(self):
-#         lib.terminate(self.tty)
-
-#     def size(self) -> (int, int):
-#         size = lib.size(self.tty)
-#         return ((size >> 16), (size & 0xffff))
-
-#     def raw(self):
-#         lib.raw(self.tty)
-
-#     def cook(self):
-#         lib.cook(self.tty)
-
-#     def enable_mouse(self):
-#         lib.enable_mouse(self.tty)
-
-#     def disable_mouse(self):
-#         lib.disable_mouse(self.tty)
-
-#     def read_char(self) -> str:
-#         return chr(lib.read_char(self.tty))
-
-#     def read_sync(self) -> 'SyncInput':
-#         return SyncInput(self.tty)
-
-#     def read_async(self) -> 'AsyncInput':
-#         return AsyncInput(self.tty)
-
-#     def clear(self, method: str):
-#         lib.clear(self.tty, method.encode('utf-8'))
-
-#     def resize(self, w: int, h: int):
-#         lib.resize(self.tty, w, h)
-
-#     def switch(self):
-#         lib.switch(self.tty)
-
-#     def to_main(self):
-#         lib.to_main(self.tty)
-
-#     def switch_to(self, index: int):
-#         lib.switch_to(self.tty, index)
-
-#     def goto(self, col: int, row: int):
-#         lib.goto(self.tty, col, row)
-
-#     def up(self):
-#         lib.up(self.tty)
-
-#     def dn(self):
-#         lib.dn(self.tty)
-
-#     def left(self):
-#         lib.left(self.tty)
-
-#     def right(self):
-#         lib.right(self.tty)
-
-#     def dpad(self, direction: str, n: int):
-#         lib.dpad(self.tty, direction.encode('utf-8'), n)
-
-#     def pos(self) -> (int, int):
-#         coord = lib.pos(self.tty)
-#         return ((coord >> 16), (coord & 0xffff))
-
-#     def mark(self):
-#         lib.mark(self.tty)
-
-#     def load(self):
-#         lib.load(self.tty)
-
-#     def hide_cursor(self):
-#         lib.hide_cursor(self.tty)
-
-#     def show_cursor(self):
-#         lib.show_cursor(self.tty)
-
-#     def set_fg(self, color: str):
-#         lib.set_fg(self.tty, color.encode('utf-8'))
-
-#     def set_bg(self, color: str):
-#         lib.set_bg(self.tty, color.encode('utf-8'))
-
-#     def set_tx(self, style: str):
-#         lib.set_tx(self.tty, style.encode('utf-8'))
-
-#     def set_fg_rgb(self, r: int, g: int, b: int):
-#         lib.set_fg_rgb(self.tty, r, g, b)
-
-#     def set_bg_rgb(self, r: int, g: int, b: int):
-#         lib.set_bg_rgb(self.tty, r, g, b)
-
-#     def set_fg_ansi(self, v: int):
-#         lib.set_fg_ansi(self.tty, v)
-
-#     def set_bg_ansi(self, v: int):
-#         lib.set_bg_ansi(self.tty, v)
-
-#     def set_style(self, fg: str, bg: str, style: str):
-#         lib.set_style(self.tty,
-#                       fg.encode('utf-8'),
-#                       bg.encode('utf-8'),
-#                       style.encode('utf-8'))
-
-#     def reset(self):
-#         lib.reset(self.tty)
-
-#     def prints(self, s: str):
-#         lib.prints(self.tty, s.encode('utf-8'))
-
-#     def flush(self):
-#         lib.flush(self.tty)
-
-
-# class SyncInput:
-#     def __init__(self, tty: 'Tty'):
-#         self.obj: POINTER('CSyncReader') = lib.read_sync(tty)
-#         self.event: 'Event' = Event()
-
-#     def __enter__(self):
-#         return self
-
-#     def __iter__(self):
-#         return self
-
-#     def __next__(self):
-#         lib.sync_next(self.obj, byref(self.event))  # blocking call
-
-#     def __exit__(self, exception_type, exception_value, traceback):
-#         lib.sync_free(self.obj)
-
-#     def close(self):
-#         lib.sync_free(self.obj)
-
-
-# class AsyncInput:
-#     def __init__(self, tty: 'Tty', delimiter=None):
-#         if delimiter is not None:
-#             self.obj: POINTER('CAsyncReader') = \
-#                 lib.read_until_async(tty, delimiter)
-#         else:
-#             self.obj: POINTER('CAsyncReader') = lib.read_async(tty)
-#         self.event: 'Event' = Event()
-
-#     def __enter__(self):
-#         return self
-
-#     def __iter__(self):
-#         return self
-
-#     def __next__(self) -> bool:
-#         return lib.async_next(self.obj, byref(self.event))  # non-blocking call
-
-#     def __exit__(self, exception_type, exception_value, traceback):
-#         lib.async_free(self.obj)
-
-#     def close(self):
-#         lib.async_free(self.obj)
