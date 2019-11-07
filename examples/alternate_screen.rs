@@ -51,13 +51,13 @@ use tuitty::terminal::dispatch::Dispatcher;
 fn signal_scenario() {
     let dispatch = Dispatcher::init();
     dispatch.signal(EnableAlt);
-    dispatch.signal(Raw);
+    // dispatch.signal(Raw);
 
-    dispatch.signal(Goto(0, 0));
-    dispatch.signal(Printf(format!("Hello, world!")));
+    // dispatch.signal(Goto(0, 0));
+    // dispatch.signal(Printf(format!("Hello, world!")));
     thread::sleep(Duration::from_secs(2));
 
-    dispatch.signal(Cook);
+    // dispatch.signal(Cook);
     dispatch.signal(DisableAlt);
     // thread::sleep(Duration::from_secs(1));
 }
@@ -84,8 +84,8 @@ fn raw_scenario() {
 }
 
 fn main() {
-    #[cfg(windows)]
-    raw_scenario();
+    // #[cfg(windows)]
+    // raw_scenario();
 
     signal_scenario();
 }

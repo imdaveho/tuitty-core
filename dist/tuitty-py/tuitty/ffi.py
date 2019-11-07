@@ -46,7 +46,7 @@ class _EventHandle(Structure):
 
 
 class Eventmeta(Structure):
-    _fields_ = [("_kind", c_int16), ("_data", c_uint32)]
+    _fields_ = [("_kind", c_uint8), ("_data", c_uint32)]
 
     def kind(self) -> 'InputEvent':
         return InputEvent(self._kind)

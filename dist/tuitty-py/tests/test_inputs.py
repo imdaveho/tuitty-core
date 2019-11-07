@@ -3,40 +3,40 @@ import time
 from tuitty.ffi import Dispatcher, InputEvent
 
 
-def test_poll_async(self):
-    with Dispatcher() as dispatch:
-        # TODO: optional -- remove once confirmed
-        dispatch.goto(5, 5)
-        dispatch.prints("Hello, tuitty!")
-        time.sleep(2)
-        dispatch.enable_alt()
-        dispatch.raw()
-        is_running = True
-        with dispatch.listen() as listener:
-            while is_running:
-                time.sleep(1./25)
-                evt = listener.poll_async
-                if evt is None: continue
-                if evt.kind() == InputEvent.Left:
-                    dispatch.left(1)
-                elif evt.kind() == InputEvent.Right:
-                    dispatch.right(1)
-                elif evt.kind() == InputEvent.Up:
-                    dispatch.up(1)
-                elif evt.kind() == InputEvent.Down:
-                    dispatch.down(1)
-                elif evt.kind() == InputEvent.Char:
-                    if evt.data() == 'q': is_running = False
-                else:
-                    pass
-        dispatch.cook()
-        dispatch.disable_alt()
-    # Dispatcher drops
-    print("waiting 2 secs...")
-    time.sleep(2)
+# def test_poll_async(self):
+#     with Dispatcher() as dispatch:
+#         # TODO: optional -- remove once confirmed
+#         dispatch.goto(5, 5)
+#         dispatch.prints("Hello, tuitty!")
+#         time.sleep(2)
+#         dispatch.enable_alt()
+#         dispatch.raw()
+#         is_running = True
+#         with dispatch.listen() as listener:
+#             while is_running:
+#                 time.sleep(1./25)
+#                 evt = listener.poll_async
+#                 if evt is None: continue
+#                 if evt.kind() == InputEvent.Left:
+#                     dispatch.left(1)
+#                 elif evt.kind() == InputEvent.Right:
+#                     dispatch.right(1)
+#                 elif evt.kind() == InputEvent.Up:
+#                     dispatch.up(1)
+#                 elif evt.kind() == InputEvent.Down:
+#                     dispatch.down(1)
+#                 elif evt.kind() == InputEvent.Char:
+#                     if evt.data() == 'q': is_running = False
+#                 else:
+#                     pass
+#         dispatch.cook()
+#         dispatch.disable_alt()
+#     # Dispatcher drops
+#     print("waiting 2 secs...")
+#     time.sleep(2)
 
-if __name__ == '__main__':
-    test_poll_async()
+# if __name__ == '__main__':
+#     test_poll_async()
 
 
 

@@ -26,7 +26,7 @@ fn main() {
             counter.signal(Prints(format!(")")));
             counter.signal(Clear(Clear::NewLn));
             counter.signal(Goto(col, row));
-            thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(200));
             count += 1;
             if count > 200 { count = 0 }
         }
@@ -38,15 +38,19 @@ fn main() {
                 match kv {
                     KeyEvent::Left => {
                         dispatch.signal(Left(1));
+                        dispatch.signal(Flush);
                     },
                     KeyEvent::Right => {
                         dispatch.signal(Right(1));
+                        dispatch.signal(Flush);
                     },
                     KeyEvent::Up => {
                         dispatch.signal(Up(1));
+                        dispatch.signal(Flush);
                     },
                     KeyEvent::Down => {
                         dispatch.signal(Down(1));
+                        dispatch.signal(Flush);
                     },
                     KeyEvent::Char(c) => if c == 'q' {
                         break switch.store(false, Ordering::SeqCst)
@@ -55,7 +59,7 @@ fn main() {
                 }
             }
         }
-        dispatch.signal(Flush);
+        
         thread::sleep(Duration::from_millis(40));
     }
 

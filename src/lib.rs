@@ -1,7 +1,7 @@
 //! `tuitty` is a cross platform, interoperable, simplfied terminal library
 //! that is meant to be wrapped by multiple languages.
 
-use std::ffi::CString;
+use std::ffi::{ CStr, CString };
 use std::os::raw::c_char;
 
 pub mod terminal;
@@ -178,8 +178,8 @@ pub extern fn dispatcher_prints(ptr: *mut Dispatcher, c_str: *mut c_char) {
     unsafe {
         assert!(!ptr.is_null());
         assert!(!c_str.is_null());
-        let r_str = CString::from_raw(c_str).into_string();
-        if let Ok(s) = r_str { (&mut *ptr).signal(Prints(s)) }
+        let r_str = CStr::from_ptr(c_str).to_str();
+        if let Ok(s) = r_str { (&mut *ptr).signal(Prints(s.to_string())) }
     }
 }
 
@@ -188,8 +188,8 @@ pub extern fn event_handle_prints(ptr: *const EventHandle, c_str: *mut c_char) {
     unsafe {
         assert!(!ptr.is_null());
         assert!(!c_str.is_null());
-        let r_str = CString::from_raw(c_str).into_string();
-        if let Ok(s) = r_str { (&*ptr).signal(Prints(s)) }
+        let r_str = CStr::from_ptr(c_str).to_str();
+        if let Ok(s) = r_str { (&*ptr).signal(Prints(s.to_string())) }
     }
 }
 
@@ -198,8 +198,8 @@ pub extern fn dispatcher_printf(ptr: *mut Dispatcher, c_str: *mut c_char) {
     unsafe {
         assert!(!ptr.is_null());
         assert!(!c_str.is_null());
-        let r_str = CString::from_raw(c_str).into_string();
-        if let Ok(s) = r_str { (&mut *ptr).signal(Printf(s)) }
+        let r_str = CStr::from_ptr(c_str).to_str();
+        if let Ok(s) = r_str { (&mut *ptr).signal(Printf(s.to_string())) }
     }
 }
 
@@ -208,8 +208,8 @@ pub extern fn event_handle_printf(ptr: *const EventHandle, c_str: *mut c_char) {
     unsafe {
         assert!(!ptr.is_null());
         assert!(!c_str.is_null());
-        let r_str = CString::from_raw(c_str).into_string();
-        if let Ok(s) = r_str { (&*ptr).signal(Printf(s)) }
+        let r_str = CStr::from_ptr(c_str).to_str();
+        if let Ok(s) = r_str { (&*ptr).signal(Printf(s.to_string())) }
     }
 }
 

@@ -2,57 +2,79 @@ import unittest
 import time
 from tuitty.ffi import Dispatcher, InputEvent, Clear
 
+# def test_goto():
+#     with Dispatcher() as dispatch:
+#         dispatch.enable_alt()
+#         dispatch.raw()
+#         with dispatch.listen() as listener:
+#             (col, row) = listener.coord()
+#             dispatch.goto(col, row)
+#             dispatch.prints("H")
+#             dispatch.flush()
+#             time.sleep(2)
+#             dispatch.goto(0, 0)
+#             dispatch.flush()
+#             time.sleep(2)
+#             (w, h) = listener.size()
+#             dispatch.goto(w - 3, h - 3)
+#             dispatch.prints("I")
+#             dispatch.flush()
+#             time.sleep(2)
+#         dispatch.cook()
+#         time.sleep(0.5)
+#         dispatch.disable_alt()
 
 def test_poll_async():
-    # with Dispatcher() as dispatch:
-    #     # TODO: optional -- remove once confirmed
-    #     dispatch.clear(Clear.All)
-    #     dispatch.goto(10, 5)
-    #     dispatch.prints("Hello0, tuitty!")
-    #     time.sleep(2)
-    #     dispatch.enable_alt()
-    #     dispatch.raw()
-    #     is_running = True
-    #     with dispatch.listen() as listener:
-    #         while is_running:
-    #             time.sleep(1./25)
-    #             evt = listener.poll_async()
-    #             if evt is None: continue
-    #             if evt.kind() == InputEvent.Left:
-    #                 dispatch.left(1)
-    #             elif evt.kind() == InputEvent.Right:
-    #                 dispatch.right(1)
-    #             elif evt.kind() == InputEvent.Up:
-    #                 dispatch.up(1)
-    #             elif evt.kind() == InputEvent.Down:
-    #                 dispatch.down(1)
-    #             elif evt.kind() == InputEvent.Char:
-    #                 if evt.data() == 'q': 
-    #                     is_running = False
-    #             else:
-    #                 pass
-    #     dispatch.cook()
-    #     dispatch.disable_alt()
-    dispatch = Dispatcher()
-    dispatch.clear(Clear.All)
-    dispatch.flush()
-    dispatch.goto(15, 11)
-    dispatch.printf("Hello, tuitty!")
-    time.sleep(2)
-
-    dispatch.goto(15, 12)
-    dispatch.printf("Hello, there!")
-    time.sleep(2)
-    
-    dispatch.goto(15, 12)
-    dispatch.printf("Hello, again!")
-    time.sleep(2)
-    
-    # dispatch.flush()
-    # Dispatcher drops
+    with Dispatcher() as dispatch:
+        dispatch.switch()
+        dispatch.raw()
+        is_running = True
+        dispatch.printf("This is a sample string.")
+        with dispatch.listen() as listener:
+            while is_running:
+                time.sleep(0.1)
+                evt = listener.poll_latest_async()
+                if evt is None: continue
+                if evt.kind() == InputEvent.Left:
+                    dispatch.left(1)
+                    dispatch.flush()
+                elif evt.kind() == InputEvent.Right:
+                    dispatch.right(1)
+                    dispatch.flush()
+                elif evt.kind() == InputEvent.Up:
+                    dispatch.up(1)
+                    dispatch.flush()
+                elif evt.kind() == InputEvent.Down:
+                    dispatch.down(1)
+                    dispatch.flush()
+                elif evt.kind() == InputEvent.Enter:
+                    ch = listener.getch()
+                    (col, row) = listener.coord()
+                    listener.goto(30, 5)
+                    listener.printf(f"char: ({ch})")
+                    listener.goto(col, row)
+                    listener.flush()                    
+                elif evt.kind() == InputEvent.Char:
+                    if evt.data() == 'q':
+                        is_running = False
+                    elif evt.data() == '1':
+                        dispatch.switch_to(1)
+                    elif evt.data() == ' ':
+                        dispatch.switch_to(0)
+                    elif evt.data() == '2':
+                        dispatch.switch_to(2)
+                    elif evt.data() == '!':
+                        dispatch.switch()
+                        dispatch.raw()
+                        dispatch.goto(5, 5)
+                        dispatch.printf("This is aalt screeen 2")
+                else: pass
+        dispatch.cook()
+        time.sleep(0.5)
+        dispatch.disable_alt()
+    # dispatch drops
     print("waiting 2 secs...")
     time.sleep(2)
-    dispatch.close()
 
 
 # import os
@@ -104,6 +126,7 @@ def test_poll_async():
 #     print(path)
 
 if __name__ == '__main__':
+    # test_goto()
     test_poll_async()
     # print_root()
     # print_settings()
