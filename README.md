@@ -260,7 +260,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 * [Termbox-go (nsf)](https://github.com/nsf/termbox-go)
 * [Asciimatics (peterbrittain)](https://github.com/peterbrittain/asciimatics)
 * [Vorpal (dthree)](https://github.com/dthree/vorpal)
-* [Tty Toolkit (piotrmurach](https://github.com/piotrmurach/tty)
+* [Tty Toolkit (piotrmurach)](https://github.com/piotrmurach/tty)
 * [Prompt-toolkit (jonathanslenders)](https://github.com/prompt-toolkit/python-prompt-toolkit)
 * [Colorama (tartley)](https://github.com/tartley/colorama)
 * [Blessings (erikrose)](https://github.com/erikrose/blessings)
