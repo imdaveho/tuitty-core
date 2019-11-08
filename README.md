@@ -13,6 +13,11 @@ A cross-platform, interoperable, simplfied terminal library that is meant to be 
   * [Dispatcher](#dispatcher)
   * [Event Handle](#event-handle)
 * [Aspirations, but not Guarantees](#crystal_ball-aspirations-but-not-guarantees)
+* [Contributing](#contributing)
+* [Versioning](#versioning)
+* [Authors](#authors)
+* [License](#license)
+* [Shoutouts](#closing-shoutouts-clap)
 
 ### :sparkles: Features
 [(Back to top)](#table-of-contents)
