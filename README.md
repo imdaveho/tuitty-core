@@ -47,11 +47,9 @@ A cross-platform, interoperable, simplfied terminal library that is meant to be 
    <summary>Show response</summary>
    <br/>
    <blockquote>
-   As you can see, there is already a proliferation of various implementations of terminal libraries...and yes I'm aware of the irony that this project is <a href="https://xkcd.com/927/">+:one: </a> to the list of implementations out there. 
-
-   However, unlike other attempts, what this project intends to do is to create a unifying API across languages that eliminates the need to repeat yourself. This is actually very similar to how <a href="https://asdf-vm.com/#/?id=ballad-of-asdf">asdf-vm</a> addressed the proliferation of "version managers" like `rbenv`, `gvm`, `nvm`, and `pyenv`. By creating something unifying and extensible, users won't have to re-discover and re-learn a new API every time they switch programming languages.
-
-   Additionally, many of the implementations out there do not provide cross-platform support (mainly Windows Console), which I'm specifically targeting with this project.
+   <p>As you can see, there is already a proliferation of various implementations of terminal libraries...and yes I'm aware of the irony that this project is <a href="https://xkcd.com/927/">+:one: </a> to the list of implementations out there.</p>
+   <p>However, unlike other attempts, what this project intends to do is to create a unifying API across languages that eliminates the need to repeat yourself. This is actually very similar to how <a href="https://asdf-vm.com/#/?id=ballad-of-asdf">asdf-vm</a> addressed the proliferation of "version managers" like <code>rbenv</code>, <code>gvm</code>, <code>nvm</code>, and <code>pyenv</code>. By creating something unifying and extensible, users won't have to re-discover and re-learn a new API every time they switch programming languages.</p>
+   <p>Additionally, many of the implementations out there do not provide cross-platform support (mainly Windows Console), which I'm specifically targeting with this project.</p>
    </blockquote>
   </details>
   
@@ -93,7 +91,7 @@ A cross-platform, interoperable, simplfied terminal library that is meant to be 
     <br/>
     <blockquote>
     <ul><li>Needs to be portable to multiple languages (ones that have an FFI with C)
-      <ul><li>C had too many :shoe::bomb: so such interoperability is provided by Rust (maybe Nim)</li></ul>
+      <ul><li>C has too many :hourglass_flowing_sand::bomb::boom: so such interoperability is provided by Rust (maybe Nim)</li></ul>
     </li></ul>
     </blockquote>
   </details>
@@ -171,15 +169,15 @@ A cross-platform, interoperable, simplfied terminal library that is meant to be 
  <summary><b>Is this really a big deal?</b></summary>
  
 <br/>
-<p>These separate diagrams were meant to help build a mental model regarding how the internals of the library works. It is helpful to understand that the <code>Dispatcher</code> is responsible for sending and receiving <code>Signal</code> or <code>Request</code> messages that either does stuff (signal actions) or fetches stuff (request app state). This uses channels under the hood.</p>
+<p>These separate diagrams were meant to help build a mental model regarding how the internals of the library work. It is helpful to understand that the <code>Dispatcher</code> is responsible for sending and receiving <code>Signal</code> or <code>Request</code> messages that either does stuff (signal actions) or fetches stuff (request app state). This uses channels under the hood.</p>
 
 <p><img src="https://github.com/day8/re-frame/raw/master/images/Readme/6dominoes.png?raw=true" align="right" width="360"/></p>
 
 <p>This is important, because on Unix systems, in order to parse user input, you would have to read <code>stdin</code>. But that would be a blocking call. If you wanted to run things concurrently (eg. autocomplete, syntax checking, etc), you would have to read things asynchronously through a spawned thread. It would be impractical to spawn a thread every time you wanted a concurrent process to read from <code>stdin</code>. Also, why would you need more than a single process reading and parsing from <code>stdin</code>? Instead of a thread, this implementation creates a new channel that receives <code>InputEvent</code>s from a single reader of <code>stdin</code> that is within the <code>Dispatcher</code>.</p>
 
-<p>Similarly, if you wanted to take actions on the terminal, in the previous paradigm, terminal actions were methods with an object that also held some mutable state (eg. screen buffers, multiple screen contexts, etc). It wasn't clear how that would cross the FFI boundary when attempting multi-threaded or async/await event loops in other languages. Passing a mutable <code>Box<T></code> (heap allocated chunk of memory) seemed like a bad idea. However, in a similar manner, with this pattern multiple entities can send <code>Signal</code>s and make <code>Request</code>s to the <code>Dispatcher</code> to be handled safely.</p>
+<p>Similarly, if you wanted to take actions on the terminal, in the previous paradigm, terminal actions were methods with an object that also held some mutable state (eg. screen buffers, multiple screen contexts, etc). It wasn't clear how that would cross the FFI boundary when attempting multi-threaded or async/await event loops in other languages. Passing a mutable <code>Box&lt;T&gt;</code> (heap allocated chunk of memory) seemed like a bad idea. However, with this pattern in a similar manner, multiple entities can send <code>Signal</code>s and make <code>Request</code>s to the <code>Dispatcher</code> to be handled safely.</p>
  
-<p>Like I mentioned previously, this is not a pattern that was invented for this particular library. Rather, this pattern pulled inspiration from reactive programming (Rx.js), the actor model / concurrency via message passing (Kafka, Erlang), and web frameworks like <a href="https://guide.elm-lang.org/architecture/">Elm</a>, React.js (aforementioned <a href="https://facebook.github.io/flux/docs/in-depth-overview#structure-and-data-flow">Flux</a>), and <a href="https://github.com/day8/re-frame/blob/master/README.md#domino-4---query">re-frame</a>. Actually, the documentation for **re-frame** has a similar diagram: (see right). The relevant parts are mainly 1-5 since the web stuff is irrelevant here. But notice how similar the flows are to each other. It has been well-documented and proven how these patterns reduce compexity and errors and improve maintainability and speed of development.</p>
+<p>Like I mentioned previously, this is not a pattern that was invented for this particular library. Rather, this pattern pulled inspiration from reactive programming (Rx.js), the actor model / concurrency via message passing (Kafka, Erlang), and web frameworks like <a href="https://guide.elm-lang.org/architecture/">Elm</a>, React.js (aforementioned <a href="https://facebook.github.io/flux/docs/in-depth-overview#structure-and-data-flow">Flux</a>), and <a href="https://github.com/day8/re-frame/blob/master/README.md#domino-4---query">re-frame</a>. Actually, the documentation for <b>re-frame</b> has a similar diagram: (see right). The relevant parts are mainly 1-5 since the web stuff is irrelevant here. But notice how similar the flows are to each other. It has been well-documented and proven how these patterns reduce compexity and errors and improve maintainability and speed of development.</p>
  </details>
 
 
@@ -190,12 +188,15 @@ A cross-platform, interoperable, simplfied terminal library that is meant to be 
 [(Back to top)](#table-of-contents)
 
 #### Tested Terminals
+[(Back to top)](#table-of-contents)
 * Windows 10 - Cmd.exe (legacy and  modern modes)
 * Windows 10 - PowerShell (legacy and modern modes)
 * Windows 10 - git-bash (w/ [winpty](https://stackoverflow.com/questions/48199794/winpty-and-git-bash))
 * Ubuntu 17.04 - gnome-terminal
 
 ### :crystal_ball: Aspirations, but not Guarantees
+[(Back to top)](#table-of-contents)
+
 <details>
   <summary>
   Expand description
@@ -212,6 +213,7 @@ A cross-platform, interoperable, simplfied terminal library that is meant to be 
 </details>
 
 ### Contributing
+[(Back to top)](#table-of-contents)
 
 Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
 
@@ -225,20 +227,25 @@ Specifically, there are labels created for each of these areas:
 * <kbd>[ergonomics](https://github.com/imdaveho/tuitty/labels/ergonomics)</kbd> ergonomics without being overly clever
 
 ### Versioning
+[(Back to top)](#table-of-contents)
 
 We use [SemVer](http://semver.org/)_(-ish)_ for versioning. For the versions available, see the _TBD_ <!--[tags on this repository](https://github.com/your/project/tags).-->
 
 ### Authors
+[(Back to top)](#table-of-contents)
 
 * **imdaveho** - *Creator and project maintainer* ([profile](https://github.com/imdaveho))
 
 <!-- See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project. -->
 
 ### License
+[(Back to top)](#table-of-contents)
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
 
 ### Closing Shoutouts :clap: 
+[(Back to top)](#table-of-contents)
+
 > _nanos gigantum humeris insidentes_
 
 **Many thanks** to the authors and projects below for various implementations that have inspired this project.
