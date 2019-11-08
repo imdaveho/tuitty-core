@@ -1,5 +1,5 @@
 # tuitty
-A cross platform, interoperable, simplfied terminal library that is meant to be wrapped by multiple languages.
+A cross-platform, interoperable, simplfied terminal library that is meant to be wrapped by multiple languages.
 
 ![tuitty-banner](https://user-images.githubusercontent.com/13990019/68438603-a6972e00-0192-11ea-8fc9-ff334ee79432.png)
 
@@ -10,7 +10,6 @@ A cross platform, interoperable, simplfied terminal library that is meant to be 
 * [Rationale](#thought_balloon-rationale)
 * [Definitions](#notebook_with_decorative_cover-definitions)
 * [Getting Started](#zap-getting-started)
-  * [API Design](#api-design)
   * [Dispatcher](#dispatcher)
   * [Event Handle](#event-handle)
 
@@ -48,14 +47,36 @@ A cross platform, interoperable, simplfied terminal library that is meant to be 
 
 ### :notebook_with_decorative_cover: Definitions
 [(Back to top)](#table-of-contents)
-* **cross-platform**
-* **interoperable**
-* **simplied**
+**Cross-platform**
+* Needs to consistently work on MacOS, Linux, and Windows
+  * BSDs and others would be secondary
+* Needs to work on these architectures:
+  * ARM - 32/64-bit
+  * Intel - 32/64-bit
+  * AMD - 32/64-bit
+
+**Interoperable**
+* Needs to be portable to multiple languages (ones that have an FFI with C)
+  * C had too many :shoe::bomb:s so such interoperability is provided by Rust (maybe Nim)
+
+**Simplified**
+* Basic functionality scoped to the below:
+  * Cursor actions (motion)
+  * Screen actions (printing/clearing)
+  * Output actions (styling)
+  * Term mode actions (raw/cooked)
+  * Input event handling
+* Implemented with as little "in the middle" as possible
+  * Tight scoping allows us to focus on specific elements to optimize performance rather than peanut-buttering across too many concerns
+* Being clear > being clever
+  * Rust actually provides great options for abstractions (eg. Traits, macros) but these should be carefully considered over a more straight-forward method—even if they are more idiomatic Rust. Often, traits and macros make code less understandable for newcomers as they can be/get quite "magical".
+  * The analogy that comes to mind is that, for the longest time, Go(lang) did not want to provide generics because the feeling was that they reduced readability and made the language more complex. Instead, the tradeoff made was that _some_ repetition was more beneficial towards maintainable code than bluntly trying to be _DRY_. Likewise, to keep things simplified, I'd rather repeat things that make what is going on obvious and less opaque.
+
 
 ### :zap: Getting Started
 [(Back to top)](#table-of-contents)
-
 #### API Design
+
 
 #### Dispatcher
 [(Back to top)](#table-of-contents)
@@ -88,7 +109,7 @@ We use [SemVer](http://semver.org/)_(-ish)_ for versioning. For the versions ava
 
 ### Authors
 
-* **Dave Ho** - *Creator and project maintainer* - [imdaveho](https://github.com/imdaveho)
+* **imdaveho** - *Creator and project maintainer* ([profile](https://github.com/imdaveho))
 
 <!-- See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project. -->
 
