@@ -30,48 +30,101 @@ A cross-platform, interoperable, simplfied terminal library that is meant to be 
 
 ### :thought_balloon: Rationale
 [(Back to top)](#table-of-contents)
+
 * **Why not use _curses_?**
-  While _[n/pd]curses_ is widely used and wrapped, there is also plenty issues regarding them: wide character support, cross-platform support, [C-style/low-level imports](https://pypi.org/project/blessings/#before-and-after) that reduce clarity, etc.
+  <details>
+  <summary>
+   Show response
+  </summary>
+   <br/>
+  While <em>[n/pd]curses</em> is widely used and wrapped, there is also plenty issues regarding them: wide character support, cross-platform support, <a href="https://pypi.org/project/blessings/#before-and-after">C-style/low-level imports</a> that reduce clarity, etc.
+  </details>
 
 
 * **Why not use _[blessings](https://github.com/erikrose/blessings) (Python)_, _[tty-tk](https://github.com/piotrmurach/tty)_ (Ruby), _[terminal-kit](https://github.com/cronvel/terminal-kit)_ (Node), or _[insert project](#rationale)_ (_insert language_)?**
-  As you can see, there is already a proliferation of various implementations of terminal libraries...and yes I'm aware of the irony that this project is [+:one:](https://xkcd.com/927/)  to the list of implementations out there. 
+  <details>
+  <summary>
+   Show response
+  </summary>
+  <br/>
+  As you can see, there is already a proliferation of various implementations of terminal libraries...and yes I'm aware of the irony that this project is <a href="https://xkcd.com/927/">+:one: </a> to the list of implementations out there. 
 
-  However, unlike other attempts, what this project intends to do is to create a unifying API across languages that eliminates the need to repeat yourself. This is actually very similar to how [asdf-vm](https://asdf-vm.com/#/?id=ballad-of-asdf) addressed the proliferation of "version managers" like `rbenv`, `gvm`, `nvm`, and `pyenv`. By creating something unifying and extensible, users won't have to re-discover and re-learn a new API every time they switch programming languages.
+  However, unlike other attempts, what this project intends to do is to create a unifying API across languages that eliminates the need to repeat yourself. This is actually very similar to how <a href="https://asdf-vm.com/#/?id=ballad-of-asdf">asdf-vm</a> addressed the proliferation of "version managers" like `rbenv`, `gvm`, `nvm`, and `pyenv`. By creating something unifying and extensible, users won't have to re-discover and re-learn a new API every time they switch programming languages.
   
   Additionally, many of the implementations out there do not provide cross-platform support (mainly Windows Console), which I'm specifically targeting with this project.
+  </details>
   
 * **Why the command line? Why cross-platform? Why, why, why?!**
+  <details>
+  <summary>
+   Show response
+  </summary>
+  <br/>
   At the end of the day, many development workflows begin and end with a terminal prompt. I wanted to learn and better understand this critical component of a software engineer's journey. Consequently, this process has gotten me familiar with systems programming languages (Rust, Go, C, and Nim), low-level OS syscalls, the Windows Console API, and countless other intangibles that have made me a more well-rounded individual.
-
+  </details>
 
 ### :notebook_with_decorative_cover: Definitions
 [(Back to top)](#table-of-contents)
 **Cross-platform**
-* Needs to consistently work on MacOS, Linux, and Windows
-  * BSDs and others would be secondary
-* Needs to work on these architectures:
-  * ARM - 32/64-bit
-  * Intel - 32/64-bit
-  * AMD - 32/64-bit
+<details>
+<summary>
+Expand description
+</summary>
+<br/>
+<ul>
+ <li>Needs to consistently work on MacOS, Linux, and Windows
+  <ul><li>BSDs and others would be secondary</li></ul>
+ </li>
+ <br/>
+ <li>Needs to work on these architectures:
+  <ul>
+   <li>ARM - 32/64-bit</li>
+   <li>Intel - 32/64-bit</li>
+   <li>AMD - 32/64-bit</li>
+  </ul></li>
+ </ul>
+ </details>
 
 **Interoperable**
-* Needs to be portable to multiple languages (ones that have an FFI with C)
-  * C had too many :shoe::bomb:s so such interoperability is provided by Rust (maybe Nim)
+<details>
+<summary>
+Expand description
+</summary>
+<br/>
+<ul><li>Needs to be portable to multiple languages (ones that have an FFI with C)
+  <ul><li>C had too many :shoe::bomb:s so such interoperability is provided by Rust (maybe Nim)</li></ul>
+</li></ul>
+</details>
 
 **Simplified**
-* Basic functionality scoped to the below:
-  * Cursor actions (motion)
-  * Screen actions (printing/clearing)
-  * Output actions (styling)
-  * Term mode actions (raw/cooked)
-  * Input event handling
-* Implemented with as little "in the middle" as possible
-  * Tight scoping allows us to focus on specific elements to optimize performance rather than peanut-buttering across too many concerns
-* Being clear > being clever
-  * Rust actually provides great options for abstractions (eg. Traits, macros) but these should be carefully considered over a more straight-forward method—even if they are more idiomatic Rust. Often, traits and macros make code less understandable for newcomers as they can be/get quite "magical".
-  * The analogy that comes to mind is that, for the longest time, Go(lang) did not want to provide generics because the feeling was that they reduced readability and made the language more complex. Instead, the tradeoff made was that _some_ repetition was more beneficial towards maintainable code than bluntly trying to be _DRY_. Likewise, to keep things simplified, I'd rather repeat things that make what is going on obvious and less opaque.
-
+<details>
+<summary>
+Expand description
+</summary>
+<br/>
+<ul>
+ <li>Basic functionality scoped to the below:
+  <ul>
+   <li>Cursor actions (motion)</li>
+   <li>Screen actions (printing/clearing)</li>
+   <li>Output actions (styling)</li>
+   <li>Term mode actions (raw/cooked)</li>
+   <li>Input event handling</li>
+  </ul>
+ </li>
+ <br/>
+ <li>Implemented with as little "in the middle" as possible
+  <ul><li>Tight scoping allows us to focus on specific elements to optimize performance rather than peanut-buttering across too many concerns</li></ul>
+ </li>
+ <br/>
+ <li>Being clear > being clever
+  <ul>
+   <li>Rust actually provides great options for abstractions (eg. Traits, macros) but these should be carefully considered over a more straight-forward method—even if they are more idiomatic Rust. Often, traits and macros make code less understandable for newcomers as they can be/get quite "magical".</li>
+   <li>The analogy that comes to mind is that, for the longest time, Go(lang) did not want to provide generics because the feeling was that they reduced readability and made the language more complex. Instead, the tradeoff made was that _some_ repetition was more beneficial towards maintainable code than bluntly trying to be _DRY_. Likewise, to keep things simplified, I'd rather repeat things that make what is going on obvious and less opaque.</li>
+  </ul>
+ </li>
+</ul>
+</details>
 
 ### :zap: Getting Started
 [(Back to top)](#table-of-contents)
