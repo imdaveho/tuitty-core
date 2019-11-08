@@ -27,8 +27,8 @@ A cross-platform, interoperable, simplfied terminal library that is meant to be 
   - avoid leaky abstractions that force you to think about what may or may not work
   - prefer to keep dependencies limited (*Unix*: __libc__, *Windows*: __winapi__) and avoid including the kitchen sink
 * Thread-safe (guarantees provided by Rust's Send + Sync traits)
-* **Cursor navigation** - _eg. goto(col, row), move up/down/left/right, alternate screen_
-* **Screen manipulations** - _eg. resize, clear, print_
+* **Cursor navigation** - _eg. goto(col, row), move up/down/left/right_
+* **Screen manipulations** - _eg. resize, clear, print, enter/leave alternate screen_
 * **Styling output** - _eg. fg and bg colors, bold, dim, underline_
 * **Terminal settings** - _eg. raw/cooked, hide/show cursor, mouse on/off_
 * **User input handling** - _eg. keyboard/mouse events_
