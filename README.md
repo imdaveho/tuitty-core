@@ -5,6 +5,8 @@ A cross-platform, interoperable, simplfied terminal library that is meant to be 
 
 > **tui • tty** \ˈtwē-dē \ *n.* - **t**ext-based **u**ser **i**nterface library for **t**ele**ty**pe writers (aka. **terminals**)
 
+***NOTE: (Nov. 8, 2019) - This library is still in alpha stage and the API is still in flux. However, the core concepts and goals outlined below will remain fairly stable. [Contributions](#contributing) are most welcome! :smile:***
+
 ## Table of Contents
 * [Features](#sparkles-features)
 * [Rationale](#thought_balloon-rationale)
