@@ -35,7 +35,7 @@ path = os.path.join(
 lib = cdll.LoadLibrary(path)
 
 
-## Parallel Structs (Classes) and Enums ########################################
+#  Parallel Structs (Classes) and Enums #######################################
 
 class _Dispatcher(Structure):
     pass
@@ -168,6 +168,15 @@ class Color(Enum):
     Grey = auto()
 
 
+class Effect(Enum):
+    Reset = 1 << (0 + 9)
+    Bold = 1 << (1 + 9)
+    Dim = 1 << (2 + 9)
+    Underline = 1 << (4 + 9)
+    Reverse = 1 << (7 + 9)
+    Hide = 1 << (8 + 9)
+
+
 class Dispatcher:
     def __init__(self):
         self.ptr = lib.dispatcher()
@@ -177,7 +186,7 @@ class Dispatcher:
 
     def __exit__(self, exception_type, exception_value, traceback):
         lib.dispatcher_free(self.ptr)
-    
+
     def listen(self) -> 'EventHandle':
         event_handle_ptr = lib.dispatcher_listen(self.ptr)
         return EventHandle(event_handle_ptr)
@@ -185,109 +194,109 @@ class Dispatcher:
     def spawn(self) -> 'EventHandle':
         event_handle_ptr = lib.dispatcher_spawn(self.ptr)
         return EventHandle(event_handle_ptr)
-    
+
     # Cursor Actions
     def goto(self, col: int, row: int):
         lib.dispatcher_goto(self.ptr, col, row)
-    
+
     def up(self, n: int):
         lib.dispatcher_up(self.ptr, n)
-    
+
     def down(self, n: int):
         lib.dispatcher_down(self.ptr, n)
-    
+
     def left(self, n: int):
         lib.dispatcher_left(self.ptr, n)
-    
+
     def right(self, n: int):
         lib.dispatcher_right(self.ptr, n)
-    
+
     # Screen Actions
     def clear(self, clr: Clear):
         lib.dispatcher_clear(self.ptr, clr.value)
-    
+
     def resize(self, w: int, h: int):
         lib.dispatcher_resize(self.ptr, w, h)
-    
+
     def prints(self, content: str):
         lib.dispatcher_prints(self.ptr, content.encode('utf-8'))
-    
+
     def printf(self, content: str):
         lib.dispatcher_printf(self.ptr, content.encode('utf-8'))
-    
+
     def flush(self):
         lib.dispatcher_flush(self.ptr)
 
     # Style Actions
-    def set_fg(self, color = None, ansi = None, rgb = None):
+    def set_fg(self, color=None, ansi=None, rgb=None):
         if color is not None and isinstance(color, Color):
             lib.dispatcher_set_basic_fg(self.ptr, color.value)
         if ansi is not None and isinstance(ansi, int) and ansi < 256:
             lib.dispatcher_set_ansi_fg(self.ptr, ansi)
         if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
             lib.dispatcher_set_rgb_fg(self.ptr, rgb[0], rgb[1], rgb[2])
-    
-    def set_bg(self, color = None, ansi = None, rgb = None):
+
+    def set_bg(self, color=None, ansi=None, rgb=None):
         if color is not None and isinstance(color, Color):
             lib.dispatcher_set_basic_bg(self.ptr, color.value)
         if ansi is not None and isinstance(ansi, int) and ansi < 256:
             lib.dispatcher_set_ansi_bg(self.ptr, ansi)
         if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
             lib.dispatcher_set_rgb_bg(self.ptr, rgb[0], rgb[1], rgb[2])
-    
-    def set_fx(self, fx: int):
-        lib.dispatcher_set_fx(self.ptr, fx)
-    
+
+    def set_fx(self, fx: Effect):
+        lib.dispatcher_set_fx(self.ptr, fx.value)
+
     def set_styles(self, fg: int, bg: int, fx: int):
         lib.dispatcher_set_styles(self.ptr, fg, bg, fx)
-    
+
     def reset_styles(self):
         lib.dispatcher_reset_styles(self.ptr)
-    
+
     # Toggle Mode Actions
     def show_cursor(self):
         lib.dispatcher_show_cursor(self.ptr)
-    
+
     def hide_cursor(self):
         lib.dispatcher_hide_cursor(self.ptr)
-    
+
     def enable_mouse(self):
         lib.dispatcher_enable_mouse(self.ptr)
-    
+
     def disable_mouse(self):
         lib.dispatcher_disable_mouse(self.ptr)
 
     def enable_alt(self):
         lib.dispatcher_enable_alt(self.ptr)
-    
+
     def disable_alt(self):
         lib.dispatcher_disable_alt(self.ptr)
-    
+
     def raw(self):
         lib.dispatcher_raw(self.ptr)
-    
+
     def cook(self):
         lib.dispatcher_cook(self.ptr)
 
     # Store Operation Actions
     def switch(self):
         lib.dispatcher_switch(self.ptr)
-    
+
     def switch_to(self, id: int):
         lib.dispatcher_switch_to(self.ptr, id)
-    
+
     def resized(self):
         lib.dispatcher_resized(self.ptr)
-    
+
     def mark(self, col: int, row: int):
         lib.dispatcher_mark(self.ptr, col, row)
-    
+
     def jump(self):
         lib.dispatcher_jump(self.ptr)
-    
+
     def sync_tab_size(self):
         lib.dispatcher_sync_tab_size(self.ptr)
-    
+
     # Manual cleanup (if not using with statement)
     def close(self):
         lib.dispatcher_free(self.ptr)
@@ -297,115 +306,115 @@ class EventHandle:
     def __init__(self, event_handle_ptr):
         self.ptr = event_handle_ptr
         self.evt = Eventmeta()
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, exception_type, exception_value, traceback):
         lib.event_handle_free(self.ptr)
-    
+
     # Cursor Actions
     def goto(self, col: int, row: int):
         lib.event_handle_goto(self.ptr, col, row)
-    
+
     def up(self, n: int):
         lib.event_handle_up(self.ptr, n)
-    
+
     def down(self, n: int):
         lib.event_handle_down(self.ptr, n)
-    
+
     def left(self, n: int):
         lib.event_handle_left(self.ptr, n)
-    
+
     def right(self, n: int):
         lib.event_handle_right(self.ptr, n)
-    
+
     # Screen Actions
     def clear(self, clr: Clear):
         lib.event_handle_clear(self.ptr, clr.value)
-    
+
     def resize(self, w: int, h: int):
         lib.event_handle_resize(self.ptr, w, h)
-    
+
     def prints(self, content: str):
         lib.event_handle_prints(self.ptr, content.encode('utf-8'))
-    
+
     def printf(self, content: str):
         lib.event_handle_printf(self.ptr, content.encode('utf-8'))
-    
+
     def flush(self):
         lib.event_handle_flush(self.ptr)
 
     # Style Actions
-    def set_fg(self, color = None, ansi = None, rgb = None):
+    def set_fg(self, color=None, ansi=None, rgb=None):
         if color is not None and isinstance(color, Color):
             lib.event_handle_set_basic_fg(self.ptr, color.value)
         if ansi is not None and isinstance(ansi, int) and ansi < 256:
             lib.event_handle_set_ansi_fg(self.ptr, ansi)
         if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
             lib.event_handle_set_rgb_fg(self.ptr, rgb[0], rgb[1], rgb[2])
-    
-    def set_bg(self, color = None, ansi = None, rgb = None):
+
+    def set_bg(self, color=None, ansi=None, rgb=None):
         if color is not None and isinstance(color, Color):
             lib.event_handle_set_basic_bg(self.ptr, color.value)
         if ansi is not None and isinstance(ansi, int) and ansi < 256:
             lib.event_handle_set_ansi_bg(self.ptr, ansi)
         if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
             lib.event_handle_set_rgb_bg(self.ptr, rgb[0], rgb[1], rgb[2])
-    
-    def set_fx(self, fx: int):
-        lib.event_handle_set_fx(self.ptr, fx)
-    
+
+    def set_fx(self, fx: Effect):
+        lib.event_handle_set_fx(self.ptr, fx.value)
+
     def set_styles(self, fg: int, bg: int, fx: int):
         lib.event_handle_set_styles(self.ptr, fg, bg, fx)
-    
+
     def reset_styles(self):
         lib.event_handle_reset_styles(self.ptr)
-    
+
     # Toggle Mode Actions
     def show_cursor(self):
         lib.event_handle_show_cursor(self.ptr)
-    
+
     def hide_cursor(self):
         lib.event_handle_hide_cursor(self.ptr)
-    
+
     def enable_mouse(self):
         lib.event_handle_enable_mouse(self.ptr)
-    
+
     def disable_mouse(self):
         lib.event_handle_disable_mouse(self.ptr)
 
     def enable_alt(self):
         lib.event_handle_enable_alt(self.ptr)
-    
+
     def disable_alt(self):
         lib.event_handle_disable_alt(self.ptr)
-    
+
     def raw(self):
         lib.event_handle_raw(self.ptr)
-    
+
     def cook(self):
         lib.event_handle_cook(self.ptr)
 
     # Store Operation Actions
     def switch(self):
         lib.event_handle_switch(self.ptr)
-    
+
     def switch_to(self, id: int):
         lib.event_handle_switch_to(self.ptr, id)
-    
+
     def resized(self):
         lib.event_handle_resized(self.ptr)
-    
+
     def mark(self, col: int, row: int):
         lib.event_handle_mark(self.ptr, col, row)
-    
+
     def jump(self):
         lib.event_handle_jump(self.ptr)
-    
+
     def sync_tab_size(self):
         lib.event_handle_sync_tab_size(self.ptr)
-    
+
     # Store Requests (EventHandle Only)
     def size(self):
         size = lib.event_handle_size(self.ptr)
@@ -417,7 +426,7 @@ class EventHandle:
 
     def syspos(self):
         syspos = lib.event_handle_syspos(self.ptr)
-        return ((syspos >> 16), (syspos &0xffff))
+        return ((syspos >> 16), (syspos & 0xffff))
 
     def getch(self):
         ptr = lib.event_handle_getch(self.ptr)
@@ -425,7 +434,7 @@ class EventHandle:
             return cast(ptr, c_char_p).value.decode('utf-8')
         finally:
             lib.gotch_free(ptr)
-        
+
     def poll_async(self):
         finished_polling = lib.event_handle_poll_async(
             self.ptr, byref(self.evt))
@@ -433,7 +442,7 @@ class EventHandle:
             return self.evt
         else:
             return None
-    
+
     def poll_latest_async(self):
         finished_polling = lib.event_handle_poll_latest_async(
             self.ptr, byref(self.evt))
@@ -441,7 +450,7 @@ class EventHandle:
             return self.evt
         else:
             return None
-    
+
     def poll_sync(self):
         lib.event_handle_poll_sync(self.ptr, byref(self.evt))
         return self.evt
@@ -449,10 +458,10 @@ class EventHandle:
     # Event Handle Commands
     def suspend(self):
         lib.event_handle_suspend(self.ptr)
-    
+
     def transmit(self):
         lib.event_handle_transmit(self.ptr)
-    
+
     def stop(self):
         # NOTE: This removes the Sender. This would cause the Receiver to
         # close; thus dropping the Channel (in idiomatic Rust). Since we
@@ -460,10 +469,10 @@ class EventHandle:
         # hold true? If so, we have a problem that now the held pointer
         # might be pointing to garbage and present unsafe memory problems.
         lib.event_handle_stop(self.ptr)
-    
+
     def lock(self):
         lib.event_handle_lock(self.ptr)
-    
+
     def unlock(self):
         lib.event_handle_unlock(self.ptr)
 
@@ -472,7 +481,7 @@ class EventHandle:
         lib.event_handle_free(self.ptr)
 
 
-# # FFI ########################################################################
+#  FFI ########################################################################
 
 # Dispatch initialization.
 lib.dispatcher.restype = POINTER(_Dispatcher)
@@ -595,11 +604,14 @@ lib.event_handle_getch.argtypes = (POINTER(_EventHandle),)
 lib.event_handle_getch.restype = c_void_p
 lib.gotch_free.argtypes = (c_void_p,)
 
-lib.event_handle_poll_async.argtypes = (POINTER(_EventHandle), POINTER(Eventmeta))
+lib.event_handle_poll_async.argtypes = (
+    POINTER(_EventHandle), POINTER(Eventmeta))
 lib.event_handle_poll_async.restype = c_bool
-lib.event_handle_poll_latest_async.argtypes = (POINTER(_EventHandle), POINTER(Eventmeta))
+lib.event_handle_poll_latest_async.argtypes = (
+    POINTER(_EventHandle), POINTER(Eventmeta))
 lib.event_handle_poll_latest_async.restype = c_bool
-lib.event_handle_poll_sync.argtypes = (POINTER(_EventHandle), POINTER(Eventmeta))
+lib.event_handle_poll_sync.argtypes = (
+    POINTER(_EventHandle), POINTER(Eventmeta))
 
 
 # Event Handle Commands
@@ -608,4 +620,3 @@ lib.event_handle_transmit.argtypes = (POINTER(_EventHandle),)
 lib.event_handle_stop.argtypes = (POINTER(_EventHandle),)
 lib.event_handle_lock.argtypes = (POINTER(_EventHandle),)
 lib.event_handle_unlock.argtypes = (POINTER(_EventHandle),)
-
