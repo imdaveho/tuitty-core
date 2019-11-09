@@ -244,11 +244,21 @@ class Dispatcher:
         if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
             lib.dispatcher_set_rgb_bg(self.ptr, rgb[0], rgb[1], rgb[2])
 
-    def set_fx(self, fx: Effect):
-        lib.dispatcher_set_fx(self.ptr, fx.value)
+    def set_fx(self, fx):
+        if isinstance(fx, Effect):
+            fx = fx.value
+        if type(fx) is int:
+            lib.dispatcher_set_fx(self.ptr, fx)
 
-    def set_styles(self, fg: int, bg: int, fx: int):
-        lib.dispatcher_set_styles(self.ptr, fg, bg, fx)
+    def set_styles(self, fg, bg, fx):
+        if isinstance(fg, Color):
+            fg = fg.value
+        if isinstance(bg, Color):
+            bg = bg.value
+        if isinstance(fx, Effect):
+            fx = fx.value
+        if type(fg) is int and type(bg) is int and type(fx) is int:
+            lib.dispatcher_set_styles(self.ptr, fg, bg, fx)
 
     def reset_styles(self):
         lib.dispatcher_reset_styles(self.ptr)
@@ -362,11 +372,21 @@ class EventHandle:
         if rgb is not None and isinstance(rgb, tuple) and len(rgb) == 3:
             lib.event_handle_set_rgb_bg(self.ptr, rgb[0], rgb[1], rgb[2])
 
-    def set_fx(self, fx: Effect):
-        lib.event_handle_set_fx(self.ptr, fx.value)
+    def set_fx(self, fx):
+        if isinstance(fx, Effect):
+            fx = fx.value
+        if type(fx) is int:
+            lib.event_handle_set_fx(self.ptr, fx)
 
-    def set_styles(self, fg: int, bg: int, fx: int):
-        lib.event_handle_set_styles(self.ptr, fg, bg, fx)
+    def set_styles(self, fg, bg, fx):
+        if isinstance(fg, Color):
+            fg = fg.value
+        if isinstance(bg, Color):
+            bg = bg.value
+        if isinstance(fx, Effect):
+            fx = fx.value
+        if type(fg) is int and type(bg) is int and type(fx) is int:
+            lib.event_handle_set_styles(self.ptr, fg, bg, fx)
 
     def reset_styles(self):
         lib.event_handle_reset_styles(self.ptr)
