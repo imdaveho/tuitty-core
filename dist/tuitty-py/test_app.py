@@ -1,10 +1,11 @@
 import time
 import asyncio
-from tuitty.ffi import Dispatcher, InputEvent, Color, Effect
+from tuitty.ffi import Dispatcher, InputEvent, Color, Effect, Clear
 
 
 DELAY = 0.01
 SECTIONS = ["ABOUT", "EXPERIENCE", "SKILLS", "RECENT POSTS", "OPEN SOURCE"]
+MIDPOINT_COL_OFFSET = 3
 
 
 def render_banner(handle, w):
@@ -29,12 +30,12 @@ def render_greeting(handle, w, h):
     from_top = h // 3
     # Print Title
     title = "Dave Ho CLI v0.beta"
-    from_col = w // 2 - (len(title) // 2) - 4
+    from_col = w // 2 - (len(title) // 2) - MIDPOINT_COL_OFFSET
     handle.goto(from_col, from_top)
     handle.prints(title)
     # Print Subtitle
     subtitle = "\\\'dæv • \'hoh\\  賀毅超  (he, him, his)"
-    from_col = w // 2 - (len(subtitle) + 3) // 2 - 4
+    from_col = w // 2 - (len(subtitle) + 3) // 2 - MIDPOINT_COL_OFFSET
     handle.goto(from_col, from_top + 1)
     handle.prints(subtitle[:13])
     handle.set_fx(Effect.Dim)
@@ -42,14 +43,50 @@ def render_greeting(handle, w, h):
     handle.set_fx(Effect.Reset)
     handle.prints(subtitle[20:])
 
-def render_menu(handle):
-    selected = 0
+def render_splash_section(handle, w, h):
+    from_top = h // 3 + 3
+    midpoint = w // 2
+    instructions = "Navigate with ↑↓ Press <ENTER> to view"
+    from_col = midpoint - len(instructions) // 2 - MIDPOINT_COL_OFFSET
+    handle.goto(from_col, from_top)
+    handle.prints(instructions[:23])
+    handle.set_fg(Color.Cyan)
+    handle.prints(instructions[23:30])
+    handle.set_fg(Color.Reset)
+    handle.prints(instructions[30:])
+    # Initial output of Sections
+    handle.set_fx(Effect.Dim)
+    from_col = midpoint - 9
+    from_top = from_top + 2
+    for i, section in enumerate(SECTIONS):
+        handle.goto(from_col, from_top + i)
+        if i == 0:
+            handle.set_fx(Effect.Reset)
+            handle.set_fg(Color.Green)
+            handle.prints(section)
+            handle.set_fg(Color.Reset)
+            handle.set_fx(Effect.Dim)
+        else:
+            handle.prints(section)
+    handle.set_fx(Effect.Reset)
+    # Tab instructions
+    instructions = "Press <TAB> to toggle the navbar after this point"
+    from_col = w // 2 - len(instructions) // 2 - MIDPOINT_COL_OFFSET
+    from_top = from_top + 7
+    handle.goto(from_col, from_top)
+    handle.prints(instructions[:6])
+    handle.set_fg(Color.Cyan)
+    handle.prints(instructions[6:11])
+    handle.set_fg(Color.Reset)
+    handle.printf(instructions[11:])
+
+def render_menu(handle, selected):
     handle.goto(0, 1)
     handle.set_fx(Effect.Dim)
     handle.prints("┌" + "─" * 14 + "┬")
     for i, section in enumerate(SECTIONS):
         handle.goto(0, 2 + i)
-        if i == 0:
+        if i == selected[0]:
             handle.prints("│")
             handle.set_fx(Effect.Reset)
             handle.set_fg(Color.Green)
@@ -69,60 +106,21 @@ def render_menu(handle):
             handle.set_fx(Effect.Dim)
             handle.prints("│")
     handle.goto(0, 7)
-    handle.printf("└" + "─" * 14 + "┘")
-
-def render_splash_section(handle, w, h):
-    from_top = h // 3 + 3
-    midpoint = w // 2
-    instructions = "Navigate with ↑↓ Press <ENTER> to view"
-    from_col = midpoint - len(instructions) // 2 - 4
-    handle.goto(from_col, from_top)
-    handle.prints(instructions[:23])
-    handle.set_fg(Color.Cyan)
-    handle.prints(instructions[23:30])
-    handle.set_fg(Color.Reset)
-    handle.prints(instructions[30:])
-    # Initial output of Sections
-    handle.set_fx(Effect.Dim)
-    from_col = midpoint - 10
-    from_top = from_top + 2
-    for i, section in enumerate(SECTIONS):
-        handle.goto(from_col, from_top + i)
-        if i == 0:
-            handle.set_fx(Effect.Reset)
-            handle.set_fg(Color.Green)
-            handle.prints(section)
-            handle.set_fg(Color.Reset)
-            handle.set_fx(Effect.Dim)
-        else:
-            handle.prints(section)
+    handle.prints("└" + "─" * 14 + "┘")
     handle.set_fx(Effect.Reset)
-    # Tab instructions
-    instructions = "Press <TAB> any time to toggle the navigation menu"
-    from_col = w // 2 - len(instructions) // 2 - 4
-    from_top = from_top + 7
-    handle.goto(from_col, from_top)
-    handle.prints(instructions[:6])
-    handle.set_fg(Color.Cyan)
-    handle.prints(instructions[6:11])
-    handle.set_fg(Color.Reset)
-    handle.printf(instructions[11:])
+    handle.flush()
 
-async def handle_splash_section(handle, w, h, is_running, section_queue):
-    from_col = w // 2 - 10
-    # NOTE: from previous render
+async def handle_splash_section(handle, w, h, is_running, selected, section_queue):
+    # NOTE: from render_splash_section at start
+    from_col = w // 2 - 9
     from_top = h // 3 + 3 + 2
-    selected = 0
     while is_running[0]:
-        if not section_queue.empty():
-            if await section_queue.get() != 0:
-                break
         await asyncio.sleep(DELAY)
         evt = handle.poll_latest_async()
         if evt is None: continue
-        handle.set_fg(Color.Reset)
+        handle.set_fx(Effect.Reset)
         if evt.kind() == InputEvent.Up:
-            if selected == 0:
+            if selected[0] == 0:
                 # At top, so wrap around
                 handle.goto(from_col, from_top)
                 handle.set_fx(Effect.Dim)
@@ -131,19 +129,19 @@ async def handle_splash_section(handle, w, h, is_running, section_queue):
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
                 handle.printf(SECTIONS[4])
-                selected = 4
+                selected[0] = 4
             else:
                 # Move up one
-                handle.goto(from_col, from_top + selected)
+                handle.goto(from_col, from_top + selected[0])
                 handle.set_fx(Effect.Dim)
-                handle.prints(SECTIONS[selected])
-                selected = selected - 1
-                handle.goto(from_col, from_top + selected)
+                handle.prints(SECTIONS[selected[0]])
+                selected[0] = selected[0] - 1
+                handle.goto(from_col, from_top + selected[0])
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
-                handle.printf(SECTIONS[selected])
+                handle.printf(SECTIONS[selected[0]])
         elif evt.kind() == InputEvent.Down:
-            if selected == 4:
+            if selected[0] == 4:
                 # At bottom, so wrap around
                 handle.goto(from_col, from_top + 4)
                 handle.set_fx(Effect.Dim)
@@ -152,32 +150,37 @@ async def handle_splash_section(handle, w, h, is_running, section_queue):
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
                 handle.printf(SECTIONS[0])
-                selected = 0
+                selected[0] = 0
             else:
                 # Move down one
-                handle.goto(from_col, from_top + selected)
+                handle.goto(from_col, from_top + selected[0])
                 handle.set_fx(Effect.Dim)
-                handle.prints(SECTIONS[selected])
-                selected = selected + 1
-                handle.goto(from_col, from_top + selected)
+                handle.prints(SECTIONS[selected[0]])
+                selected[0] = selected[0] + 1
+                handle.goto(from_col, from_top + selected[0])
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
-                handle.printf(SECTIONS[selected])
+                handle.printf(SECTIONS[selected[0]])
         elif evt.kind() == InputEvent.Enter:
-            return selected
+            await section_queue.put(selected[0])
+            break
+        elif evt.kind() == InputEvent.MousePressLeft:
+            (col, row) = evt.data()
+            if row == 0 and (w - 4) <= col <= (w - 2):
+                is_running[0] = False
+                break
         else:
             pass
 
-async def handle_menu(handle, is_running, section_queue):
+async def handle_menu(handle, is_running, selected, section_queue):
     is_open = False
-    selected = 0
     while is_running[0]:
         await asyncio.sleep(DELAY)
         evt = handle.poll_latest_async();
         if evt is None: continue
         if evt.kind() == InputEvent.Tab:
             if not is_open:
-                render_menu(handle)
+                render_menu(handle, selected)
                 is_open = True
                 handle.lock()
             else:
@@ -199,7 +202,7 @@ async def handle_menu(handle, is_running, section_queue):
         elif evt.kind() == InputEvent.MousePressLeft:
             (col, row) = evt.data()
             if row == 0 and 0 <= col <= 5 and not is_open:
-                render_menu(handle)
+                render_menu(handle, selected)
                 is_open = True
                 handle.lock()
             elif row == 0 and 0 <= col <= 5 and is_open:
@@ -237,17 +240,18 @@ async def handle_menu(handle, is_running, section_queue):
             handle.flush()
 
         elif evt.kind() == InputEvent.Up and is_open:
-            if selected == 0:
+            handle.set_fx(Effect.Dim)
+            if selected[0] == 0:
                 handle.goto(0, 2)
                 handle.prints("│")
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
                 handle.prints("▎")
                 handle.set_fg(Color.Reset)
-                handle.prints(SECTIONS[selected].ljust(13))
+                handle.prints(SECTIONS[selected[0]].ljust(13))
                 handle.set_fx(Effect.Dim)
                 handle.prints("│")
-                selected = 4
+                selected[0] = 4
                 handle.goto(0, 2 + 4)
                 handle.prints("│")
                 handle.set_fx(Effect.Reset)
@@ -255,45 +259,46 @@ async def handle_menu(handle, is_running, section_queue):
                 handle.prints("▎")
                 handle.set_bg(Color.White)
                 handle.set_fg(Color.Black)
-                handle.prints(SECTIONS[selected].ljust(13))
+                handle.prints(SECTIONS[selected[0]].ljust(13))
                 handle.set_styles(Color.Reset, Color.Reset, Effect.Dim)
                 handle.prints("│")
                 handle.flush()
             else:
-                handle.goto(0, 2 + selected)
+                handle.goto(0, 2 + selected[0])
                 handle.prints("│")
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
                 handle.prints("▎")
                 handle.set_fg(Color.Reset)
-                handle.prints(SECTIONS[selected].ljust(13))
+                handle.prints(SECTIONS[selected[0]].ljust(13))
                 handle.set_fx(Effect.Dim)
                 handle.prints("│")
-                selected = selected - 1
-                handle.goto(0, 2 + selected)
+                selected[0] = selected[0] - 1
+                handle.goto(0, 2 + selected[0])
                 handle.prints("│")
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
                 handle.prints("▎")
                 handle.set_bg(Color.White)
                 handle.set_fg(Color.Black)
-                handle.prints(SECTIONS[selected].ljust(13))
+                handle.prints(SECTIONS[selected[0]].ljust(13))
                 handle.set_styles(Color.Reset, Color.Reset, Effect.Dim)
                 handle.prints("│")
                 handle.flush()
 
         elif evt.kind() == InputEvent.Down and is_open:
-            if selected == 4:
+            handle.set_fx(Effect.Dim)
+            if selected[0] == 4:
                 handle.goto(0, 2 + 4)
                 handle.prints("│")
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
                 handle.prints("▎")
                 handle.set_fg(Color.Reset)
-                handle.prints(SECTIONS[selected].ljust(13))
+                handle.prints(SECTIONS[selected[0]].ljust(13))
                 handle.set_fx(Effect.Dim)
                 handle.prints("│")
-                selected = 0
+                selected[0] = 0
                 handle.goto(0, 2)
                 handle.prints("│")
                 handle.set_fx(Effect.Reset)
@@ -301,29 +306,29 @@ async def handle_menu(handle, is_running, section_queue):
                 handle.prints("▎")
                 handle.set_bg(Color.White)
                 handle.set_fg(Color.Black)
-                handle.prints(SECTIONS[selected].ljust(13))
+                handle.prints(SECTIONS[selected[0]].ljust(13))
                 handle.set_styles(Color.Reset, Color.Reset, Effect.Dim)
                 handle.prints("│")
                 handle.flush()
             else:
-                handle.goto(0, 2 + selected)
+                handle.goto(0, 2 + selected[0])
                 handle.prints("│")
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
                 handle.prints("▎")
                 handle.set_fg(Color.Reset)
-                handle.prints(SECTIONS[selected].ljust(13))
+                handle.prints(SECTIONS[selected[0]].ljust(13))
                 handle.set_fx(Effect.Dim)
                 handle.prints("│")
-                selected = selected + 1
-                handle.goto(0, 2 + selected)
+                selected[0] = selected[0] + 1
+                handle.goto(0, 2 + selected[0])
                 handle.prints("│")
                 handle.set_fx(Effect.Reset)
                 handle.set_fg(Color.Green)
                 handle.prints("▎")
                 handle.set_bg(Color.White)
                 handle.set_fg(Color.Black)
-                handle.prints(SECTIONS[selected].ljust(13))
+                handle.prints(SECTIONS[selected[0]].ljust(13))
                 handle.set_styles(Color.Reset, Color.Reset, Effect.Dim)
                 handle.prints("│")
                 handle.flush()
@@ -331,9 +336,92 @@ async def handle_menu(handle, is_running, section_queue):
         elif evt.kind() == InputEvent.Enter and is_open:
             handle.unlock()
             is_open = False
-            await section_queue.put(selected)
+            await section_queue.put(selected[0])
         else:
             pass
+
+def clear_section_body(handle, w, name, col, row):
+    handle.goto(0, 1)
+    handle.set_fx(Effect.Dim)
+    handle.prints("─" * w)
+    handle.set_fx(Effect.Reset)
+    handle.goto(0, row)
+    handle.clear(Clear.CursorDown)
+    handle.goto(col, row)
+    handle.printf(f"- {name} -")
+
+async def handle_toggle_sections(handle, w, h, is_running, section_queue):
+    current = [0, ]
+    body_row = 2
+    offset = MIDPOINT_COL_OFFSET - 1
+    while is_running[0]:
+        try:
+            section = section_queue.get_nowait()
+            current[0] = section
+        except asyncio.QueueEmpty:
+            await asyncio.sleep(DELAY)
+            continue
+        except:
+            section = -1
+            current[0] = -1
+
+        if section == 0:
+            # ABOUT
+            try:
+                name = SECTIONS[section]
+            except:
+                name = "NONE"
+            col = w // 2 - len(name) // 2 - offset
+            clear_section_body(handle, w, name, col, body_row)
+
+        elif section == 1:
+            # EXPERIENCE
+            try:
+                name = SECTIONS[section]
+            except:
+                name = "NONE"
+            col = w // 2 - len(name) // 2 - offset
+            clear_section_body(handle, w, name, col, body_row)
+
+        elif section == 2:
+            # SKILLS
+            try:
+                name = SECTIONS[section]
+            except:
+                name = "NONE"
+            col = w // 2 - len(name) // 2 - offset
+            clear_section_body(handle, w, name, col, body_row)
+
+        elif section == 3:
+            # RECENT POSTS
+            try:
+                name = SECTIONS[section]
+            except:
+                name = "NONE"
+            col = w // 2 - len(name) // 2 - offset
+            clear_section_body(handle, w, name, col, body_row)
+        elif section == 4:
+            # OPEN SOURCE
+            try:
+                name = SECTIONS[section]
+            except:
+                name = "NONE"
+            col = w // 2 - len(name) // 2 - offset
+            clear_section_body(handle, w, name, col, body_row)
+
+        else:
+            pass
+
+
+def render_about_section(handle, w, h):
+    pass
+
+async def handle_about_section(handle, w, h, current):
+    while current[0] == 0:
+        await asyncio.sleep(DELAY)
+        evt = handle.poll_latest_async();
+        if evt is None: continue
+
 
 async def handle_quit(handle, w, is_running):
     (w, _) = handle.size()
@@ -351,8 +439,10 @@ async def handle_quit(handle, w, is_running):
                 is_running[0] = False
                 break
 
+
 async def main():
     is_running = [True, ]
+    selected = [0, ]
     with Dispatcher() as dispatch:
         dispatch.switch()
         dispatch.raw()
@@ -370,47 +460,21 @@ async def main():
             section_queue = asyncio.Queue(1)
             # Initial splash screen handle:
             splash_task = asyncio.create_task(
-                handle_splash_section(l, w, h, is_running, section_queue))
+                handle_splash_section(l, w, h, is_running, selected, section_queue))
+            await splash_task
             # The below live for the lifetime of the application
+            toggle_task = asyncio.create_task(
+                handle_toggle_sections(l, w, h, is_running, section_queue))
             menu_task = asyncio.create_task(
-                handle_menu(m, is_running, section_queue))
+                handle_menu(m, is_running, selected, section_queue))
             shutdown_task = asyncio.create_task(
                 handle_quit(q, w, is_running))
-            await splash_task
 
-            # NOTE: HOW TO RUN THE PART THAT HANDLES PAGE TOGGLING??
-            # Render sections based on queue
-            while is_running[0]:
-                try:
-                    section = await section_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    await asyncio.sleep(DELAY)
-                    continue
-                except:
-                    break
-
-                if section == 0:
-                    await render_splash_section(l, w, h, is_running, section_queue)
-                elif section == 1:
-                    # ABOUT
-                    pass
-                elif section == 2:
-                    # EXPERIENCE
-                    pass
-                elif section == 3:
-                    # SKILLS
-                    pass
-                elif section == 4:
-                    # RECENT POSTS
-                    pass
-                elif section == 5:
-                    # OPEN SOURCE
-                    pass
-                else:
-                    pass
-
-            await menu_task
-            await shutdown_task
+            await asyncio.gather(
+                  toggle_task
+                , menu_task
+                , shutdown_task
+            )
 
         dispatch.disable_mouse()
         dispatch.show_cursor()
