@@ -26,7 +26,21 @@ where I: Iterator<Item = u8> {
                     }
                 }
                 Some(b'[') => parse_csi(iter),
-                Some(b'\x1B') => Keyboard(Esc),
+                // (imdaveho) NOTE: Since we are taking 12 bytes
+                // each time from /dev/tty, the iterator that results
+                // is always going to have zeroes. This causes ESC to
+                // be ignored. Unless there is a specific ANSI escape
+                // sequence that results in [\x1B, 0, ...], we can
+                // safely assume that this was indeed simply ESC that
+                // was pressed. This may also prevent other escape
+                // sequences from being gobbled up thinking that ESC
+                // was pressed: https://github.com/imdaveho/tuitty/issues/2
+                // TODO: if need be, we can make Some(b'0') as it's own
+                // variant and handle it by checking if the rest of the
+                // iterator is all zeroes.
+                // NOTE: Also Alt + num or AltCodes don't exist on Linux:
+                // https://www.linux.org/threads/alt-keys-and-linux.11517/
+                Some(b'\x1B') | Some(0) => Keyboard(Esc),
                 Some(c) => match parse_utf8_char(c, iter) {
                         Some(ch) => Keyboard(Alt(ch)),
                         None => Unsupported,
