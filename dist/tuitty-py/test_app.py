@@ -1,5 +1,8 @@
 import time
+import random
 import asyncio
+import webbrowser
+from itertools import cycle
 from tuitty.ffi import Dispatcher, InputEvent, Color, Effect, Clear
 
 
@@ -373,6 +376,12 @@ async def handle_toggle_sections(handle, w, h, is_running, section_queue):
                 name = "NONE"
             col = w // 2 - len(name) // 2 - offset
             clear_section_body(handle, w, name, col, body_row)
+            about_task = asyncio.create_task(
+                handle_about_section(handle, w, h, current))
+            animate_task = asyncio.create_task(
+                render_about_section(handle, w, h, current))
+            await animate_task
+            await about_task
 
         elif section == 1:
             # EXPERIENCE
@@ -400,6 +409,7 @@ async def handle_toggle_sections(handle, w, h, is_running, section_queue):
                 name = "NONE"
             col = w // 2 - len(name) // 2 - offset
             clear_section_body(handle, w, name, col, body_row)
+
         elif section == 4:
             # OPEN SOURCE
             try:
@@ -413,14 +423,81 @@ async def handle_toggle_sections(handle, w, h, is_running, section_queue):
             pass
 
 
-def render_about_section(handle, w, h):
-    pass
+async def render_about_section(handle, w, h, current):
+    quotes_a = ["Find the good", "Perfect is the", "Thru discipline",
+            "if knocked_down:", "Non nobis solum", "Ad astra"]
+    quotes_b = ["and believe it", "enemy of great", "comes freedom",
+        "  get_up += 1", "nati sumus", "per aspera"]
+
+    errors_a = ["404 Not Found:", "ERR04 Recursion", "[error]: cannot",
+        "[!] `undefined`", "RefErr: event", "#: Cannot find"]
+    errors_b = ["file `good.py`", "depth exceeded", "assign to field",
+        "is not an object", "is not defined", "vcvarsall.bat"]
+    
+    relaxes_a = ["Ok, keep calm", "Hmm...oh! Just", "www.reddit.com/",
+        "It works again!", "It's not a bug,", "Time to go for"]
+    relaxes_b = ["and carry on", "a typo : vs ;", "r/funnycats",
+        "...no idea why", "it's a feature!", "a coffee run!"]
+    indices = [0, 1, 2, 3 , 4, 5]
+    random.shuffle(indices)
+
+    with open("animation_loop.txt", encoding="utf-8", mode="r") as f:
+        handle.clear(Clear.CursorDown)
+        (start_col, start_row) = (0, 5)
+        (iterations, full_loops) = (0, 0)
+        (msg_ax, msg_bx) = (102, 175)
+        scenes = f.read().split('1.')
+        scene_len = len(scenes)
+        if scene_len != 263:
+            raise("Incorrect scene length.")
+        handle.goto(start_col, start_row)
+        scenes = cycle(scenes)
+        msg_id = indices.pop()
+        while current[0] == 0:
+            handle.goto(start_col, start_row)
+            handle.clear(Clear.CursorDown)
+            scene = next(scenes)
+            if (iterations % scene_len) in range(46, 73):
+                (qav, qbv) = (quotes_a[msg_id], quotes_b[msg_id])
+                (end_ax, end_bx) = (msg_ax + len(qav), msg_bx + len(qbv))
+                msg = scene[3:msg_ax] + qav + \
+                    scene[end_ax:msg_bx] + qbv + scene[end_bx:]
+            elif (iterations % scene_len) in range(74, 99):
+                (eav, ebv) = (errors_a[msg_id], errors_b[msg_id])
+                (end_ax, end_bx) = (msg_ax + len(eav), msg_bx + len(ebv))
+                msg = scene[3:msg_ax] + eav + \
+                    scene[end_ax:msg_bx] + ebv + scene[end_bx:]
+            elif (iterations % scene_len) in range(120, 132):
+                (rav, rbv) = (relaxes_a[msg_id], relaxes_b[msg_id])
+                (end_ax, end_bx) = (msg_ax + len(rav), msg_bx + len(rbv))
+                msg = scene[3:msg_ax] + rav + \
+                    scene[end_ax:msg_bx] + rbv + scene[end_bx:]
+            elif iterations == scene_len:
+                iterations = 1
+                full_loops += scene_len
+                try:
+                    bubble = indices.pop()
+                except IndexError:
+                    indices.extend([0, 1, 2, 3, 4, 5])
+                    random.shuffle(indices)
+                    bubble = indices.pop()
+                time.sleep(0.1)
+                continue
+            else:
+                msg = scene[3:]
+            iterations += 1
+            handle.printf(msg)
+            time.sleep(0.1)
+        # <-- end while
+    # <-- end with open
 
 async def handle_about_section(handle, w, h, current):
     while current[0] == 0:
         await asyncio.sleep(DELAY)
-        evt = handle.poll_latest_async();
+        evt = handle.poll_latest_async()
         if evt is None: continue
+        if evt.kind() == 'g':
+            webbrowser.open_new_tab("https://github.com/imdaveho")
 
 
 async def handle_quit(handle, w, is_running):
