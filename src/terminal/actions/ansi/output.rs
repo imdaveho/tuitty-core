@@ -6,7 +6,7 @@ pub fn prints(content: &str) {
     let output = stdout();
     let lock = output.lock();
     let mut outbuf = BufWriter::new(lock);
-    outbuf.write(content.as_bytes()).expect("I/O error on write");
+    outbuf.write_all(content.as_bytes()).expect("I/O error on write");
 }
 
 pub fn flush() {
@@ -20,7 +20,7 @@ pub fn printf(content: &str) {
     let output = stdout();
     let lock = output.lock();
     let mut outbuf = BufWriter::new(lock);
-    outbuf.write(content.as_bytes()).expect("I/O error on write");
+    outbuf.write_all(content.as_bytes()).expect("I/O error on write");
     outbuf.flush().expect("I/O error on flush");
 }
 
