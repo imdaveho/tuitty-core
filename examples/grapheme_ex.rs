@@ -54,25 +54,27 @@ fn main() {
     //     thread::sleep(Duration::from_secs(1));
     // }
 
-    let compound_emojis = ["👦🏿", "👩‍🔬", "👨‍👩‍👦"];
+    let compound_emojis = ["👦🏿", "👩‍🔬", "👨‍👩‍👦", "👪", "👪🏽", "👨🏽‍👩🏽‍👧🏽"];
     let zero_width_joiner = "\u{200d}";
     // let virama_modifier = "् \u{94d}";
     let basic_escapes = ["\t", "\0", "\n", "\r", "\r\n"];
     let ascii_cjk_mix = "He㓘o";
     let wide_symbol = "。。。";
 
-    // Returns the character's displayed width in columns, or `None` if the
-    // character is a control character other than `'\x00'`.
-
-    let emojis = format!("{}{}{}",
+    let emojis = format!("{}{}{}{}{}{}",
                          compound_emojis[0],
                          compound_emojis[1],
-                         compound_emojis[2]);
+                         compound_emojis[2],
+                         compound_emojis[3],
+                         compound_emojis[4],
+                         compound_emojis[5]);
     let zwjs = format!("{}{}{}",
                        zero_width_joiner,
                        zero_width_joiner,
                        zero_width_joiner);
     let modified_ka = "\u{915}\u{94d}";
+    let devanagari = "क्‍ष";
+    let devanagari_manual = "\u{915}\u{94d}\u{200d}\u{937}";
     let esc_chars = format!("{}{}{}{}{}",
                             basic_escapes[0],
                             basic_escapes[1],
@@ -80,10 +82,12 @@ fn main() {
                             basic_escapes[3],
                             basic_escapes[4]);
 
-    let string = format!("{} {} {} {} {} {}",
+    let string = format!("{} {} {} {} {} {} {} {}",
                          emojis,
                          zwjs,
                          modified_ka,
+                         devanagari,
+                         devanagari_manual,
                          esc_chars,
                          ascii_cjk_mix,
                          wide_symbol);
@@ -95,6 +99,9 @@ fn main() {
         let mut chars = s.chars().peekable();
         if let Some(car) = chars.next() { match chars.peek() {
             // A single grapheme - can be ascii, cjk, or escape seq:
+            // .width() returns the character's displayed
+            // width in columns, or `None` if the character
+            // is a control character other than `'\x00'`.
             None => match car.width() {
                 // Ascii or CJK
                 Some(w) => match w {
@@ -125,24 +132,34 @@ fn main() {
                             // Continue iterating through grapheme cluster:
                             content.push(next);
                             width += next.width().unwrap_or(0);
+                            let fitzpatrick = [
+                                '\u{1f3fb}',
+                                '\u{1f3fc}',
+                                '\u{1f3fd}',
+                                '\u{1f3fe}',
+                                '\u{1f3ff}'];
+                            if fitzpatrick.contains(content.last().unwrap()) {
+                                println!("FITZ");
+                            }
                         } else {
                             // End of grapheme - check if there is a joiner:
-                            if let Some(c) = content.last() { match c {
+                            match content.last().unwrap() {
                                 '\u{200d}' => if let Some(s) = graphemes
                                     .next() {
                                         chars = s.chars().peekable();
                                         continue;
                                     },
                                 _ => break,
-                            }}
+                            }
                         }
                     }
+
                     let zwj_enabled = false;
                     if zwj_enabled {
-                        println!("Content::Complex({:?}", content);
+                        println!("Content::Complex({:?} | width: 2", content);
                         println!("Content::Link(L: -1, R: +1)");
                     } else {
-                        println!("Content::Complex({:?})", content);
+                        println!("Content::Complex({:?}) | width: {}", content, width);
                         for i in 0..width {
                             println!("Content::Link(L: -{}, R: {})",
                                      i + 1, width - i);
@@ -151,53 +168,6 @@ fn main() {
                 }
             }
         }}
-        // let f = chars.next().unwrap_or('\0');
-        // if f == '\0' {
-        //     println!("Content::NULL");
-        //     continue;
-        // }
-        // match chars.peek() {
-        //     Some(t) => {
-        //         match (f, t) {
-        //             ('\r', '\n') => println!("Content::CRLF"),
-        //             _ => {
-        //                 // Complex Unicode
-        //                 let mut content = vec![f];
-        //                 loop {
-        //                     content.extend(chars.collect::<Vec<char>>());
-        //                     if content[content.len() - 1] == '\u{200d}' {
-        //                         match graphemes.next() {
-        //                             Some(s) => {
-        //                                 chars = s.chars().peekable();
-        //                                 continue;
-        //                             },
-        //                             None => break,
-        //                         }
-        //                     } else { break; }
-        //                 }
-        //                 println!("Content::Complex({:?})", content);
-        //             }
-        //         }
-        //     },
-        //     None => match s.width() {
-        //         1 => {
-        //             // if space --> blank
-        //             match f {
-        //                 ' ' => println!("Content::SPC"),
-        //                 _ => println!("Content::Single({})", f)
-        //             }
-        //         },
-        //         2 => println!("Content::Double({})", f),
-        //         _ => {
-        //             match f {
-        //                 '\t' => println!("Content::Tab"),
-        //                 '\n' => println!("Content::LF"),
-        //                 '\r' => println!("Content::CR"),
-        //                 _ => println!("Content::Unknown({:?})", f)
-        //             }
-        //         }
-        //     }
-        // }
     }
-    println!("output: \"{:?}\"", string);
+    println!("output: \"{}\"", string);
 }
