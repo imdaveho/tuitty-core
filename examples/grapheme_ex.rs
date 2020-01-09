@@ -1,14 +1,14 @@
 extern crate tuitty;
+use tuitty::common::unicode::wcwidth::UnicodeWidthChar;
 use tuitty::common::unicode::grapheme::UnicodeGraphemes;
-use tuitty::common::unicode::wcwidth::UnicodeWidthStr;
 
-use std::{ thread, time::Duration };
+// use std::{ thread, time::Duration };
 
-#[cfg(unix)]
-use tuitty::terminal::actions::posix;
+// #[cfg(unix)]
+// use tuitty::terminal::actions::posix;
 
-#[cfg(windows)]
-use tuitty::terminal::actions::win32;
+// #[cfg(windows)]
+// use tuitty::terminal::actions::win32;
 
 
 fn main() {
@@ -34,25 +34,170 @@ fn main() {
     //     println!("{}", n.is_ascii());
     // }
 
-    #[cfg(unix)] {
-        let initial = posix::get_mode();
+    // #[cfg(unix)] {
+    //     let initial = posix::get_mode();
 
-        posix::enable_alt();
-        posix::raw();
+    //     posix::enable_alt();
+    //     posix::raw();
 
-        posix::goto(0, 0);
-        posix::printf("He㓘o, क्‍ष");
-        posix::goto(2, 0);
-        posix::flush();
-        thread::sleep(Duration::from_secs(2));
-        posix::goto(7, 0);
-        posix::flush();
-        thread::sleep(Duration::from_secs(2));
+    //     posix::goto(0, 0);
+    //     posix::printf("He㓘o, क्‍ष");
+    //     posix::goto(2, 0);
+    //     posix::flush();
+    //     thread::sleep(Duration::from_secs(2));
+    //     posix::goto(7, 0);
+    //     posix::flush();
+    //     thread::sleep(Duration::from_secs(2));
 
-        posix::cook(&initial);
-        posix::disable_alt();
-        thread::sleep(Duration::from_secs(1));
+    //     posix::cook(&initial);
+    //     posix::disable_alt();
+    //     thread::sleep(Duration::from_secs(1));
+    // }
+
+    let compound_emojis = ["👦🏿", "👩‍🔬", "👨‍👩‍👦"];
+    let zero_width_joiner = "\u{200d}";
+    // let virama_modifier = "् \u{94d}";
+    let basic_escapes = ["\t", "\0", "\n", "\r", "\r\n"];
+    let ascii_cjk_mix = "He㓘o";
+    let wide_symbol = "。。。";
+
+    // Returns the character's displayed width in columns, or `None` if the
+    // character is a control character other than `'\x00'`.
+
+    let emojis = format!("{}{}{}",
+                         compound_emojis[0],
+                         compound_emojis[1],
+                         compound_emojis[2]);
+    let zwjs = format!("{}{}{}",
+                       zero_width_joiner,
+                       zero_width_joiner,
+                       zero_width_joiner);
+    let modified_ka = "\u{915}\u{94d}";
+    let esc_chars = format!("{}{}{}{}{}",
+                            basic_escapes[0],
+                            basic_escapes[1],
+                            basic_escapes[2],
+                            basic_escapes[3],
+                            basic_escapes[4]);
+
+    let string = format!("{} {} {} {} {} {}",
+                         emojis,
+                         zwjs,
+                         modified_ka,
+                         esc_chars,
+                         ascii_cjk_mix,
+                         wide_symbol);
+
+    let mut graphemes = UnicodeGraphemes
+        ::graphemes(string.as_str(), true);
+
+    while let Some(s) = graphemes.next() {
+        let mut chars = s.chars().peekable();
+        if let Some(car) = chars.next() { match chars.peek() {
+            // A single grapheme - can be ascii, cjk, or escape seq:
+            None => match car.width() {
+                // Ascii or CJK
+                Some(w) => match w {
+                    0 => continue,
+                    1 => {
+                        if car == ' ' { println!("Content::Blank") }
+                        else { println!("Content::Single({})", car) }
+                    },
+                    2 => println!("Content::Double({})", car),
+                    _ => println!("Content::Unsupported"),
+                },
+                // Escape character
+                None => match car {
+                    '\t' => println!("Content::Tab"),
+                    '\n' => println!("Content::LF"),
+                    '\r' => println!("Content::CR"),
+                    _ => unreachable!(),
+                }
+            },
+            // A complex grapheme - can be emoji, CRLF, or language:
+            Some(cadr) => match (car, cadr) {
+                ('\r', '\n') => println!("Content::CRLF"),
+                _ => {
+                    let mut width = car.width().unwrap_or(0);
+                    let mut content = vec![car];
+                    loop {
+                        if let Some(next) = chars.next() {
+                            // Continue iterating through grapheme cluster:
+                            content.push(next);
+                            width += next.width().unwrap_or(0);
+                        } else {
+                            // End of grapheme - check if there is a joiner:
+                            if let Some(c) = content.last() { match c {
+                                '\u{200d}' => if let Some(s) = graphemes
+                                    .next() {
+                                        chars = s.chars().peekable();
+                                        continue;
+                                    },
+                                _ => break,
+                            }}
+                        }
+                    }
+                    let zwj_enabled = false;
+                    if zwj_enabled {
+                        println!("Content::Complex({:?}", content);
+                        println!("Content::Link(L: -1, R: +1)");
+                    } else {
+                        println!("Content::Complex({:?})", content);
+                        for i in 0..width {
+                            println!("Content::Link(L: -{}, R: {})",
+                                     i + 1, width - i);
+                        }
+                    }
+                }
+            }
+        }}
+        // let f = chars.next().unwrap_or('\0');
+        // if f == '\0' {
+        //     println!("Content::NULL");
+        //     continue;
+        // }
+        // match chars.peek() {
+        //     Some(t) => {
+        //         match (f, t) {
+        //             ('\r', '\n') => println!("Content::CRLF"),
+        //             _ => {
+        //                 // Complex Unicode
+        //                 let mut content = vec![f];
+        //                 loop {
+        //                     content.extend(chars.collect::<Vec<char>>());
+        //                     if content[content.len() - 1] == '\u{200d}' {
+        //                         match graphemes.next() {
+        //                             Some(s) => {
+        //                                 chars = s.chars().peekable();
+        //                                 continue;
+        //                             },
+        //                             None => break,
+        //                         }
+        //                     } else { break; }
+        //                 }
+        //                 println!("Content::Complex({:?})", content);
+        //             }
+        //         }
+        //     },
+        //     None => match s.width() {
+        //         1 => {
+        //             // if space --> blank
+        //             match f {
+        //                 ' ' => println!("Content::SPC"),
+        //                 _ => println!("Content::Single({})", f)
+        //             }
+        //         },
+        //         2 => println!("Content::Double({})", f),
+        //         _ => {
+        //             match f {
+        //                 '\t' => println!("Content::Tab"),
+        //                 '\n' => println!("Content::LF"),
+        //                 '\r' => println!("Content::CR"),
+        //                 _ => println!("Content::Unknown({:?})", f)
+        //             }
+        //         }
+        //     }
+        // }
     }
-
-
+    println!("output: \"{:?}\"", string);
 }
