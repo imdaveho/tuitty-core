@@ -12,54 +12,12 @@ use tuitty::common::unicode::grapheme::UnicodeGraphemes;
 
 
 fn main() {
-    // let c = "क्‍ष 👪 👨👩‍👧‍👦 🤦♀";
-    // println!("{}", c.width());
-    // let clusters = c.graphemes(true).collect::<Vec<&str>>();
-    // for c in clusters {
-    //     println!("{:?}: {:?}", c, c.width());
-    // }
-    // let c = 'क';
-    // let d = '्';
-    // let e = 'ष';
-
-    // println!("h{}{}{}h", c, d, e);
-
-    // let fp = "|🤦‍♀️|";
-    // println!("{}", fp);
-
-    // let content = "\x1B\t\r\n";
-    // let clusters = content.graphemes(true).collect::<Vec<&str>>();
-    // println!("{:?}", clusters);
-    // for n in clusters {
-    //     println!("{}", n.is_ascii());
-    // }
-
-    // #[cfg(unix)] {
-    //     let initial = posix::get_mode();
-
-    //     posix::enable_alt();
-    //     posix::raw();
-
-    //     posix::goto(0, 0);
-    //     posix::printf("He㓘o, क्‍ष");
-    //     posix::goto(2, 0);
-    //     posix::flush();
-    //     thread::sleep(Duration::from_secs(2));
-    //     posix::goto(7, 0);
-    //     posix::flush();
-    //     thread::sleep(Duration::from_secs(2));
-
-    //     posix::cook(&initial);
-    //     posix::disable_alt();
-    //     thread::sleep(Duration::from_secs(1));
-    // }
-
     let compound_emojis = ["👦🏿", "👩‍🔬", "👨‍👩‍👦", "👪", "👪🏽", "👨🏽‍👩🏽‍👧🏽"];
     let zero_width_joiner = "\u{200d}";
     // let virama_modifier = "् \u{94d}";
-    let basic_escapes = ["\t", "\0", "\n", "\r", "\r\n"];
+    let basic_escapes = ["\t", "\0", "\x1b]34m", "\n", "\r", "\r\n"];
     let ascii_cjk_mix = "He㓘o";
-    let wide_symbol = "。。。";
+    let wide_symbol = "。。。👪";
 
     let emojis = format!("{}{}{}{}{}{}",
                          compound_emojis[0],
@@ -75,12 +33,13 @@ fn main() {
     let modified_ka = "\u{915}\u{94d}";
     let devanagari = "क्‍ष";
     let devanagari_manual = "\u{915}\u{94d}\u{200d}\u{937}";
-    let esc_chars = format!("{}{}{}{}{}",
+    let esc_chars = format!("{}{}{}{}{}{}",
                             basic_escapes[0],
                             basic_escapes[1],
                             basic_escapes[2],
                             basic_escapes[3],
-                            basic_escapes[4]);
+                            basic_escapes[4],
+                            basic_escapes[5]);
 
     let string = format!("{} {} {} {} {} {} {} {}",
                          emojis,
@@ -105,7 +64,7 @@ fn main() {
             None => match car.width() {
                 // Ascii or CJK
                 Some(w) => match w {
-                    0 => continue,
+                    0 => println!("Content::Zero({:?})", car),
                     1 => {
                         if car == ' ' { println!("Content::Blank") }
                         else { println!("Content::Single({})", car) }
@@ -118,7 +77,7 @@ fn main() {
                     '\t' => println!("Content::Tab"),
                     '\n' => println!("Content::LF"),
                     '\r' => println!("Content::CR"),
-                    _ => unreachable!(),
+                    _ => println!("Content::Esc({:?})", car),
                 }
             },
             // A complex grapheme - can be emoji, CRLF, or language:

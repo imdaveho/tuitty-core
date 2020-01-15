@@ -686,7 +686,7 @@ impl Dispatcher {
     pub fn listen(&mut self) -> EventHandle {
         // Do not duplicate threads.
         // If input handle exists don't do anything.
-        if let Some(_) = self.input_handle { return self.spawn() }
+        if self.input_handle.is_some() { return self.spawn() }
 
         // Setup input channel and Arc's to move to thread.
         let is_running = self.is_running.clone();
