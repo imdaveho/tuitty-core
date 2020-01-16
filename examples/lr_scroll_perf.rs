@@ -117,9 +117,11 @@ fn main() {
     thread::sleep(Duration::from_millis(1000));
     printf(&goto(80, 0));
     thread::sleep(Duration::from_millis(1000));
+    printf("\x1b[4h");
+    printf("a\ta");
     // printf("whale!Go US");
     // printf("\x1B[2P");
-    // printf("\x1B[4l");
+    printf("\x1B[4l");
     thread::sleep(Duration::from_millis(2000));
 
 
