@@ -43,14 +43,15 @@ pub struct Buffer {
     index: usize,
     cells: Vec<Cell>,
     strbuf: String,
-    #[cfg(windows)]
-    conbuf: Vec<CHAR_INFO>,
     width: i16,
     height: i16,
     style: (Color, Color, u32),
     tabwidth: usize,
     savedpos: usize,
+    #[cfg(windows)]
     use_winapi: bool,
+    #[cfg(windows)]
+    conbuf: Vec<CHAR_INFO>,
     wchar_mode: Option<bool>,
 }
 
@@ -73,24 +74,26 @@ impl Buffer {
         // Some(true): Full support
         //    eg. compound family takes 2 cells
         //    eg. compound with fitzpatrick takes 2 cells
+        #[cfg(windows)]
+        let use_winapi = !win32::is_ansi_enabled();
 
         Self {
             index: 0,
             cells: vec![Cell::NIL; capacity],
             strbuf: String::with_capacity(capacity),
-            #[cfg(windows)]
-            conbuf: vec![zeroed(); capacity],
             width,
             height,
             style: (Reset, Reset, Effect::Reset as u32),
             tabwidth: 4,
             savedpos: 0,
-            use_winapi: false,
+            #[cfg(windows)]
+            use_winapi,
+            #[cfg(windows)]
+            conbuf: vec![zeroed(); capacity],
             wchar_mode: None,
         }
     }
 
-    pub fn winapi(&mut self) { self.use_winapi = true }
     pub fn tabsize(&mut self, n: usize) { self.tabwidth = n }
 
     pub fn size(&self) -> (i16, i16) { (self.width, self.height) }
@@ -125,7 +128,7 @@ impl Buffer {
                     (row * w) as usize,
                     ((row + 1) * w) as usize );
                 for i in start..stop { self.cells[i] = Cell::NIL }
-                self.reindex(self.index((0, row)));
+                self.goto_coord(0, row);
             }
             Clear::CursorUp => {
                 let index = self.cursor();
@@ -148,11 +151,6 @@ impl Buffer {
 
     // pub fn savedpos(&self) -> usize { self.savedpos }
     pub fn markpos(&mut self, i: usize) { self.savedpos = i }
-    pub fn gotomark(&mut self) {
-        let index = self.cursor();
-        self.reindex(self.savedpos);
-        self.savedpos = index;
-    }
 
     pub fn style(&mut self, s: (Color, Color, u32)) { self.style = s }
     pub fn style_fg(&mut self, c: Color) { self.style.0 = c }
@@ -191,61 +189,61 @@ impl Buffer {
         ((row * self.width) + new_stop) as usize
     }
 
-    // Returns the index shifted left a col.
-    // Does NOT update internal index.
-    pub fn index_left(&self, index: usize, n: i16) -> usize {
-        if n < 0 { return self.index_right(index, n.abs()) }
-        let (col, row) = self.coord(index);
-        let mincol = 0;
-        let newcol = col - n;
-        if newcol <= mincol {
-            self.index((mincol, row))
-        } else {
-            self.index((newcol, row))
-        }
-    }
+    // // Returns the index shifted left a col.
+    // // Does NOT update internal index.
+    // pub fn index_left(&self, index: usize, n: i16) -> usize {
+    //     if n < 0 { return self.index_right(index, n.abs()) }
+    //     let (col, row) = self.coord(index);
+    //     let mincol = 0;
+    //     let newcol = col - n;
+    //     if newcol <= mincol {
+    //         self.index((mincol, row))
+    //     } else {
+    //         self.index((newcol, row))
+    //     }
+    // }
 
-    // Returns the index shifted right a col.
-    // Does NOT update internal index.
-    pub fn index_right(&self, index: usize, n: i16) -> usize {
-        if n < 0 { return self.index_left(index, n.abs()) }
-        let (col, row) = self.coord(index);
-        let maxcol = self.width - 1;
-        let newcol = col + n;
-        if newcol >= maxcol {
-            self.index((maxcol, row))
-        } else {
-            self.index((newcol, row))
-        }
-    }
+    // // Returns the index shifted right a col.
+    // // Does NOT update internal index.
+    // pub fn index_right(&self, index: usize, n: i16) -> usize {
+    //     if n < 0 { return self.index_left(index, n.abs()) }
+    //     let (col, row) = self.coord(index);
+    //     let maxcol = self.width - 1;
+    //     let newcol = col + n;
+    //     if newcol >= maxcol {
+    //         self.index((maxcol, row))
+    //     } else {
+    //         self.index((newcol, row))
+    //     }
+    // }
 
-    // Returns the index shifted up a row.
-    // Does NOT update internal index.
-    pub fn index_up(&self, index:usize, n: i16) -> usize {
-        if n < 0 { return self.index_down(index, n.abs()) }
-        let (col, row) = self.coord(index);
-        let minrow = 0;
-        let newrow = row - n;
-        if newrow <= minrow {
-            self.index((col, minrow))
-        } else {
-            self.index((col, newrow))
-        }
-    }
+    // // Returns the index shifted up a row.
+    // // Does NOT update internal index.
+    // pub fn index_up(&self, index:usize, n: i16) -> usize {
+    //     if n < 0 { return self.index_down(index, n.abs()) }
+    //     let (col, row) = self.coord(index);
+    //     let minrow = 0;
+    //     let newrow = row - n;
+    //     if newrow <= minrow {
+    //         self.index((col, minrow))
+    //     } else {
+    //         self.index((col, newrow))
+    //     }
+    // }
 
-    // Returns the index shifted down a row.
-    // Does NOT update internal index.
-    pub fn index_down(&self, index: usize, n: i16) -> usize {
-        if n < 0 { return self.index_up(index, n.abs()) }
-        let (col, row) = self.coord(index);
-        let maxrow = self.height - 1;
-        let newrow = row + n;
-        if newrow >= maxrow {
-            self.index((col, maxrow))
-        } else {
-            self.index((col, newrow))
-        }
-    }
+    // // Returns the index shifted down a row.
+    // // Does NOT update internal index.
+    // pub fn index_down(&self, index: usize, n: i16) -> usize {
+    //     if n < 0 { return self.index_up(index, n.abs()) }
+    //     let (col, row) = self.coord(index);
+    //     let maxrow = self.height - 1;
+    //     let newrow = row + n;
+    //     if newrow >= maxrow {
+    //         self.index((col, maxrow))
+    //     } else {
+    //         self.index((col, newrow))
+    //     }
+    // }
 
     // Returns a valid index after bounds checking. Always
     // provides an index at the beginning of a Cell (no Linkers).
@@ -291,30 +289,33 @@ impl Buffer {
         self.index
     }
 
-    // Update the index and returns the valid index.
-    pub fn reindex(&mut self, index: usize) -> usize {
+    pub fn goto_index(&mut self, index: usize) -> usize {
         self.index = index;
         self.cursor()
     }
 
+    pub fn goto_coord(&mut self, col: i16, row: i16) -> usize {
+        self.index = self.index((col, row));
+        self.cursor()
+    }
+
+    pub fn goto_mark(&mut self) {
+        let index = self.cursor();
+        self.goto_index(self.savedpos);
+        self.savedpos = index;
+    }
 
 
     // TODO: WINDOWS vs ANSI.
 
     fn patch(&mut self, cell: Cell, index: usize, cutoff: usize) -> bool {
         // TODO: WINDOWS
-        if self.use_winapi { return false }
+        // if self.use_winapi { return false }
 
         let mut reset_cutoff = false;
         let that = &self.cells[index];
         // Handles only different cells.
         if &cell != that {
-
-            // NOTE: Style would already be handled
-            // since self.style and the corresponding
-            // ansi string would be set upon calling
-            // `set_fg/bg/fx/styles`.
-           
             // Handle output contents.
             // Check consecutive unchanged Cells.
             if cutoff > 8 {
@@ -355,13 +356,13 @@ impl Buffer {
                         self.cells[index + i] = Cell::NIL;
                     }
                 },
-                // Linker almost should be impossible to reach
-                // beacuse either (A) the call to `self.cursor`
-                // should place you at a top level Cell or (B)
-                // the prior iterations would have replaced Linkers
-                // with NILs. However, the case (C) is if there
-                // was an escape character (`\t`, `\n`, `\r`, etc)
-                // that caused the index to hit a Linker.
+                // Linker almost should be rare to reach because
+                // either (A) the call to `self.cursor` should
+                // place you at a top level Cell or (B) the prior
+                // iterations would have replaced Linkers with
+                // NILs. However, the case (C) is if there was an
+                // escape character (`\t`, `\n`, `\r`, etc) that
+                // caused the index to hit a Linker.
                 Cell::Linker(lhs, rhs) => {
                     // Removes Linkers to the left including the
                     // main Cell, but not the Cell at the index.
@@ -406,7 +407,8 @@ impl Buffer {
         let mut cutoff: usize = 0;
         // Index of the last diff or strbuf trunctation.
         let mut freeze: usize = 0;
-        for grphm in UnicodeGraphemes::graphemes(s, true) {
+        let mut graphemes = UnicodeGraphemes::graphemes(s, true);
+        while let Some(grphm) = graphemes.next()  {
             let mut chars = grphm.chars().peekable();
             if let Some(car) = chars.next() { match chars.peek() {
                 // A single grapheme - can be ascii, cjk, or escape seq:
@@ -434,7 +436,12 @@ impl Buffer {
                             self.strbuf.push(car);
                             let cell = Cell::Double(car, 2, self.style);
                             let reset = self.patch(cell, index, cutoff);
-                            self.cells[index + 1] = Cell::Linker(1, 1);
+                            // self.cells[index + 1] = Cell::Linker(1, 1);
+                            // NOTE: for Linkers we don't have to consider
+                            // cutoff as it was handled previously with the
+                            // main character grapheme; patching ensures
+                            // that we handle the next Cells consistently.
+                            self.patch(Cell::Linker(1, 1), index + 1, 0);
                             index += 2;
                             if reset { cutoff = 0; freeze = index }
                         },
@@ -450,8 +457,8 @@ impl Buffer {
                             let tabbed = self.tabstop(self.coord(index));
                             let offset = tabbed - index;
                             if offset > 0 {
-                                let patch = format!("\x1B[{}C", offset);
-                                self.strbuf.push_str(&patch);
+                                self.strbuf.push_str(
+                                    &format!("\x1B[{}C", offset));
                                 // Updates to the strbuf resets the cutoff.
                                 cutoff = 0;
                                 index = tabbed;
@@ -459,30 +466,47 @@ impl Buffer {
                             }
                         },
                         '\n' => {
-                            if self.use_winapi {
+                            // TODO: Toggle between raw mode and cooked
+                            // mode treatments...for ansi
+                            // TODO: Windows simply needs to update index
+                            #[cfg(windows)] { if self.use_winapi {
+                                let row = index as i16 / self.width;
                                 // NOTE: `\n` is equal to `\r\n` this treats
                                 // them consistently...
-                                // TODO: Toggle between raw mode and cooked
-                                // mode treatments...
-                                // TODO: Windows simply needs to update index
-                                let (_, row) = self.coord(index);
                                 index = if self.height > row + 1 {
                                     self.index((0, row + 1))
                                 } else {
                                     self.index((0, self.height - 1))
                                 };
                             } else {
+                                let (col, row) = self.coord(index);
                                 self.strbuf.push_str(&String::from("\x1B[B"));
                                 // Updates to the strbuf resets the cutoff.
                                 cutoff = 0;
-                                index = self.index_down(index, 1);
+                                // index = self.index_down(index, 1);
+                                index = if self.height > row + 1 {
+                                    self.index((col, row + 1))
+                                } else {
+                                    self.index((col, self.height - 1))
+                                };
                                 freeze = index;
+                            };}
+
+                            let (col, row) = self.coord(index);
+                            self.strbuf.push_str(&String::from("\x1B[B"));
+                            // Updates to the strbuf resets the cutoff.
+                            cutoff = 0;
+                            // index = self.index_down(index, 1);
+                            index = if self.height > row + 1 {
+                                self.index((col, row + 1))
+                            } else {
+                                self.index((col, self.height - 1))
                             };
+                            freeze = index;
                         },
                         '\r' => {
                             let (col, row) = self.coord(index);
-                            let patch = format!("\x1B[{}D", col);
-                            self.strbuf.push_str(&patch);
+                            self.strbuf.push_str(&format!("\x1B[{}D", col));
                             // Updates to the strbuf resets the cutoff.
                             cutoff = 0;
                             index = self.index((0, row));
@@ -499,7 +523,62 @@ impl Buffer {
                         _ => continue,
                     }
                 },
-                Some(cadr) => (),
+                Some(cadr) => match (car, cadr) {
+                    ('\r', '\n') => {
+                        let row = index as i16 / self.width;
+                        // Updates to the strbuf resets the cutoff.
+                        cutoff = 0;
+                        if self.height > row + 1 {
+                            self.strbuf.push_str(
+                                &format!("\x1B[0;{}H", row + 1));
+                            index = self.index((0, row + 1));
+                        } else {
+                            self.strbuf.push_str(
+                                &format!("\x1B[0;{}H", self.height - 1));
+                            index = self.index((0, self.height - 1));
+                        }
+                        freeze = index;
+                    },
+                    _ => {
+                        // let fitzpatrick = ['\u{1f3fb}', '\u{1f3fc}',
+                        //                    '\u{1f3fd}', '\u{1f3fe}',
+                        //                    '\u{1f3ff}'];
+                        cutoff += std::mem::size_of_val(grphm);
+                        let mut width = car.width().unwrap_or(0);
+                        let mut content = vec![car];
+                        // Gather all characters into content.
+                        loop {
+                            if let Some(next) = chars.next() {
+                                // Continue iterating through the grapheme.
+                                content.push(next);
+                                width += next.width().unwrap_or(0);
+                            } else {
+                                // End of grapheme - check if there is a joiner:
+                                match content.last().unwrap() {
+                                    '\u{200d}' => {
+                                        if let Some(grphm) = graphemes.next() {
+                                            cutoff += std::mem
+                                                ::size_of_val(grphm);
+                                            chars = grphm.chars().peekable();
+                                            continue;
+                                        }
+                                    },
+                                    _ => break,
+                                }
+                            }
+                        }
+                        // Apply updates as with Singles and Doubles.
+                        for c in &content { self.strbuf.push(*c) }
+                        let cell = Cell::Vector(content, width, self.style);
+                        let reset = self.patch(cell, index, cutoff);
+                        for i in 1..width {
+                            let link = Cell::Linker(i, width - i);
+                            self.patch(link, index + i, 0);
+                        }
+                        index += width;
+                        if reset { cutoff = 0; freeze = index }
+                    }
+                }
             }}
         }
         // Truncate remaining cutoff, if any, from output string.
@@ -509,14 +588,8 @@ impl Buffer {
             index = freeze;
         }
         // Set index to the new index
-        self.reindex(index);
-    }
-
-    #[cfg(test)]
-    pub fn flush(&mut self) -> String {
-        let output = self.strbuf.to_string();
-        self.strbuf.clear();
-        output
+        self.index = index;
+        self.cursor();
     }
 
     pub fn getch(&mut self) -> String {
@@ -529,6 +602,73 @@ impl Buffer {
             Cell::Linker(..) => unreachable!()
         }
     }
+
+    #[cfg(test)]
+    #[cfg(windows)]
+    fn is_winapi(&self) -> bool { self.use_winapi }
+
+    #[cfg(test)]
+    fn flush(&mut self) -> String {
+        let output = self.strbuf.to_string();
+        self.strbuf.clear();
+        output
+    }
+}
+
+
+fn pos_raw() -> (i16, i16) {
+    use std::io::{ Write, BufRead };
+    let ln = 603;
+    // Where is the cursor?
+    // Use `ESC [ 6 n`.
+    let mut stdout = std::io::stdout();
+    let stdin = std::io::stdin();
+
+    // Write command
+    stdout.write_all(b"\x1B[6n").expect(&format!(
+        "buffer.rs [Ln: {}]: Error writing to stdout", ln + 9));
+    stdout.flush().expect(&format!(
+        "buffer.rs [Ln: {}]: Error flushing stdout", ln + 11));
+
+    stdin.lock().read_until(b'[', &mut vec![]).expect(&format!(
+        "buffer.rs [Ln {}]: Error reading stdin", ln + 14));
+
+    let mut rows = vec![];
+    stdin.lock().read_until(b';', &mut rows).expect(&format!(
+        "buffer.rs [Ln {}]: Error reading stdin", ln + 18));
+
+    let mut cols = vec![];
+    stdin.lock().read_until(b'R', &mut cols).expect(&format!(
+        "buffer.rs [Ln {}]: Error reading stdin", ln + 22));
+
+    // remove delimiter
+    rows.pop();
+    cols.pop();
+
+    let rows = rows
+        .into_iter()
+        .map(|b| (b as char))
+        .fold(String::new(), |mut acc, n| {
+            acc.push(n);
+            acc
+        })
+        .parse::<usize>()
+        .expect(&format!(
+            "buffer.rs [Ln {}]: Error parsing row position.", ln + 29
+        ));
+    let cols = cols
+        .into_iter()
+        .map(|b| (b as char))
+        .fold(String::new(), |mut acc, n| {
+            acc.push(n);
+            acc
+        })
+        .parse::<usize>()
+        .expect(&format!(
+            "buffer.rs [Ln {}]: Error parsing col position.", ln + 40
+        ));
+
+    ((cols - 1) as i16, (rows - 1) as i16)
 }
 
 
@@ -537,32 +677,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_() {
-        assert_eq!((2 + 2), 4)
-    }
-
-    #[test]
     fn test_tabstop() {
         let mut buf = Buffer::new();
-        let index = buf.reindex(buf.index((15, 0)));
+        buf.goto_coord(15, 0);
         let tabbed = buf.tabstop((15, 0));
-        let offset = tabbed - index;
         assert_eq!(tabbed, 16);
-        buf.reindex(tabbed);
+        buf.goto_index(tabbed);
         assert_eq!(buf.cursor(), 16);
     }
 
     #[test]
     fn test_ascii_buffer_simple() {
-        // NOTE: ANSI
         let mut buf = Buffer::new();
+        // NOTE: this test is only for ANSI supported terminals.
+        #[cfg(windows)] { if buf.is_winapi() { return } }
+
         let original_input = "Hello, world!";
         buf.parse(original_input);
-        buf.flush(); // probably want to write the output to stdout asap;
-        // NOTE: don't want the stfbuf getting wonky from multiple write ops.
+        buf.flush();
+        // TODO: probably want to write the output to stdout asap;
+        // TODO: don't want the stfbuf getting wonky from multiple write ops.
 
         let modified_input = "Bella, whale!";
-        buf.reindex(buf.index((0, 0)));
+        buf.goto_coord(0, 0);
         buf.parse(modified_input);
         let output = buf.flush();
         assert_eq!(String::from("Bella, whale"), output);
@@ -570,36 +707,98 @@ mod tests {
         assert_eq!("!", &buf.getch());
 
         // Mimick goto:
-        buf.reindex(buf.index((5, 0)));
+        buf.goto_coord(5, 0);
         assert_eq!(",", &buf.getch());
 
         let consecutive_input = "Hella, wharf!";
-        buf.reindex(buf.index((0, 0)));
+        buf.goto_coord(0, 0);
         buf.parse(consecutive_input);
         let output = buf.flush();
         assert_eq!(String::from("H\x1B[0;10Hrf"), output);
     }
 
     #[test]
-    fn test_ascii_buffer_complex() {
-        // NOTE: ANSI
+    fn test_cjk_buffer() {
         let mut buf = Buffer::new();
+        // NOTE: this test is only for ANSI supported terminals.
+        #[cfg(windows)] { if buf.is_winapi() { return } }
+
+        let original_input = "... Hello, 中易隶书, world!";
+        buf.parse(original_input);
+        buf.flush();
+        buf.goto_coord(12, 0);
+        assert_eq!("中", buf.getch());
+        // 12 is not a valid index.
+        assert_ne!(buf.cursor(), 12);
+        assert_eq!(buf.cursor(), 11);
+        let index = buf.cursor() as i16;
+        // 13 is valid here for the next character `易`.
+        // buf.goto_index(buf.index_right(index, 2));
+        buf.goto_coord(index + 2, 0);
+        assert_eq!(buf.cursor(), 13);
+        assert_eq!("易", buf.getch());
+
+        let tabbed_input = "\tx";
+        buf.parse(tabbed_input);
+        let output = buf.flush();
+        assert_eq!("\x1B[3Cx", output);
+        buf.goto_coord(15, 0);
+        assert_eq!(" ", &buf.getch());
+        buf.goto_coord(16, 0);
+        assert_eq!("x", &buf.getch());
+
+        let modified_input = "o,  中易隶书, wrld!";
+        buf.goto_coord(8, 0);
+        buf.parse(modified_input);
+        let output = buf.flush();
+        assert_eq!(String::from("o,  中易隶书, w"), output);
+        assert_eq!(buf.cursor(), 23);
+        assert_eq!("r", &buf.getch());
+
+        // The character should not be at (11, 0)
+        buf.goto_coord(11, 0);
+        assert_ne!("中", &buf.getch());
+        let index = buf.cursor() as i16;
+        // Indeed 11 is a valid "NIL" character.
+        assert_eq!(index, 11);
+        assert_eq!(" ", &buf.getch());
+
+        // The "中" character has moved one to the right.
+        buf.goto_coord(index + 1, 0);
+        assert_eq!("中", &buf.getch());
+        // 12 is a valid index now.
+        assert_eq!(buf.cursor(), 12);
+        // 13 no longer is for `易`.
+        buf.goto_coord(13, 0);
+        assert_eq!("中", &buf.getch());
+        assert_eq!(buf.cursor(), 12);
+        // // The character `易` is now at index 14.
+        buf.goto_coord(14, 0);
+        assert_eq!("易", buf.getch());
+    }
+
+    #[test]
+    fn test_ascii_buffer_complex() {
+        let mut buf = Buffer::new();
+        // NOTE: this test is only for ANSI supported terminals.
+        #[cfg(windows)] { if buf.is_winapi() { return } }
+
         let original_input = "Hello, world!\n\nH23\towdy, neighbor!";
         buf.parse(original_input);
         buf.flush();
-        // // Mimick goto:
-        buf.reindex(buf.index((12, 0)));
+        // Mimick goto:
+        buf.goto_coord(12, 0);
         assert_eq!("!", &buf.getch());
-        buf.reindex(buf.index((13, 2)));
+        buf.goto_coord(13, 2);
         assert_eq!("H", &buf.getch());
-        buf.reindex(buf.index((14, 2)));
+        buf.goto_coord(14, 2);
         assert_eq!("2", &buf.getch());
-        buf.reindex(buf.index((15, 2)));
+        buf.goto_coord(15, 2);
         assert_eq!("3", &buf.getch());
-        buf.reindex(buf.index((20, 2)));
+        buf.goto_coord(20, 2);
         assert_eq!("o", &buf.getch());
 
-        buf.reindex(buf.index((13, 2)));
+        buf.goto_coord(13, 2);
         let modified_input = "B23\tella, nutrition!";
         buf.parse(modified_input);
         let output = buf.flush();
@@ -607,14 +806,16 @@ mod tests {
         // tabstop would be 20 or 4 cells away.
         assert_eq!(String::from("B23\x1B[4Cella, nutrition!"), output);
 
-        buf.reindex(buf.index((26, 2)));
+        buf.goto_coord(26, 2);
         assert_eq!("n", &buf.getch());
 
-        buf.reindex(buf.index((13, 2)));
+        buf.goto_coord(13, 2);
         let repeated_input = "B23\tella, natrition!";
         buf.parse(repeated_input);
         let output = buf.flush();
-        assert_ne!(String::from("B23\x1B[4Cella, nutrition!"), output);
+        // NOTE: Even though the only changed letter is `a` from `nutrition`
+        // the parser is smart enough to trim the excess unchanged letters.
+        assert_ne!(String::from("B23\x1B[4Cella, natrition!"), output);
         assert_eq!(String::from("B23\x1B[4Cella, na"), output);
     }
 }

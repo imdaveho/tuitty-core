@@ -12,20 +12,26 @@ use tuitty::common::unicode::grapheme::UnicodeGraphemes;
 
 
 fn main() {
-    let compound_emojis = ["👦🏿", "👩‍🔬", "👨‍👩‍👦", "👪", "👪🏽", "👨🏽‍👩🏽‍👧🏽"];
+    let compound_emojis = ["👦🏿", "👩‍🔬", "👨‍👩‍👦", "👪", "👪🏽", "👨🏽‍👩🏽‍👧🏽",
+                           "👨‍🦰", "🧗🏾‍♂\u{fe0f}", "🧗🏾‍♀\u{fe0f}",
+                           "🕵🏼‍♀\u{fe0f}"];
     let zero_width_joiner = "\u{200d}";
     // let virama_modifier = "् \u{94d}";
     let basic_escapes = ["\t", "\0", "\x1b]34m", "\n", "\r", "\r\n"];
-    let ascii_cjk_mix = "He㓘o";
+    let ascii_cjk_mix = "He㓘o, \u{2764}\u{fe0e}";
     let wide_symbol = "。。。👪";
 
-    let emojis = format!("{}{}{}{}{}{}",
+    let emojis = format!("{}{}{}{}{}{}{}{}{}{}",
                          compound_emojis[0],
                          compound_emojis[1],
                          compound_emojis[2],
                          compound_emojis[3],
                          compound_emojis[4],
-                         compound_emojis[5]);
+                         compound_emojis[5],
+                         compound_emojis[6],
+                         compound_emojis[7],
+                         compound_emojis[8],
+                         compound_emojis[9]);
     let zwjs = format!("{}{}{}",
                        zero_width_joiner,
                        zero_width_joiner,
@@ -41,9 +47,10 @@ fn main() {
                             basic_escapes[4],
                             basic_escapes[5]);
 
-    let string = format!("{} {} {} {} {} {} {} {}",
+    // let string = format!("{} {} {} {} {} {} {} {}",
+    let string = format!("{} {} {} {} {} {} {}",
                          emojis,
-                         zwjs,
+                         // zwjs,
                          modified_ka,
                          devanagari,
                          devanagari_manual,
@@ -52,8 +59,20 @@ fn main() {
                          wide_symbol);
 
     let mut graphemes = UnicodeGraphemes
-        ::graphemes(string.as_str(), true);
+        ::graphemes(string.as_str(), true).peekable();
 
+    // From: https://eng.getwisdom.io/emoji-modifiers-and-sequence-combinations/
+    let modifiers = [
+        // skin tone (light, med-l, med, med-d, dark)
+        '\u{1f3fb}', '\u{1f3fc}', '\u{1f3fd}', '\u{1f3fe}', '\u{1f3ff}',
+        // gender (male, female)
+        '\u{2640}', '\u{2642}',
+        // hair (red, curly, bald, white)
+        '\u{1f9b0}', '\u{1f9b1}', '\u{1f9b2}', '\u{1f9b3}'
+    ];
+
+    // let mut content = Vec::with_capacity(14);
+    // let mut extra_w = 0;
     while let Some(s) = graphemes.next() {
         let mut chars = s.chars().peekable();
         if let Some(car) = chars.next() { match chars.peek() {
@@ -69,7 +88,39 @@ fn main() {
                         if car == ' ' { println!("Content::Blank") }
                         else { println!("Content::Single({})", car) }
                     },
-                    2 => println!("Content::Double({})", car),
+                    2 => {
+                        match graphemes.peek() {
+                            Some(g) => {
+                                let next_first = g.chars().next().unwrap();
+                                if modifiers.contains(&next_first) {
+                                    // println!("DBL JOIN");
+                                    let mut width = 2;
+                                    let mut content = vec![car];
+                                    if let Some(s) = graphemes.next() {
+                                        chars = s.chars().peekable();
+                                        loop {
+                                            if let Some(next) = chars.next() {
+                                                content.push(next);
+                                                width += next.width().unwrap_or(0);
+                                            } else {
+                                                if let '\u{200d}' = content.last().unwrap() {
+                                                    if let Some(s) = graphemes.next() {
+                                                        chars = s.chars().peekable();
+                                                        continue;
+                                                    }
+                                                } else { break }
+                                            }
+                                        }
+                                        println!("Content::Complex({:?}) | width: {}",
+                                                 content, width);
+                                        continue;
+                                    }
+                                }
+                            },
+                            _ => (),
+                        }
+                        println!("Content::Double({})", car);
+                    },
                     _ => println!("Content::Unsupported"),
                 },
                 // Escape character
@@ -85,21 +136,17 @@ fn main() {
                 ('\r', '\n') => println!("Content::CRLF"),
                 _ => {
                     let mut width = car.width().unwrap_or(0);
+                    // let mut width = car.width().unwrap_or(0) + extra_w;
                     let mut content = vec![car];
+                    // content.push(car);
                     loop {
                         if let Some(next) = chars.next() {
                             // Continue iterating through grapheme cluster:
                             content.push(next);
                             width += next.width().unwrap_or(0);
-                            let fitzpatrick = [
-                                '\u{1f3fb}',
-                                '\u{1f3fc}',
-                                '\u{1f3fd}',
-                                '\u{1f3fe}',
-                                '\u{1f3ff}'];
-                            if fitzpatrick.contains(content.last().unwrap()) {
-                                println!("FITZ");
-                            }
+                            // if modifiers.contains(content.last().unwrap()) {
+                            //     println!("FITZ");
+                            // }
                         } else {
                             // End of grapheme - check if there is a joiner:
                             match content.last().unwrap() {
@@ -124,9 +171,11 @@ fn main() {
                                      i + 1, width - i);
                         }
                     }
+                    // content.clear();
+                    // extra_w = 0;
                 }
             }
         }}
     }
-    println!("output: \"{}\"", string);
+    println!("output: \"{:?}\"", string);
 }
