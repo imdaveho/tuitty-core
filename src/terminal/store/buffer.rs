@@ -50,8 +50,8 @@ pub struct Buffer {
     savedpos: usize,
     #[cfg(windows)]
     use_winapi: bool,
-    #[cfg(windows)]
-    conbuf: Vec<CHAR_INFO>,
+    // #[cfg(windows)]
+    // conbuf: Vec<CHAR_INFO>,
     wchar_mode: Option<bool>,
 }
 
@@ -88,8 +88,8 @@ impl Buffer {
             savedpos: 0,
             #[cfg(windows)]
             use_winapi,
-            #[cfg(windows)]
-            conbuf: vec![zeroed(); capacity],
+            // #[cfg(windows)]
+            // conbuf: vec![zeroed(); capacity],
             wchar_mode: None,
         }
     }
@@ -97,6 +97,7 @@ impl Buffer {
     pub fn tabsize(&mut self, n: usize) { self.tabwidth = n }
 
     pub fn size(&self) -> (i16, i16) { (self.width, self.height) }
+
     pub fn resize(&mut self, w: i16, h: i16) {
         self.width = w;
         self.height = h;
@@ -149,12 +150,14 @@ impl Buffer {
         }
     }
 
-    // pub fn savedpos(&self) -> usize { self.savedpos }
-    pub fn markpos(&mut self, i: usize) { self.savedpos = i }
+    pub fn mark(&mut self, i: usize) { self.savedpos = i }
 
     pub fn style(&mut self, s: (Color, Color, u32)) { self.style = s }
+
     pub fn style_fg(&mut self, c: Color) { self.style.0 = c }
+
     pub fn style_bg(&mut self, c: Color) { self.style.1 = c }
+
     pub fn style_fx(&mut self, f: u32) { self.style.2 = f }
 
     // Buffer navigation specific functions.
@@ -305,9 +308,7 @@ impl Buffer {
         self.savedpos = index;
     }
 
-
     // TODO: WINDOWS vs ANSI.
-
     fn patch(&mut self, cell: Cell, index: usize, cutoff: usize) -> bool {
         // TODO: WINDOWS
         // if self.use_winapi { return false }
@@ -399,6 +400,15 @@ impl Buffer {
     }
 
     pub fn parse(&mut self, s: &str) {
+        // https://eng.getwisdom.io/emoji-modifiers-and-sequence-combinations/
+        let mods = [
+            // skin tone (light, med-l, med, med-d, dark)
+            '\u{1f3fb}', '\u{1f3fc}', '\u{1f3fd}', '\u{1f3fe}', '\u{1f3ff}',
+            // gender (male, female)
+            '\u{2640}', '\u{2642}',
+            // hair (red, curly, bald, white)
+            '\u{1f9b0}', '\u{1f9b1}', '\u{1f9b2}', '\u{1f9b3}'
+        ];
         let mut index: usize = self.cursor();
         // Keep track of the memory size of consecutive unchanged Cells
         // to truncate or cutoff once a changed Cell or the end of the
@@ -407,7 +417,7 @@ impl Buffer {
         let mut cutoff: usize = 0;
         // Index of the last diff or strbuf trunctation.
         let mut freeze: usize = 0;
-        let mut graphemes = UnicodeGraphemes::graphemes(s, true);
+        let mut graphemes = UnicodeGraphemes::graphemes(s, true).peekable();
         while let Some(grphm) = graphemes.next()  {
             let mut chars = grphm.chars().peekable();
             if let Some(car) = chars.next() { match chars.peek() {
@@ -422,28 +432,64 @@ impl Buffer {
                         1 => {
                             cutoff += std::mem::size_of_val(grphm);
                             self.strbuf.push(car);
-                            let cell = if car == ' ' {
-                                Cell::NIL
-                            } else {
-                                Cell::Single(car, 1, self.style)
-                            };
-                            let reset = self.patch(cell, index, cutoff);
+                            let reset = self.patch(
+                                if car == ' ' { Cell::NIL }
+                                else { Cell::Single(car, 1, self.style)},
+                                index, cutoff);
                             index += 1;
                             if reset { cutoff = 0; freeze = index }
                         },
                         2 => {
-                            cutoff += std::mem::size_of_val(grphm);
-                            self.strbuf.push(car);
-                            let cell = Cell::Double(car, 2, self.style);
-                            let reset = self.patch(cell, index, cutoff);
-                            // self.cells[index + 1] = Cell::Linker(1, 1);
-                            // NOTE: for Linkers we don't have to consider
-                            // cutoff as it was handled previously with the
-                            // main character grapheme; patching ensures
-                            // that we handle the next Cells consistently.
-                            self.patch(Cell::Linker(1, 1), index + 1, 0);
-                            index += 2;
-                            if reset { cutoff = 0; freeze = index }
+                            let pk = graphemes.peek().unwrap_or(&"0");
+                            if mods.contains(&pk.chars().next().unwrap()) {
+                                let mut width = 2;
+                                let mut content = vec![car];
+                                chars = graphemes.next()
+                                                 .unwrap()
+                                                 .chars().peekable();
+
+                                loop { match chars.next() {
+                                    Some(next) => {
+                                        content.push(next);
+                                        width += next.width().unwrap_or(0);
+                                    },
+                                    None => {
+                                        if let '\u{200d}' = content.last().unwrap() {
+                                            if let Some(grphm) = graphemes.next() {
+                                                cutoff += std::mem
+                                                    ::size_of_val(grphm);
+                                                chars = grphm.chars().peekable();
+                                                continue;
+                                            } else { break }
+                                        }
+                                    }
+                                }}
+                                for c in &content { self.strbuf.push(*c) }
+                                let reset = self.patch(
+                                    Cell::Vector(content, width, self.style),
+                                    index, cutoff);
+                                for i in 1..width { self.patch(
+                                    Cell::Linker(i, width - i),
+                                    index + i, 0);
+                                }
+                                index += width;
+                                if reset { cutoff = 0; freeze = index }
+                            } else {
+                                cutoff += std::mem::size_of_val(grphm);
+                                self.strbuf.push(car);
+                                let cell = ;
+                                let reset = self.patch(
+                                    Cell::Double(car, 2, self.style),
+                                    index, cutoff);
+                                // self.cells[index + 1] = Cell::Linker(1, 1);
+                                // NOTE: for Linkers we don't have to consider
+                                // cutoff as it was handled previously with the
+                                // main character grapheme; patching ensures
+                                // that we handle the next Cells consistently.
+                                self.patch(Cell::Linker(1, 1), index + 1, 0);
+                                index += 2;
+                                if reset { cutoff = 0; freeze = index }
+                            }
                         },
                         _ => continue,
                     },
@@ -515,8 +561,9 @@ impl Buffer {
                         '\x1B' => {
                             cutoff += std::mem::size_of_val(grphm);
                             self.strbuf.push('^');
-                            let cell = Cell::Single('^', 1, self.style);
-                            let reset = self.patch(cell, index, cutoff);
+                            let reset = self.patch(
+                                Cell::Single('^', 1, self.style),
+                                index, cutoff);
                             index += 1;
                             if reset { cutoff = 0; freeze = index }
                         },
@@ -540,40 +587,35 @@ impl Buffer {
                         freeze = index;
                     },
                     _ => {
-                        // let fitzpatrick = ['\u{1f3fb}', '\u{1f3fc}',
-                        //                    '\u{1f3fd}', '\u{1f3fe}',
-                        //                    '\u{1f3ff}'];
                         cutoff += std::mem::size_of_val(grphm);
                         let mut width = car.width().unwrap_or(0);
                         let mut content = vec![car];
                         // Gather all characters into content.
-                        loop {
-                            if let Some(next) = chars.next() {
+                        loop { match chars.next() {
+                            Some(next) => {
                                 // Continue iterating through the grapheme.
                                 content.push(next);
                                 width += next.width().unwrap_or(0);
-                            } else {
+                            }
+                            None => {
                                 // End of grapheme - check if there is a joiner:
-                                match content.last().unwrap() {
-                                    '\u{200d}' => {
-                                        if let Some(grphm) = graphemes.next() {
-                                            cutoff += std::mem
-                                                ::size_of_val(grphm);
-                                            chars = grphm.chars().peekable();
-                                            continue;
-                                        }
-                                    },
-                                    _ => break,
+                                if let '\u{200d}' = content.last().unwrap() {
+                                    if let Some(grphm) = graphemes.next() {
+                                        cutoff += std::mem
+                                            ::size_of_val(grphm);
+                                        chars = grphm.chars().peekable();
+                                        continue;
+                                    } else { break }
                                 }
                             }
-                        }
-                        // Apply updates as with Singles and Doubles.
+                        }}
                         for c in &content { self.strbuf.push(*c) }
-                        let cell = Cell::Vector(content, width, self.style);
-                        let reset = self.patch(cell, index, cutoff);
-                        for i in 1..width {
-                            let link = Cell::Linker(i, width - i);
-                            self.patch(link, index + i, 0);
+                        let reset = self.patch(
+                            Cell::Vector(content, width, self.style),
+                            index, cutoff);
+                        for i in 1..width { self.patch(
+                            Cell::Linker(i, width - i),
+                            index + i, 0);
                         }
                         index += width;
                         if reset { cutoff = 0; freeze = index }
