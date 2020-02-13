@@ -33,7 +33,7 @@ use tuitty::terminal::actions::posix;
 //     outbuf.flush().expect("I/O error on flush");
 // }
 
-#[cfg(not(windows))]
+#[cfg(unix)]
 fn pos_raw() -> (i16, i16) {
     use std::io::{ Write, BufRead };
     let ln = 603;
@@ -104,6 +104,7 @@ fn pos_raw() -> (i16, i16) {
 //     "\x1B[?1049l".to_string()
 // }
 
+#[cfg(unix)]
 fn main() {
     posix::enable_alt();
     let mode = posix::get_mode();
@@ -111,8 +112,16 @@ fn main() {
 
     posix::goto(0, 0);
 
-    let string = "👨🏽‍👩🏽‍👧🏽";
-    // let string = "🧗🏽‍♀️";
+    // let string = "👨🏽‍👩🏽‍👧🏽";
+    let climber = "🧗";
+    let skintone = "🏽";
+    let gender = "♀";
+    let string = format!("{}{}\u{200d}{}\u{fe0f}",
+                         climber,
+                         skintone,
+                         gender);
+    let string = string.as_str();
+   
     posix::printf(string);
 
     thread::sleep(Duration::from_millis(1000));

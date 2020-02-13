@@ -477,7 +477,6 @@ impl Buffer {
                             } else {
                                 cutoff += std::mem::size_of_val(grphm);
                                 self.strbuf.push(car);
-                                let cell = ;
                                 let reset = self.patch(
                                     Cell::Double(car, 2, self.style),
                                     index, cutoff);
