@@ -1,6 +1,10 @@
 // This module provides an internal representation of the contents that
 // make up the terminal screen.
-use std::cmp::Ordering;
+use std::{
+    thread,
+    cmp::Ordering,
+    time::Duration,
+};
 
 use crate::common::{
     enums::{ Color::{*, self}, Effect, Style, Clear },
@@ -12,7 +16,6 @@ use crate::common::{
 
 #[cfg(unix)]
 use crate::terminal::actions::posix;
-
 #[cfg(windows)]
 use crate::terminal::actions::win32;
 
@@ -28,17 +31,6 @@ enum Cell {
 }
 
 
-// e.g. ansi
-// [ goto(x,y), print(s), goto(x, y), print(s), ..., goto(cursor) ] + flush()
-// e.g. windows (unused)
-// [ writeconsoleoutput{ rect }, writeconsoleoutput{ rect }, ... ]
-// In both cases, the cursor returns to where it needs to be after executing.
-// enum Edit {
-//     Index(usize),
-//     Content(String),
-//     // Styles(Color, Color, u32),
-// }
-
 pub struct Buffer {
     index: usize,
     cells: Vec<Cell>,
@@ -46,13 +38,11 @@ pub struct Buffer {
     width: i16,
     height: i16,
     style: (Color, Color, u32),
-    tabwidth: usize,
     savedpos: usize,
-    #[cfg(windows)]
-    use_winapi: bool,
+    tabwidth: usize,
     // #[cfg(windows)]
-    // conbuf: Vec<CHAR_INFO>,
-    wchar_mode: Option<bool>,
+    // use_winapi: bool,
+    mod_support: bool,
 }
 
 impl Buffer {
@@ -61,40 +51,40 @@ impl Buffer {
         let (width, height) = posix::size();
         #[cfg(windows)]
         let (width, height) = win32::size();
-        let capacity = (width * height) as usize;
 
-        // TODO: run config to determine how the terminal
-        // renders complex unicode.
-        // None: No joiner support
-        //    eg. compound family takes 6 cells
-        //    eg. compound with fitzpatrick takes 12 cells
-        // Some(false): No fitzpatrick support
-        //    eg. compound family takes 2 cells
-        //    eg. compound with fitzpatrick takes 4 cells
-        // Some(true): Full support
-        //    eg. compound family takes 2 cells
-        //    eg. compound with fitzpatrick takes 2 cells
-        #[cfg(windows)]
-        let use_winapi = !win32::is_ansi_enabled();
+        let capacity = (width * height) as usize;
+        // NOTE: TODO: When actions unify get use_winapi
+        // from that.
+        // #[cfg(windows)]
+        // let use_winapi = !win32::is_ansi_enabled();
 
         Self {
             index: 0,
             cells: vec![Cell::NIL; capacity],
             strbuf: String::with_capacity(capacity),
-            width,
-            height,
+            width, height,
             style: (Reset, Reset, Effect::Reset as u32),
-            tabwidth: 4,
             savedpos: 0,
-            #[cfg(windows)]
-            use_winapi,
+            tabwidth: 4,
             // #[cfg(windows)]
-            // conbuf: vec![zeroed(); capacity],
-            wchar_mode: None,
+            // use_winapi,
+            mod_support: false,
         }
     }
 
-    pub fn tabsize(&mut self, n: usize) { self.tabwidth = n }
+    pub fn check_mod(&mut self) -> i16 {
+        let test = &["🧗", "🏽", "\u{200d}", "♀", "\u{fe0f}"].concat();
+        // TODO: Replace this once actions are unified
+        posix::enable_alt();
+        let mode = posix::get_mode();
+        posix::raw();
+        posix::goto(0, 0);
+        posix::printf(test);
+        let (col, _) = pos_raw();
+        posix::cook(&mode);
+        posix::disable_alt();
+        col
+    }
 
     pub fn size(&self) -> (i16, i16) { (self.width, self.height) }
 
@@ -151,6 +141,8 @@ impl Buffer {
     }
 
     pub fn mark(&mut self, i: usize) { self.savedpos = i }
+
+    pub fn tabsize(&mut self, n: usize) { self.tabwidth = n }
 
     pub fn style(&mut self, s: (Color, Color, u32)) { self.style = s }
 
@@ -645,8 +637,13 @@ impl Buffer {
     }
 
     #[cfg(test)]
-    #[cfg(windows)]
-    fn is_winapi(&self) -> bool { self.use_winapi }
+    pub fn is_mod(&self) -> bool {
+        self.mod_support
+    }
+
+    // #[cfg(test)]
+    // #[cfg(windows)]
+    // fn is_winapi(&self) -> bool { self.use_winapi }
 
     #[cfg(test)]
     fn flush(&mut self) -> String {
@@ -858,5 +855,19 @@ mod tests {
         // the parser is smart enough to trim the excess unchanged letters.
         assert_ne!(String::from("B23\x1B[4Cella, natrition!"), output);
         assert_eq!(String::from("B23\x1B[4Cella, na"), output);
+    }
+
+    // #[test]
+    // fn test_linux_mod_support() {
+    //     let mut buf = Buffer::new();
+    //     assert_eq!(buf.is_mod(), false);
+    // }
+
+    #[test]
+    fn test_macos_mod_support() {
+        let mut buf = Buffer::new();
+        assert_eq!(buf.check_mod(), 2);
+        // buf.check_mod();
+        // assert_eq!(buf.is_mod(), true);
     }
 }

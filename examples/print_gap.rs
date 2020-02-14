@@ -113,18 +113,11 @@ fn main() {
     posix::goto(0, 0);
 
     // let string = "👨🏽‍👩🏽‍👧🏽";
-    let climber = "🧗";
-    let skintone = "🏽";
-    let gender = "♀";
-    let string = format!("{}{}\u{200d}{}\u{fe0f}",
-                         climber,
-                         skintone,
-                         gender);
-    let string = string.as_str();
+    let string = &["🧗", "🏽", "\u{200d}", "♀", "\u{fe0f}"].concat();
    
     posix::printf(string);
 
-    thread::sleep(Duration::from_millis(1000));
+    // thread::sleep(Duration::from_millis(1000));
     let (col, row) = pos_raw();
 
     posix::cook(&mode);
