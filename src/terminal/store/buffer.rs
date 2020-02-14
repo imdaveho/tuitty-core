@@ -1,10 +1,6 @@
 // This module provides an internal representation of the contents that
 // make up the terminal screen.
-use std::{
-    thread,
-    cmp::Ordering,
-    time::Duration,
-};
+use std::cmp::Ordering;
 
 use crate::common::{
     enums::{ Color::{*, self}, Effect, Style, Clear },
@@ -72,6 +68,7 @@ impl Buffer {
         }
     }
 
+    #[cfg(unix)]
     pub fn check_mod(&mut self) -> i16 {
         let test = &["🧗", "🏽", "\u{200d}", "♀", "\u{fe0f}"].concat();
         // TODO: Replace this once actions are unified
@@ -864,10 +861,15 @@ mod tests {
     // }
 
     #[test]
-    fn test_macos_mod_support() {
-        let mut buf = Buffer::new();
-        assert_eq!(buf.check_mod(), 2);
-        // buf.check_mod();
-        // assert_eq!(buf.is_mod(), true);
+    fn test_mod_support() {
+        if cfg!(target_os = "macos") {
+            let mut buf = Buffer::new();
+            assert_eq!(buf.check_mod(), 2);
+        } else if cfg!(target_os = "windows") {
+            ()
+        } else {
+            let mut buf = Buffer::new();
+            assert_eq!(buf.check_mod(), 5);
+        }
     }
 }
