@@ -1,6 +1,7 @@
 // This module provides an internal representation of the contents that
 // make up the terminal screen.
 use std::cmp::Ordering;
+use std::mem::size_of_val;
 
 use crate::common::{
     enums::{ Color::{*, self}, Effect, Style, Clear },
@@ -18,12 +19,10 @@ use crate::terminal::actions::win32;
 
 #[derive(Clone, PartialEq)]
 enum Cell {
-    Single(char, usize, (Color, Color, u32)),
-    Double(char, usize, (Color, Color, u32)),
-    Vector(Vec<char>, usize, (Color, Color, u32)),
-    // Linker is used for complex unicode values kept in a Vector. It
-    // contains index offsets to the left and right from its position.
-    Linker(usize, usize), NIL
+    Single(char, (Color, Color, u32)),
+    Double(char, (Color, Color, u32)),
+    Multi(Vec<char>, usize, (Color, Color, u32)),
+    Link, NIL
 }
 
 
@@ -33,12 +32,16 @@ pub struct Buffer {
     strbuf: String,
     width: i16,
     height: i16,
-    style: (Color, Color, u32),
-    savedpos: usize,
-    tabwidth: usize,
-    // #[cfg(windows)]
-    // use_winapi: bool,
-    mod_support: bool,
+    pub style: (Color, Color, u32),
+    pub savedpos: usize,
+    pub tabwidth: usize,
+    pub use_winapi: bool,
+    pub can_modify: bool,
+    // NOTE: We don't support emoji joiners (yet). The reason is due to
+    // there being few fonts and systems that support it well. While OSX
+    // does provide proper rendering, the cursor position gets messy. It
+    // is better to constrain to standalone emojis, but store the full
+    // contents in the Cell enum for copy/paste purposes...
 }
 
 impl Buffer {
@@ -47,12 +50,7 @@ impl Buffer {
         let (width, height) = posix::size();
         #[cfg(windows)]
         let (width, height) = win32::size();
-
         let capacity = (width * height) as usize;
-        // NOTE: TODO: When actions unify get use_winapi
-        // from that.
-        // #[cfg(windows)]
-        // let use_winapi = !win32::is_ansi_enabled();
 
         Self {
             index: 0,
@@ -62,26 +60,25 @@ impl Buffer {
             style: (Reset, Reset, Effect::Reset as u32),
             savedpos: 0,
             tabwidth: 4,
-            // #[cfg(windows)]
-            // use_winapi,
-            mod_support: false,
+            use_winapi: false,
+            can_modify: false,
         }
     }
 
-    #[cfg(unix)]
-    pub fn check_mod(&mut self) -> i16 {
-        let test = &["🧗", "🏽", "\u{200d}", "♀", "\u{fe0f}"].concat();
-        // TODO: Replace this once actions are unified
-        posix::enable_alt();
-        let mode = posix::get_mode();
-        posix::raw();
-        posix::goto(0, 0);
-        posix::printf(test);
-        let (col, _) = pos_raw();
-        posix::cook(&mode);
-        posix::disable_alt();
-        col
-    }
+    // #[cfg(unix)]
+    // pub fn check_mod(&mut self) -> i16 {
+    //     let test = &["🧗", "🏽", "\u{200d}", "♀", "\u{fe0f}"].concat();
+    //     // TODO: Replace this once actions are unified
+    //     posix::enable_alt();
+    //     let mode = posix::get_mode();
+    //     posix::raw();
+    //     posix::goto(0, 0);
+    //     posix::printf(test);
+    //     let (col, _) = pos_raw();
+    //     posix::cook(&mode);
+    //     posix::disable_alt();
+    //     col
+    // }
 
     pub fn size(&self) -> (i16, i16) { (self.width, self.height) }
 
@@ -136,18 +133,6 @@ impl Buffer {
             }
         }
     }
-
-    pub fn mark(&mut self, i: usize) { self.savedpos = i }
-
-    pub fn tabsize(&mut self, n: usize) { self.tabwidth = n }
-
-    pub fn style(&mut self, s: (Color, Color, u32)) { self.style = s }
-
-    pub fn style_fg(&mut self, c: Color) { self.style.0 = c }
-
-    pub fn style_bg(&mut self, c: Color) { self.style.1 = c }
-
-    pub fn style_fx(&mut self, f: u32) { self.style.2 = f }
 
     // Buffer navigation specific functions.
     //
@@ -241,7 +226,7 @@ impl Buffer {
     // provides an index at the beginning of a Cell (no Linkers).
     pub fn cursor(&mut self) -> usize {
         match self.cells.get(self.index) {
-            Some(Cell::Linker(offset, _)) => self.index -= offset,
+            Some(Cell::Link) => self.index -= 1,
             Some(_) => (),
             None => {
                 // Could be out-of-bounds. Fix len/cap issues.
@@ -272,9 +257,7 @@ impl Buffer {
                 // Ensure index is valid after fixing buffer len/cap issues.
                 if self.index >= capacity { self.index = capacity - 1 }
                 // Should always be a valid index after the above:
-                if let Cell::Linker(offset, _) = self.cells[self.index] {
-                    self.index -= offset;
-                }
+                if let Cell::Link = self.cells[self.index] { self.index -= 1 }
             }
         }
 
@@ -298,10 +281,10 @@ impl Buffer {
     }
 
     // TODO: WINDOWS vs ANSI.
-    fn patch(&mut self, cell: Cell, index: usize, cutoff: usize) -> bool {
+    fn patch(&mut self, cell: Cell, data: (usize, usize)) -> bool {
         // TODO: WINDOWS
         // if self.use_winapi { return false }
-
+        let (index, cutoff) = data;
         let mut reset_cutoff = false;
         let that = &self.cells[index];
         // Handles only different cells.
@@ -324,11 +307,16 @@ impl Buffer {
                 match &cell {
                     Cell::Single(ch, ..) => self.strbuf.push(*ch),
                     Cell::Double(ch, ..) => self.strbuf.push(*ch),
-                    Cell::Vector(chs,..) => for ch in chs {
-                        self.strbuf.push(*ch)
-                    },
+                    Cell::Multi(v, w, _) => if w >= 2 {
+                        let pred = |m: &char| *m == '\u{200d}';
+                        let slice = v.split(pred).next();
+                        for c in slice.unwrap_or(&[]) {
+                            self.strbuf.push(*c);
+                            if !self.can_modify { break }
+                        }
+                    } else { for c in &v { self.strbuf.push(*c) }},
                     Cell::NIL => self.strbuf.push(' '),
-                    Cell::Linker(..) => (),
+                    Cell::Link => (),
                 }
             }
             // Reset the cutoff anytime we change the index or
@@ -337,15 +325,19 @@ impl Buffer {
             // Handle internal cell buffer.
             // Replace Linkers for NIL.
             match *that {
+                Cell::NIL => (),
                 Cell::Single(..) => (),
-                Cell::Double(..) => {
-                    self.cells[index + 1] = Cell::NIL;
-                },
-                Cell::Vector(_, w, _) => {
-                    for i in 0..w {
-                        self.cells[index + i] = Cell::NIL;
-                    }
-                },
+                Cell::Link => self.cells[index - 1] = Cell::NIL,
+                _ => self.cells[index + 1] = Cell::NIL,
+                // Cell::Double(..) => {
+                //     self.cells[index + 1] = Cell::NIL;
+                // },
+                // Cell::Vector(..) => {
+                //     // for i in 0..w {
+                //     //     self.cells[index + i] = Cell::NIL;
+                //     // }
+                //     self.cells[index + 1] = Cell::NIL;
+                // },
                 // Linker almost should be rare to reach because
                 // either (A) the call to `self.cursor` should
                 // place you at a top level Cell or (B) the prior
@@ -353,33 +345,32 @@ impl Buffer {
                 // NILs. However, the case (C) is if there was an
                 // escape character (`\t`, `\n`, `\r`, etc) that
                 // caused the index to hit a Linker.
-                Cell::Linker(lhs, rhs) => {
-                    // Removes Linkers to the left including the
-                    // main Cell, but not the Cell at the index.
-                    for i in 1..=lhs {
-                        self.cells[index - i] = Cell::NIL;
-                    }
-                    // Removes Linkers to the right including the
-                    // Cell at index, but not the next main Cell.
-                    for i in 0..rhs {
-                        self.cells[index + i] = Cell::NIL;
-                    }
-                    // NOTE: for example:
-                    // a, b, c, [d, %, %], g, h
-                    //    ^         t
-                    // if ^ is the cursor and t is the tabstop
-                    // the linker @ t, will have a lhs of 1 and
-                    // a rhs of 2.
-                    // the first loop will clear the d:
-                    // i = (1..=1,) or (1) so [index - 1]
-                    // the second loop will clear the index
-                    // and the Linker next to it:
-                    // i = (0, 1,) so [index + 0] and [index + 1]
-                    // this way, when the current Cell gets swapped
-                    // with the new Cell, the wide cell will have
-                    // been cleared out.
-                },
-                Cell::NIL => (),
+                // Cell::Linker(lhs, rhs) => {
+                //     // Removes Linkers to the left including the
+                //     // main Cell, but not the Cell at the index.
+                //     for i in 1..=lhs {
+                //         self.cells[index - i] = Cell::NIL;
+                //     }
+                //     // Removes Linkers to the right including the
+                //     // Cell at index, but not the next main Cell.
+                //     for i in 0..rhs {
+                //         self.cells[index + i] = Cell::NIL;
+                //     }
+                //     // NOTE: for example:
+                //     // a, b, c, [d, %, %], g, h
+                //     //    ^         t
+                //     // if ^ is the cursor and t is the tabstop
+                //     // the linker @ t, will have a lhs of 1 and
+                //     // a rhs of 2.
+                //     // the first loop will clear the d:
+                //     // i = (1..=1,) or (1) so [index - 1]
+                //     // the second loop will clear the index
+                //     // and the Linker next to it:
+                //     // i = (0, 1,) so [index + 0] and [index + 1]
+                //     // this way, when the current Cell gets swapped
+                //     // with the new Cell, the wide cell will have
+                //     // been cleared out.
+                // },
             }
             // Swap current index with new Cell.
             self.cells[index] = cell
@@ -407,8 +398,8 @@ impl Buffer {
         // Index of the last diff or strbuf trunctation.
         let mut freeze: usize = 0;
         let mut graphemes = UnicodeGraphemes::graphemes(s, true).peekable();
-        while let Some(grphm) = graphemes.next()  {
-            let mut chars = grphm.chars().peekable();
+        while let Some(g) = graphemes.next()  {
+            let mut chars = g.chars().peekable();
             if let Some(car) = chars.next() { match chars.peek() {
                 // A single grapheme - can be ascii, cjk, or escape seq:
                 // char.width() returns the character's displayed
@@ -419,62 +410,67 @@ impl Buffer {
                     Some(w) => match w {
                         0 => continue,
                         1 => {
-                            cutoff += std::mem::size_of_val(grphm);
+                            cutoff += size_of_val(g);
                             self.strbuf.push(car);
+                            let data = (index, cutoff);
                             let reset = self.patch(
                                 if car == ' ' { Cell::NIL }
-                                else { Cell::Single(car, 1, self.style)},
-                                index, cutoff);
+                                else { Cell::Single(car, self.style) }, data);
                             index += 1;
                             if reset { cutoff = 0; freeze = index }
                         },
                         2 => {
                             let pk = graphemes.peek().unwrap_or(&"0");
-                            if mods.contains(&pk.chars().next().unwrap()) {
+                            let ch = pk.chars().next().unwrap();
+                            if mods.contains(&ch) {
+                                // Modified Double-width Cell
                                 let mut width = 2;
                                 let mut content = vec![car];
-                                chars = graphemes.next()
-                                                 .unwrap()
-                                                 .chars().peekable();
-
+                                let next = graphemes.next().unwrap();
+                                chars = next.chars().peekable();
                                 loop { match chars.next() {
                                     Some(next) => {
                                         content.push(next);
                                         width += next.width().unwrap_or(0);
                                     },
-                                    None => {
-                                        if let '\u{200d}' = content.last().unwrap() {
-                                            if let Some(grphm) = graphemes.next() {
-                                                cutoff += std::mem
-                                                    ::size_of_val(grphm);
-                                                chars = grphm.chars().peekable();
+                                    None => match content.last().unwrap() {
+                                        '\u{200d}' => match graphemes.next() {
+                                            Some(g) => {
+                                                chars = g.chars().peekable();
                                                 continue;
-                                            } else { break }
+                                            },
+                                            _ => break
                                         }
+                                        _ => break
                                     }
                                 }}
-                                for c in &content { self.strbuf.push(*c) }
-                                let reset = self.patch(
-                                    Cell::Vector(content, width, self.style),
-                                    index, cutoff);
-                                for i in 1..width { self.patch(
-                                    Cell::Linker(i, width - i),
-                                    index + i, 0);
+                                if width >= 2 {
+                                    let pred = |m: &char| *m == '\u{200d}';
+                                    let slice = content.split(pred).next();
+                                    for c in slice.unwrap_or(&[]) {
+                                        self.strbuf.push(*c);
+                                        cutoff += c.len_utf8();
+                                        if !self.can_modify { break }
+                                    }
+                                } else {
+                                    // Eg. devanagari: "क्‍\u{200d}ष";
+                                    for c in &content { self.strbuf.push(*c) }
                                 }
-                                index += width;
+
+                                let data = (index, cutoff);
+                                let reset = self.patch(
+                                    Cell::Multi(content, width, self.style), data);
+                                self.patch(Cell::Link, (index + 1, 0));
+                                index += 2;
                                 if reset { cutoff = 0; freeze = index }
                             } else {
-                                cutoff += std::mem::size_of_val(grphm);
+                                // Standard Double-width Cell
+                                cutoff += size_of_val(g);
                                 self.strbuf.push(car);
+                                let data = (index, cutoff);
                                 let reset = self.patch(
-                                    Cell::Double(car, 2, self.style),
-                                    index, cutoff);
-                                // self.cells[index + 1] = Cell::Linker(1, 1);
-                                // NOTE: for Linkers we don't have to consider
-                                // cutoff as it was handled previously with the
-                                // main character grapheme; patching ensures
-                                // that we handle the next Cells consistently.
-                                self.patch(Cell::Linker(1, 1), index + 1, 0);
+                                    Cell::Double(car, self.style), data);
+                                self.patch(Cell::Link, (index + 1, 0));
                                 index += 2;
                                 if reset { cutoff = 0; freeze = index }
                             }
@@ -547,11 +543,11 @@ impl Buffer {
                             freeze = index;
                         },
                         '\x1B' => {
-                            cutoff += std::mem::size_of_val(grphm);
+                            cutoff += size_of_val(g);
                             self.strbuf.push('^');
+                            let data = (index, cutoff);
                             let reset = self.patch(
-                                Cell::Single('^', 1, self.style),
-                                index, cutoff);
+                                Cell::Single('^', self.style), data);
                             index += 1;
                             if reset { cutoff = 0; freeze = index }
                         },
@@ -575,37 +571,48 @@ impl Buffer {
                         freeze = index;
                     },
                     _ => {
-                        cutoff += std::mem::size_of_val(grphm);
+                        // cutoff += size_of_val(g);
                         let mut width = car.width().unwrap_or(0);
                         let mut content = vec![car];
                         // Gather all characters into content.
                         loop { match chars.next() {
                             Some(next) => {
-                                // Continue iterating through the grapheme.
                                 content.push(next);
                                 width += next.width().unwrap_or(0);
-                            }
-                            None => {
-                                // End of grapheme - check if there is a joiner:
-                                if let '\u{200d}' = content.last().unwrap() {
-                                    if let Some(grphm) = graphemes.next() {
-                                        cutoff += std::mem
-                                            ::size_of_val(grphm);
-                                        chars = grphm.chars().peekable();
+                            },
+                            None => match content.last().unwrap() {
+                                '\u{200d}' => match graphemes.next() {
+                                    Some(g) => {
+                                        chars = g.chars().peekable();
                                         continue;
-                                    } else { break }
-                                }
+                                    },
+                                    None => break
+                                },
+                                _ => break
                             }
                         }}
-                        for c in &content { self.strbuf.push(*c) }
-                        let reset = self.patch(
-                            Cell::Vector(content, width, self.style),
-                            index, cutoff);
-                        for i in 1..width { self.patch(
-                            Cell::Linker(i, width - i),
-                            index + i, 0);
+                        if width >= 2 {
+                            let pred = |m: &char| *m == '\u{200d}';
+                            let slice = content.split(pred).next();
+                            for c in slice.unwrap_or(&[]) {
+                                self.strbuf.push(*c);
+                                cutoff += c.len_utf8();
+                                if !self.can_modify { break }
+                            }
+                        } else {
+                            // Eg. devanagari: "क्‍\u{200d}ष";
+                            for c in &content { self.strbuf.push(*c) }
                         }
-                        index += width;
+
+                        let data = (index, cutoff);
+                        let reset = self.patch(
+                            Cell::Multi(content, width, self.style), data);
+                        // for i in 1..width { self.patch(
+                        //     Cell::Link, (index + i, 0));
+                        // }
+                        self.patch(Cell::Link, (index + 1, 0));
+                        // index += width;
+                        index += 2;
                         if reset { cutoff = 0; freeze = index }
                     }
                 }
@@ -627,16 +634,16 @@ impl Buffer {
         match &self.cells[index] {
             Cell::Single(ch, ..) => format!("{}", ch),
             Cell::Double(ch, ..) => format!("{}", ch),
-            Cell::Vector(chs,..) => chs.iter().collect(),
+            Cell::Multi(chs,..) => chs.iter().collect(),
             Cell::NIL => String::from(" "),
-            Cell::Linker(..) => unreachable!()
+            Cell::Link => unreachable!()
         }
     }
 
-    #[cfg(test)]
-    pub fn is_mod(&self) -> bool {
-        self.mod_support
-    }
+    // #[cfg(test)]
+    // pub fn is_mod(&self) -> bool {
+    //     self.mod_support
+    // }
 
     // #[cfg(test)]
     // #[cfg(windows)]
@@ -651,60 +658,60 @@ impl Buffer {
 }
 
 
-fn pos_raw() -> (i16, i16) {
-    use std::io::{ Write, BufRead };
-    let ln = 603;
-    // Where is the cursor?
-    // Use `ESC [ 6 n`.
-    let mut stdout = std::io::stdout();
-    let stdin = std::io::stdin();
+// fn pos_raw() -> (i16, i16) {
+//     use std::io::{ Write, BufRead };
+//     let ln = 603;
+//     // Where is the cursor?
+//     // Use `ESC [ 6 n`.
+//     let mut stdout = std::io::stdout();
+//     let stdin = std::io::stdin();
 
-    // Write command
-    stdout.write_all(b"\x1B[6n").expect(&format!(
-        "buffer.rs [Ln: {}]: Error writing to stdout", ln + 9));
-    stdout.flush().expect(&format!(
-        "buffer.rs [Ln: {}]: Error flushing stdout", ln + 11));
+//     // Write command
+//     stdout.write_all(b"\x1B[6n").expect(&format!(
+//         "buffer.rs [Ln: {}]: Error writing to stdout", ln + 9));
+//     stdout.flush().expect(&format!(
+//         "buffer.rs [Ln: {}]: Error flushing stdout", ln + 11));
 
-    stdin.lock().read_until(b'[', &mut vec![]).expect(&format!(
-        "buffer.rs [Ln {}]: Error reading stdin", ln + 14));
+//     stdin.lock().read_until(b'[', &mut vec![]).expect(&format!(
+//         "buffer.rs [Ln {}]: Error reading stdin", ln + 14));
 
-    let mut rows = vec![];
-    stdin.lock().read_until(b';', &mut rows).expect(&format!(
-        "buffer.rs [Ln {}]: Error reading stdin", ln + 18));
+//     let mut rows = vec![];
+//     stdin.lock().read_until(b';', &mut rows).expect(&format!(
+//         "buffer.rs [Ln {}]: Error reading stdin", ln + 18));
 
-    let mut cols = vec![];
-    stdin.lock().read_until(b'R', &mut cols).expect(&format!(
-        "buffer.rs [Ln {}]: Error reading stdin", ln + 22));
+//     let mut cols = vec![];
+//     stdin.lock().read_until(b'R', &mut cols).expect(&format!(
+//         "buffer.rs [Ln {}]: Error reading stdin", ln + 22));
 
-    // remove delimiter
-    rows.pop();
-    cols.pop();
+//     // remove delimiter
+//     rows.pop();
+//     cols.pop();
 
-    let rows = rows
-        .into_iter()
-        .map(|b| (b as char))
-        .fold(String::new(), |mut acc, n| {
-            acc.push(n);
-            acc
-        })
-        .parse::<usize>()
-        .expect(&format!(
-            "buffer.rs [Ln {}]: Error parsing row position.", ln + 29
-        ));
-    let cols = cols
-        .into_iter()
-        .map(|b| (b as char))
-        .fold(String::new(), |mut acc, n| {
-            acc.push(n);
-            acc
-        })
-        .parse::<usize>()
-        .expect(&format!(
-            "buffer.rs [Ln {}]: Error parsing col position.", ln + 40
-        ));
+//     let rows = rows
+//         .into_iter()
+//         .map(|b| (b as char))
+//         .fold(String::new(), |mut acc, n| {
+//             acc.push(n);
+//             acc
+//         })
+//         .parse::<usize>()
+//         .expect(&format!(
+//             "buffer.rs [Ln {}]: Error parsing row position.", ln + 29
+//         ));
+//     let cols = cols
+//         .into_iter()
+//         .map(|b| (b as char))
+//         .fold(String::new(), |mut acc, n| {
+//             acc.push(n);
+//             acc
+//         })
+//         .parse::<usize>()
+//         .expect(&format!(
+//             "buffer.rs [Ln {}]: Error parsing col position.", ln + 40
+//         ));
 
-    ((cols - 1) as i16, (rows - 1) as i16)
-}
+//     ((cols - 1) as i16, (rows - 1) as i16)
+// }
 
 
 #[cfg(test)]
@@ -725,7 +732,7 @@ mod tests {
     fn test_ascii_buffer_simple() {
         let mut buf = Buffer::new();
         // NOTE: this test is only for ANSI supported terminals.
-        #[cfg(windows)] { if buf.is_winapi() { return } }
+        #[cfg(windows)] { if buf.winmode() { return } }
 
         let original_input = "Hello, world!";
         buf.parse(original_input);
@@ -756,7 +763,7 @@ mod tests {
     fn test_cjk_buffer() {
         let mut buf = Buffer::new();
         // NOTE: this test is only for ANSI supported terminals.
-        #[cfg(windows)] { if buf.is_winapi() { return } }
+        #[cfg(windows)] { if buf.winmode() { return } }
 
         let original_input = "... Hello, 中易隶书, world!";
         buf.parse(original_input);
@@ -816,7 +823,7 @@ mod tests {
     fn test_ascii_buffer_complex() {
         let mut buf = Buffer::new();
         // NOTE: this test is only for ANSI supported terminals.
-        #[cfg(windows)] { if buf.is_winapi() { return } }
+        #[cfg(windows)] { if buf.winmode() { return } }
 
         let original_input = "Hello, world!\n\nH23\towdy, neighbor!";
         buf.parse(original_input);
@@ -854,22 +861,38 @@ mod tests {
         assert_eq!(String::from("B23\x1B[4Cella, na"), output);
     }
 
-    // #[test]
-    // fn test_linux_mod_support() {
-    //     let mut buf = Buffer::new();
-    //     assert_eq!(buf.is_mod(), false);
-    // }
+    #[test]
+    fn test_modifier_support() {
+        let mut buf = Buffer::new();
+        // NOTE: this test is only for ANSI supported terminals.
+        #[cfg(windows)] { if buf.winmode() { return } }
+
+        let original_input = "---- 👦🏿 ----";
+        buf.parse(original_input);
+        buf.flush();
+    }
 
     #[test]
-    fn test_mod_support() {
-        if cfg!(target_os = "macos") {
-            let mut buf = Buffer::new();
-            assert_eq!(buf.check_mod(), 2);
-        } else if cfg!(target_os = "windows") {
-            ()
-        } else {
-            let mut buf = Buffer::new();
-            assert_eq!(buf.check_mod(), 5);
-        }
+    fn test_emoji_support() {
+        let mut buf = Buffer::new();
+        // NOTE: this test is only for ANSI supported terminals.
+        #[cfg(windows)] { if buf.winmode() { return } }
+
+        let original_input = "---- 👦🏿 ----";
+        buf.parse(original_input);
+        buf.flush();
     }
+
+    // #[test]
+    // fn test_mod_support() {
+    //     if cfg!(target_os = "macos") {
+    //         let mut buf = Buffer::new();
+    //         assert_eq!(buf.check_mod(), 2);
+    //     } else if cfg!(target_os = "windows") {
+    //         ()
+    //     } else {
+    //         let mut buf = Buffer::new();
+    //         assert_eq!(buf.check_mod(), 5);
+    //     }
+    // }
 }

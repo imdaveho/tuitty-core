@@ -54,7 +54,8 @@ fn main() {
                          modified_ka,
                          devanagari,
                          devanagari_manual,
-                         esc_chars,
+                         // esc_chars,
+                         "",
                          ascii_cjk_mix,
                          wide_symbol);
 
@@ -177,5 +178,5 @@ fn main() {
             }
         }}
     }
-    println!("output: \"{:?}\"", string);
+    println!("output: \"{}\"", string);
 }
