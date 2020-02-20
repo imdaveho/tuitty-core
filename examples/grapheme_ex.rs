@@ -10,8 +10,17 @@ use tuitty::common::unicode::grapheme::UnicodeGraphemes;
 // #[cfg(windows)]
 // use tuitty::terminal::actions::win32;
 
-
 fn main() {
+    // let original_input = "---- 👦🏿 ----";
+    let original_input = "---- 👨🏿‍🦰 ----";
+    let mut graphemes = UnicodeGraphemes::graphemes(original_input, true);
+    for g in graphemes {
+        println!("grapheme: {:?}, size: {}", g, std::mem::size_of_val(g));
+    }
+
+}
+
+fn _main() {
     let compound_emojis = ["👦🏿", "👩‍🔬", "👨‍👩‍👦", "👪", "👪🏽", "👨🏽‍👩🏽‍👧🏽",
                            "👨‍🦰", "🧗🏾‍♂\u{fe0f}", "🧗🏾‍♀\u{fe0f}",
                            "🕵🏼‍♀\u{fe0f}"];
@@ -48,16 +57,17 @@ fn main() {
                             basic_escapes[5]);
 
     // let string = format!("{} {} {} {} {} {} {} {}",
-    let string = format!("{} {} {} {} {} {} {}",
-                         emojis,
-                         // zwjs,
-                         modified_ka,
-                         devanagari,
-                         devanagari_manual,
-                         // esc_chars,
-                         "",
-                         ascii_cjk_mix,
-                         wide_symbol);
+    // let string = format!("{} {} {} {} {} {} {}",
+    //                      emojis,
+    //                      // zwjs,
+    //                      modified_ka,
+    //                      devanagari,
+    //                      devanagari_manual,
+    //                      // esc_chars,
+    //                      "",
+    //                      ascii_cjk_mix,
+    //                      wide_symbol);
+    let string = String::from("---- 👨🏿‍🦰 ----");
 
     let mut graphemes = UnicodeGraphemes
         ::graphemes(string.as_str(), true).peekable();
@@ -161,6 +171,13 @@ fn main() {
                         }
                     }
 
+                    let pred = |m: &char| *m == '\u{200d}';
+                    let slice = content.split(pred).next();
+                    let mut cutoff = 0;
+                    for c in slice.unwrap_or(&[]) {
+                        cutoff += c.len_utf8();
+                    }
+                    println!("cutoff: {}", cutoff);
                     let zwj_enabled = false;
                     if zwj_enabled {
                         println!("Content::Complex({:?} | width: 2", content);

@@ -30,8 +30,8 @@ pub struct Buffer {
     index: usize,
     cells: Vec<Cell>,
     strbuf: String,
-    width: i16,
-    height: i16,
+    pub width: i16,
+    pub height: i16,
     pub style: (Color, Color, u32),
     pub savedpos: usize,
     pub tabwidth: usize,
@@ -79,8 +79,6 @@ impl Buffer {
     //     posix::disable_alt();
     //     col
     // }
-
-    pub fn size(&self) -> (i16, i16) { (self.width, self.height) }
 
     pub fn resize(&mut self, w: i16, h: i16) {
         self.width = w;
@@ -137,7 +135,7 @@ impl Buffer {
     // Buffer navigation specific functions.
     //
     // Returns a coordinate tuple from an index.
-    // Does NOT update internal index.
+    // NOTE: Does NOT update internal index.
     pub fn coord(&self, index: usize) -> (i16, i16) {
         let width = self.width;
         let index = index as i16;
@@ -145,7 +143,7 @@ impl Buffer {
     }
 
     // Returns an index from a coordinate tuple.
-    // Does NOT update internal index.
+    // NOTE: Does NOT update internal index.
     pub fn index(&self, coord: (i16, i16)) -> usize {
         let (mut col, mut row) = (coord.0, coord.1);
         if col < 0 { col = col.abs() }
@@ -154,7 +152,7 @@ impl Buffer {
     }
 
     // Returns t next tabstop given a tab length from a coordinate tuple.
-    // Does NOT update internal index.
+    // NOTE: Does NOT update internal index.
     pub fn tabstop(&self, coord: (i16, i16)) -> usize {
         let (col, row) = (coord.0, coord.1);
         // 1. handle new tab stop:
@@ -294,27 +292,40 @@ impl Buffer {
             if cutoff > 8 {
                 // 1. Truncate the output strbuf.
                 let len = self.strbuf.len();
-                // Check if output will be empty after
-                // truncation, if not, push it, else, skip.
-                if len.saturating_sub(cutoff) > 0 {
-                    self.strbuf.truncate(len - cutoff);
+                let mut tail = String::with_capacity(16);
+                match &cell {
+                    // 1b. Adjust cutoff to strip only contents of Multi.
+                    Cell::Multi(v, w, ..) => {
+                        let mut cutoff = 0;
+                        if w >= &2 {
+                            let pred = |m: &char| *m == '\u{200d}';
+                            let slice = v.split(pred).next();
+                            for c in slice.unwrap_or(&[]) {
+                                tail.push(*c);
+                                cutoff += c.len_utf8();
+                                if !self.can_modify { break }
+                            }
+                        } else { for c in v {
+                            tail.push(*c);
+                            cutoff += c.len_utf8();
+                        }}
+                        // Ensure truncation will not go less than 0.
+                        if len >= cutoff { self.strbuf.truncate(len - cutoff) }
+                    },
+                    _ => {
+                        // Ensure truncation will not go less than 0.
+                        if len >= cutoff { self.strbuf.truncate(len - cutoff) }
+                        // 2. Send a Goto escape sequence.
+                        let (col, row) = self.coord(index);
+                        let goto = format!("\x1B[{};{}H", row, col);
+                        self.strbuf.push_str(&goto);
+                    }
                 }
-                // 2. Send a Goto escape sequence.
-                let (col, row) = self.coord(index);
-                let goto = format!("\x1B[{};{}H", row, col);
-                self.strbuf.push_str(&goto);
                 // 3. Restore the last char that was truncated.
                 match &cell {
                     Cell::Single(ch, ..) => self.strbuf.push(*ch),
                     Cell::Double(ch, ..) => self.strbuf.push(*ch),
-                    Cell::Multi(v, w, _) => if w >= 2 {
-                        let pred = |m: &char| *m == '\u{200d}';
-                        let slice = v.split(pred).next();
-                        for c in slice.unwrap_or(&[]) {
-                            self.strbuf.push(*c);
-                            if !self.can_modify { break }
-                        }
-                    } else { for c in &v { self.strbuf.push(*c) }},
+                    Cell::Multi(..) => self.strbuf.push_str(&tail),
                     Cell::NIL => self.strbuf.push(' '),
                     Cell::Link => (),
                 }
@@ -329,48 +340,6 @@ impl Buffer {
                 Cell::Single(..) => (),
                 Cell::Link => self.cells[index - 1] = Cell::NIL,
                 _ => self.cells[index + 1] = Cell::NIL,
-                // Cell::Double(..) => {
-                //     self.cells[index + 1] = Cell::NIL;
-                // },
-                // Cell::Vector(..) => {
-                //     // for i in 0..w {
-                //     //     self.cells[index + i] = Cell::NIL;
-                //     // }
-                //     self.cells[index + 1] = Cell::NIL;
-                // },
-                // Linker almost should be rare to reach because
-                // either (A) the call to `self.cursor` should
-                // place you at a top level Cell or (B) the prior
-                // iterations would have replaced Linkers with
-                // NILs. However, the case (C) is if there was an
-                // escape character (`\t`, `\n`, `\r`, etc) that
-                // caused the index to hit a Linker.
-                // Cell::Linker(lhs, rhs) => {
-                //     // Removes Linkers to the left including the
-                //     // main Cell, but not the Cell at the index.
-                //     for i in 1..=lhs {
-                //         self.cells[index - i] = Cell::NIL;
-                //     }
-                //     // Removes Linkers to the right including the
-                //     // Cell at index, but not the next main Cell.
-                //     for i in 0..rhs {
-                //         self.cells[index + i] = Cell::NIL;
-                //     }
-                //     // NOTE: for example:
-                //     // a, b, c, [d, %, %], g, h
-                //     //    ^         t
-                //     // if ^ is the cursor and t is the tabstop
-                //     // the linker @ t, will have a lhs of 1 and
-                //     // a rhs of 2.
-                //     // the first loop will clear the d:
-                //     // i = (1..=1,) or (1) so [index - 1]
-                //     // the second loop will clear the index
-                //     // and the Linker next to it:
-                //     // i = (0, 1,) so [index + 0] and [index + 1]
-                //     // this way, when the current Cell gets swapped
-                //     // with the new Cell, the wide cell will have
-                //     // been cleared out.
-                // },
             }
             // Swap current index with new Cell.
             self.cells[index] = cell
@@ -424,16 +393,15 @@ impl Buffer {
                             let ch = pk.chars().next().unwrap();
                             if mods.contains(&ch) {
                                 // Modified Double-width Cell
-                                let mut width = 2;
-                                let mut content = vec![car];
+                                let (mut w, mut v) = (2, vec![car]);
                                 let next = graphemes.next().unwrap();
                                 chars = next.chars().peekable();
                                 loop { match chars.next() {
                                     Some(next) => {
-                                        content.push(next);
-                                        width += next.width().unwrap_or(0);
+                                        v.push(next);
+                                        w += next.width().unwrap_or(0);
                                     },
-                                    None => match content.last().unwrap() {
+                                    None => match v.last().unwrap() {
                                         '\u{200d}' => match graphemes.next() {
                                             Some(g) => {
                                                 chars = g.chars().peekable();
@@ -444,22 +412,21 @@ impl Buffer {
                                         _ => break
                                     }
                                 }}
-                                if width >= 2 {
+                                if w >= 2 {
                                     let pred = |m: &char| *m == '\u{200d}';
-                                    let slice = content.split(pred).next();
+                                    let slice = v.split(pred).next();
                                     for c in slice.unwrap_or(&[]) {
                                         self.strbuf.push(*c);
                                         cutoff += c.len_utf8();
                                         if !self.can_modify { break }
                                     }
-                                } else {
-                                    // Eg. devanagari: "क्‍\u{200d}ष";
-                                    for c in &content { self.strbuf.push(*c) }
-                                }
-
+                                } else { for c in &v {
+                                    self.strbuf.push(*c);
+                                    cutoff += c.len_utf8();
+                                }}
                                 let data = (index, cutoff);
-                                let reset = self.patch(
-                                    Cell::Multi(content, width, self.style), data);
+                                let reset = self.patch(Cell::Multi(
+                                    v, w, self.style), data);
                                 self.patch(Cell::Link, (index + 1, 0));
                                 index += 2;
                                 if reset { cutoff = 0; freeze = index }
@@ -571,16 +538,15 @@ impl Buffer {
                         freeze = index;
                     },
                     _ => {
-                        // cutoff += size_of_val(g);
-                        let mut width = car.width().unwrap_or(0);
-                        let mut content = vec![car];
+                        let mut w = car.width().unwrap_or(0);
+                        let mut v = vec![car];
                         // Gather all characters into content.
                         loop { match chars.next() {
                             Some(next) => {
-                                content.push(next);
-                                width += next.width().unwrap_or(0);
+                                v.push(next);
+                                w += next.width().unwrap_or(0);
                             },
-                            None => match content.last().unwrap() {
+                            None => match v.last().unwrap() {
                                 '\u{200d}' => match graphemes.next() {
                                     Some(g) => {
                                         chars = g.chars().peekable();
@@ -591,27 +557,22 @@ impl Buffer {
                                 _ => break
                             }
                         }}
-                        if width >= 2 {
+                        if w >= 2 {
                             let pred = |m: &char| *m == '\u{200d}';
-                            let slice = content.split(pred).next();
+                            let slice = v.split(pred).next();
                             for c in slice.unwrap_or(&[]) {
                                 self.strbuf.push(*c);
                                 cutoff += c.len_utf8();
                                 if !self.can_modify { break }
                             }
-                        } else {
-                            // Eg. devanagari: "क्‍\u{200d}ष";
-                            for c in &content { self.strbuf.push(*c) }
-                        }
-
+                        } else { for c in &v {
+                            self.strbuf.push(*c);
+                            cutoff += c.len_utf8();
+                        }}
                         let data = (index, cutoff);
-                        let reset = self.patch(
-                            Cell::Multi(content, width, self.style), data);
-                        // for i in 1..width { self.patch(
-                        //     Cell::Link, (index + i, 0));
-                        // }
+                        let reset = self.patch(Cell::Multi(
+                            v, w, self.style), data);
                         self.patch(Cell::Link, (index + 1, 0));
-                        // index += width;
                         index += 2;
                         if reset { cutoff = 0; freeze = index }
                     }
@@ -639,15 +600,6 @@ impl Buffer {
             Cell::Link => unreachable!()
         }
     }
-
-    // #[cfg(test)]
-    // pub fn is_mod(&self) -> bool {
-    //     self.mod_support
-    // }
-
-    // #[cfg(test)]
-    // #[cfg(windows)]
-    // fn is_winapi(&self) -> bool { self.use_winapi }
 
     #[cfg(test)]
     fn flush(&mut self) -> String {
@@ -760,6 +712,22 @@ mod tests {
     }
 
     #[test]
+    fn test_ascii_buffer_simple_v2() {
+        // This was used to catch the self.strbuf.truncate
+        // issue when using .saturating_sub which didn't
+        // truncate because len == cutoff.
+        let mut buf = Buffer::new();
+        let original_input = "-------- a";
+        buf.parse(original_input);
+        let _ = buf.flush();
+        let modified_input = "-------- b";
+        buf.goto_index(0);
+        buf.parse(modified_input);
+        let output = buf.flush();
+        assert_eq!("\x1B[0;9Hb", output);
+    }
+
+    #[test]
     fn test_cjk_buffer() {
         let mut buf = Buffer::new();
         // NOTE: this test is only for ANSI supported terminals.
@@ -862,37 +830,73 @@ mod tests {
     }
 
     #[test]
-    fn test_modifier_support() {
+    fn test_modifier_false_support() {
         let mut buf = Buffer::new();
-        // NOTE: this test is only for ANSI supported terminals.
-        #[cfg(windows)] { if buf.winmode() { return } }
-
-        let original_input = "---- 👦🏿 ----";
+        // // NOTE: this test is only for ANSI supported terminals.
+        // #[cfg(windows)] { if buf.winmode() { return } }
+        let original_input = "-------- 👨🏿‍🦰 ----";
         buf.parse(original_input);
-        buf.flush();
+        let output = buf.flush();
+        assert_ne!(original_input, output);
+        assert_eq!("-------- 👨 ----", output);
+        buf.goto_index(0);
+        let adjusted_input = "-------- 👨🏿‍🦰 ****";
+        buf.parse(adjusted_input);
+        let output = buf.flush();
+        assert_eq!("\x1B[0;12H****", output);
+    }
+
+    #[test]
+    fn test_modifier_true_support() {
+        let mut buf = Buffer::new();
+        buf.can_modify = true;
+        let original_input = "---- 👨🏿‍🦰 ----";
+        buf.parse(original_input);
+        let output = buf.flush();
+        let modified_input = "---- 👨🏿 ----";
+        assert_eq!(modified_input, output);
+        buf.goto_index(0);
+        let adjusted_input = "**** 👨🏿‍🦰 ****";
+        buf.parse(adjusted_input);
+        let output = buf.flush();
+        buf.goto_index(5);
+        let chat5 = buf.getch();
+        buf.goto_index(6);
+        let chat6 = buf.getch();
+        // NOTE: If can_modify = true, that means that
+        // "👨" and "🏿" combine into a single 2-cell
+        // char. In this case, the ch at index 5 and 6
+        // are equivalent...
+        assert_eq!(chat5, chat6);
+        buf.goto_index(7);
+        // ...and what is at index 7 is the space before
+        // the strbuf change ('-' -> '*')
+        assert_eq!(" ", buf.getch());
+        assert_eq!("****\x1B[0;8H****", output);
     }
 
     #[test]
     fn test_emoji_support() {
         let mut buf = Buffer::new();
-        // NOTE: this test is only for ANSI supported terminals.
-        #[cfg(windows)] { if buf.winmode() { return } }
-
-        let original_input = "---- 👦🏿 ----";
+        let original_input = "-------- 👨‍👩‍👦 ----";
         buf.parse(original_input);
-        buf.flush();
+        let output = buf.flush();
+        assert_eq!("-------- 👨 ----", output);
+        let adjusted_input = "-------- 👨‍👩‍👦 ****";
+        buf.goto_index(0);
+        buf.parse(adjusted_input);
+        let output = buf.flush();
+        assert_eq!("\x1B[0;12H****", output);
+        buf.clear(Clear::All);
+        buf.can_modify = true;
+        let modified_input = "-------- 👨🏽‍👩🏽‍👧🏽 ----";
+        buf.parse(modified_input);
+        let output = buf.flush();
+        assert_eq!("-------- 👨🏽 ----", output);
+        let adjusted_input = "-------- 👨🏽‍👩🏽‍👧🏽 ****";
+        buf.goto_index(0);
+        buf.parse(adjusted_input);
+        let output = buf.flush();
+        assert_eq!("\x1B[0;12H****", output);
     }
-
-    // #[test]
-    // fn test_mod_support() {
-    //     if cfg!(target_os = "macos") {
-    //         let mut buf = Buffer::new();
-    //         assert_eq!(buf.check_mod(), 2);
-    //     } else if cfg!(target_os = "windows") {
-    //         ()
-    //     } else {
-    //         let mut buf = Buffer::new();
-    //         assert_eq!(buf.check_mod(), 5);
-    //     }
-    // }
 }
