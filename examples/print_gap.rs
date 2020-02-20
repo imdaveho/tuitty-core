@@ -114,10 +114,14 @@ fn main() {
 
     // let string = "👨🏽‍👩🏽‍👧🏽";
     let string = &["🧗", "🏽", "\u{200d}", "♀", "\u{fe0f}"].concat();
-   
+    // let string = "👨🏿‍🦰";
+
+    // let string = "👨🏽‍👩🏽‍👧🏽cursor - bad";
+    // let string = &["🧗", "🏽", "\u{200d}", "♀", "\u{fe0f}", "cursor - good"].concat();
+    // let string = "👨🏿‍🦰cursor - good";
     posix::printf(string);
 
-    // thread::sleep(Duration::from_millis(1000));
+    thread::sleep(Duration::from_millis(2000));
     let (col, row) = pos_raw();
 
     posix::cook(&mode);

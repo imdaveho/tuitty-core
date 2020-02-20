@@ -22,6 +22,7 @@ pub fn reset(reset_style: u16) -> Result<()> {
             return Err(Error::last_os_error());
         }
     }
+    // handle.close()?;
     Ok(())
 }
 

@@ -44,7 +44,50 @@ pub mod posix {
     }
 
     pub fn pos() {
+        // TODO: rename to query_pos()
         output::printf(&cursor::pos());
+    }
+
+    pub fn pos_raw() -> (i16, i16) {
+        // Where is the cursor?
+        // Use `ESC [ 6 n`.
+        let mut stdout = std::io::stdout();
+        let stdin = std::io::stdin();
+
+        // Write command
+        std::io::Write::write_all(&mut stdout, b"\x1B[6n")
+            .expect("Error writing cursor report");
+        std::io::Write::flush(&mut stdout)
+            .expect("Error flushing cursor report");
+        std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])
+            .expect("Error reading cursor report");
+        let mut rows = vec![];
+        std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut rows)
+            .expect("Error reading cursor row");
+        let mut cols = vec![];
+        std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut cols)
+            .expect("Error reading cursor col");
+        // remove delimiter
+        rows.pop(); cols.pop();
+
+        let parsed_rows: i16 = rows
+            .into_iter()
+            .map(|b| (b as char))
+            .fold(String::new(), |mut acc, n| {
+                acc.push(n);
+                acc
+            })
+            .parse().expect("Error parsing row position");
+        let parsed_cols: i16 = cols
+            .into_iter()
+            .map(|b| (b as char))
+            .fold(String::new(), |mut acc, n| {
+                acc.push(n);
+                acc
+            })
+            .parse().expect("Error parsing col position");
+
+        (parsed_cols.saturating_sub(1) , parsed_rows.saturating_sub(1))
     }
 
     pub fn hide_cursor() {
@@ -131,6 +174,44 @@ pub mod posix {
     pub fn get_mode() -> Termios {
         output::get_mode().expect("Error fetching Termios")
     }
+
+
+    // UNIFIED STRUCT W/ ACTIONS
+    pub struct Term { mode: Termios }
+    impl Term {
+        pub fn new() -> Self {
+            Self { mode: get_mode() }
+        }
+        pub fn goto(&self, col: i16, row: i16) { goto(col, row) }
+        pub fn up(&self, n: i16) { up(n) }
+        pub fn down(&self, n: i16) { down(n) }
+        pub fn left(&self, n: i16) { left(n) }
+        pub fn right(&self, n: i16) { right(n) }
+        pub fn query_pos(&self) { pos() }
+        pub fn pos_raw(&self) -> (i16, i16) { pos_raw() }
+        pub fn hide_cursor(&self) { hide_cursor() }
+        pub fn show_cursor(&self) { show_cursor() }
+        pub fn clear(&self, method: Clear) { clear(method) }
+        pub fn size(&self) -> (i16, i16) { size() }
+        pub fn resize(&self, w: i16, h: i16) { resize(w, h) }
+        pub fn enable_alt(&self) { enable_alt() }
+        pub fn disable_alt(&self) { disable_alt() }
+        pub fn prints(&self, content: &str) { prints(content) }
+        pub fn printf(&self, content: &str) { printf(content) }
+        pub fn flush(&self) { flush() }
+        pub fn raw(&self) { raw() }
+        pub fn cook(&self) { cook(&self.mode) }
+        pub fn enable_mouse(&self) { enable_mouse() }
+        pub fn disable_mouse(&self) { disable_mouse() }
+        pub fn set_fx(&self, effects: u32) { set_fx(effects) }
+        pub fn set_fg(&self, color: Color) { set_fg(color) }
+        pub fn set_bg(&self, color: Color) { set_bg(color) }
+        pub fn set_styles(&self, fg: Color, bg: Color, fx: u32) {
+            set_styles(fg, bg, fx)
+        }
+        pub fn reset_styles(&self) { reset_styles() }
+    }
+
 }
 
 
@@ -375,5 +456,41 @@ pub mod win32 {
                 Err(_) => return false,
             }
         }
+    }
+
+
+    // UNIFIED STRUCT W/ ACTIONS
+    pub struct Term {
+        mode: u32,
+        reset: i16,
+        conout: Handle,
+        //conin: Handle,
+        cfg: bool
+    }
+    impl Term {
+        pub fn new() -> Self {
+            let conout = Handle::conout()
+                .expect("Error fetching CONOUT$");
+            let reset = ConsoleInfo::of(&conout)
+                .expect("Error fetching ConsoleInfo from CONOUT$");
+            Self {
+                mode: get_mode(),
+                reset, conout,
+                cfg: is_ansi_enabled()
+            }
+        }
+        pub fn goto(&self, col: i16, row: i16) { goto(col, row, self.cfg) }
+        pub fn up(&self, n: i16) { up(n, self.cfg) }
+        pub fn down(&self, n: i16) { down(n, self.cfg) }
+        pub fn left(&self, n: i16) { left(n, self.cfg) }
+        pub fn right(&self, n: i16) { right(n, self.cfg) }
+        // TODO TODO TODO - should pass in self.conout ???
+        pub fn pos_raw(&self) -> (i16, i16) {
+            let info = ConsoleInfo::of(&self.conout)
+                .expect("Error fetching cursor position from CONOUT$");
+            info.cursor_pos()
+        }
+        pub fn hide_cursor() { () }
+
     }
 }
