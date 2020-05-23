@@ -267,11 +267,11 @@ impl ScreenBuffer {
                 self.cursor = index + 2;
             },
             false => {
-                let mut placeholder = false;
+                let mut partial = false;
                 // If cell below is wide and new cell is single,
-                // we would need to clear out the placeholder cell.
+                // we would need to clear out the partial cell.
                 if let Some(cell) = &self.cells[index] {
-                    if cell.is_wide { placeholder = true }
+                    if cell.is_wide { partial = true }
                 }
                 self.cells.remove(index);
                 self.cells.insert(index, Some(Cell {
@@ -281,7 +281,7 @@ impl ScreenBuffer {
                     style: self.active_style,
                 }));
                 self.cursor = index + 1;
-                if placeholder {
+                if partial {
                     self.cells.remove(index + 1);
                     self.cells.insert(index + 1, None);
                     self.cursor = index + 2;

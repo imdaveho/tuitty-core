@@ -462,7 +462,9 @@ pub mod win32 {
     // UNIFIED STRUCT W/ ACTIONS
     pub struct Term {
         mode: u32,
-        reset: i16,
+        #[cfg(windows)]
+        reset: ConsoleInfo,
+        #[cfg(windows)]
         conout: Handle,
         //conin: Handle,
         cfg: bool

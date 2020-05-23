@@ -129,3 +129,8 @@ fn main() {
 
     println!("{}, {}", col, row);
 }
+
+#[cfg(windows)]
+fn main() {
+    println!("Not implemented")
+}

@@ -1,7 +1,7 @@
 // This module provides the Store which synchronizes application state with
 // dispatched user actions and maintains settings across each "screen".
 
-mod buffer;
+// mod buffer;
 mod cell;
 use cell::ScreenBuffer;
 

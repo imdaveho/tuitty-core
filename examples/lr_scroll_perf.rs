@@ -88,6 +88,7 @@ fn set_mode(termios: &Termios) -> Result<()> {
     }
 }
 
+#[cfg(unix)]
 fn main() {
     // Null printing test (to see if it skips chars)
     // printf(&"\n".repeat(30));
@@ -239,4 +240,10 @@ fn main() {
 
     let _ = set_mode(&mode);
     printf(&disable_alt());
+}
+
+
+#[cfg(windows)]
+fn main() {
+    println!("Not implemented")
 }
