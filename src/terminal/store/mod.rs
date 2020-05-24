@@ -66,7 +66,6 @@ impl Store {
     }
 
     pub fn size(&self) -> (i16, i16) {
-        // TODO: tput size? see: crossterm/issue/276
         if let Some(s) = self.data.get(self.id) {
             s.buffer.size()
         } else { (0, 0) }

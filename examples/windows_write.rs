@@ -99,7 +99,7 @@ fn main() {
 
     // Read contents
     // let mut read_buf: Vec<CHAR_INFO> = Vec::with_capacity(len);
-    let mut read_buf: Vec<CHAR_INFO> = unsafe { vec![zeroed(); 85 * 29 * 4] };
+    let mut read_buf: Vec<CHAR_INFO> = unsafe { vec![zeroed(); 86 * 30] };
     // let mut read_buf = unsafe { vec![zeroed(); 85 * 29 * 4] };
     let buf_read = unsafe {
         ReadConsoleOutputW(
@@ -116,56 +116,86 @@ fn main() {
         panic!("Something went wrong reading buffer");
     }
 
-    let read_u16: Vec<u16> = read_buf.iter().map(|x| unsafe { *x.Char.UnicodeChar() }).collect();
-    let read_string: String = String::from_utf16_lossy(&read_u16);
-    tuitty::terminal::actions::win32::goto(0, 0, false);
-    let mut written = 0;
-    let res = unsafe {
-        WriteConsoleW(
-            altern.0,
-            read_string.as_ptr() as *const c_void,
-            85 * 29,
-            &mut written, null_mut()
-        )
-    };
-    if res == 0 {
-            tuitty::terminal::actions::win32::cook();
-            tuitty::terminal::actions::win32::disable_alt(false);
-            panic!("Something went wrong pasting buffer");
-    }
+    // let read_u16: Vec<u16> = read_buf.iter().map(|x| unsafe { *x.Char.UnicodeChar() }).collect();
+    // let read_string: String = String::from_utf16_lossy(&read_u16);
+    // tuitty::terminal::actions::win32::goto(0, 0, false);
+    // let mut written = 0;
+    // let res = unsafe {
+    //     WriteConsoleW(
+    //         altern.0,
+    //         read_string.as_ptr() as *const c_void,
+    //         85 * 29,
+    //         &mut written, null_mut()
+    //     )
+    // };
+    // if res == 0 {
+    //         tuitty::terminal::actions::win32::cook();
+    //         tuitty::terminal::actions::win32::disable_alt(false);
+    //         panic!("Something went wrong pasting buffer");
+    // }
     
 
+    let mut index = 0;
+    // for u in "qwertyuiopasd⚠️fghjkl🚧園v明nmQWE👪RTY👨‍👩‍👧UIOPASDFGHJKLZXCVBNM".encode_utf16() {
+    for u in OsStr::new("qwertyuiopasd⚠️fghjkl🚧園v明nmQWE👪RTY👨‍👩‍👧UIOPASDFGHJKLZXCVBNM").encode_wide() {
+        unsafe {
+            *read_buf[index].Char.UnicodeChar_mut() = u;    
+        }
+        index += 1;
+    };
 
-    // let mut index = 0;
-    // for u in OsStr::new(&read_string).encode_wide() {
+    // let mut index = 22;
+    // for u in OsStr::new("🚧").encode_wide() {
+    //     unsafe {
+    //         *read_buf[index].Char.UnicodeChar_mut() = u;    
+    //     }
+    //     index += 1;
+    // };
+    // index = 23;
+    // for u in OsStr::new(&format!("{}", index)).encode_wide() {
+    //     unsafe {
+    //         *read_buf[index].Char.UnicodeChar_mut() = u;    
+    //     }
+    //     index += 1;
+    // };
+    // index = 26;
+    // for u in OsStr::new("T").encode_wide() {
+    //     unsafe {
+    //         *read_buf[index].Char.UnicodeChar_mut() = u;    
+    //     }
+    //     index += 1;
+    // };
+    // index = 28;
+    // for u in OsStr::new("K").encode_wide() {
     //     unsafe {
     //         *read_buf[index].Char.UnicodeChar_mut() = u;    
     //     }
     //     index += 1;
     // };
 
-    // // Copy contents over
-    // let buf_copy = unsafe {
-    //     WriteConsoleOutputW(
-    //     // WriteConsoleOutputA(
-    //         altern.0, 
-    //         read_buf.as_ptr(), 
-    //         // COORD {X: len as i16, Y: 1},
-    //         COORD {X: 51, Y: 1},
-    //         COORD {X: 0, Y: 0},
-    //         &mut SMALL_RECT {
-    //             Top: 5,
-    //             Left: 5,
-    //             Bottom: 29,
-    //             Right: 85,
-    //         })
-    // };
 
-    // if buf_copy == 0 { 
-    //     tuitty::terminal::actions::win32::cook();
-    //     tuitty::terminal::actions::win32::disable_alt(false);
-    //     panic!("Something went wrong copying buffer");
-    // }
+    // Copy contents over
+    let buf_copy = unsafe {
+        WriteConsoleOutputW(
+        // WriteConsoleOutputA(
+            altern.0, 
+            read_buf.as_ptr(), 
+            // COORD {X: len as i16, Y: 1},
+            COORD {X: 51, Y: 1},
+            COORD {X: 0, Y: 0},
+            &mut SMALL_RECT {
+                Top: 5,
+                Left: 5,
+                Bottom: 29,
+                Right: 85,
+            })
+    };
+
+    if buf_copy == 0 { 
+        tuitty::terminal::actions::win32::cook();
+        tuitty::terminal::actions::win32::disable_alt(false);
+        panic!("Something went wrong copying buffer");
+    }
 
     thread::sleep(Duration::from_millis(2000));
 

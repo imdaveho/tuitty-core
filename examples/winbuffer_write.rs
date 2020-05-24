@@ -333,8 +333,8 @@ fn main() {
 
     thread::sleep(Duration::from_millis(2000));
 
-    // tuitty::terminal::actions::win32::printf("!", false);
     tuitty::terminal::actions::win32::goto(size.0 - 1, size.1 - 1, false);
+    tuitty::terminal::actions::win32::printf(" ", false);
 
     thread::sleep(Duration::from_millis(5000));
 

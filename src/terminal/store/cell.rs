@@ -30,6 +30,7 @@ pub struct ScreenBuffer {
     window: (i16, i16),
     tab_size: usize,
     active_style: (Color, Color, u32),
+    placeholder: char,
 }
 
 impl ScreenBuffer {
@@ -43,10 +44,11 @@ impl ScreenBuffer {
             cursor: 0,
             marker: 0,
             cells: vec![None; capacity],
-            capacity: capacity,
+            capacity,
             window: (w, h),
             tab_size: 8,
             active_style: (Reset, Reset, Effect::Reset as u32),
+            placeholder: '🚧',
         }
     }
 
@@ -88,7 +90,6 @@ impl ScreenBuffer {
                 self.cursor = index;
             },
         }
-
         index
     }
 
@@ -186,6 +187,10 @@ impl ScreenBuffer {
         self.tab_size = n;
     }
 
+    pub fn sync_placeholder(&mut self, ch: char) {
+        self.placeholder = ch;
+    }
+
     pub fn sync_size(&mut self, w: i16, h: i16) {
         self.window = (w, h);
         self.capacity = (w * h) as usize;
@@ -195,7 +200,15 @@ impl ScreenBuffer {
     pub fn getch(&self) -> String {
         let index = self.cursor;
         match &self.cells[index] {
-            Some(cell) => cell.glyph.iter().collect(),
+            Some(cell) => match cell.is_part {
+                true => {
+                    match &self.cells[index - 1] {
+                        Some(cell) => return cell.glyph.iter().collect(),
+                        None => return format!(" ")
+                    }
+                },
+                false => cell.glyph.iter().collect(),
+            },
             None => format!(" "),
         }
     }
@@ -208,6 +221,12 @@ impl ScreenBuffer {
         match &self.cells[index] {
             Some(cell) => match cell.is_part {
                 true => {
+                    // Technically, impossible to hit since self.cursor()
+                    // should always land on a normal cell (vs a partial one).
+                    // However, in the case that somehow the index is a 
+                    // partial cell, we remove the normal cell left of it, 
+                    // and once it is deleted, the partial cell is now in 
+                    // index - 1 and ready for deletion as well.
                     for _ in 0..2 {
                         self.cells.remove(index - 1);
                         self.cells.push(None);
@@ -215,6 +234,9 @@ impl ScreenBuffer {
                     self.cursor = index - 1;
                 },
                 false => {
+                    // In this case, we delete the normal cell under the cursor,
+                    // and when the vec shifts to the left, the existing index
+                    // will remove the partial cell that has shifted into position.
                     if cell.is_wide {
                         for _ in 0..2 {
                             self.cells.remove(index);
@@ -267,11 +289,11 @@ impl ScreenBuffer {
                 self.cursor = index + 2;
             },
             false => {
-                let mut partial = false;
+                let mut from_wide = false;
                 // If cell below is wide and new cell is single,
                 // we would need to clear out the partial cell.
                 if let Some(cell) = &self.cells[index] {
-                    if cell.is_wide { partial = true }
+                    if cell.is_wide { from_wide = true }
                 }
                 self.cells.remove(index);
                 self.cells.insert(index, Some(Cell {
@@ -281,9 +303,11 @@ impl ScreenBuffer {
                     style: self.active_style,
                 }));
                 self.cursor = index + 1;
-                if partial {
+                if from_wide {
                     self.cells.remove(index + 1);
                     self.cells.insert(index + 1, None);
+                    // Keep the spacing from 2 cells occupied to
+                    // the first cell updated and the second cell blank.
                     self.cursor = index + 2;
                 }
             }
@@ -337,14 +361,22 @@ impl ScreenBuffer {
             if s.is_ascii() { self.set_ascii(s) }
             else {
                 match s.width() {
-                    1 => self.set_cell(s.chars().collect(), false),
+                    1 => {
+                        if s.contains("\u{fe0f}") {
+                            self.set_cell(s.chars().collect(), true)
+                        } else {
+                            self.set_cell(s.chars().collect(), false)
+                        }
+                    },
                     2 => self.set_cell(s.chars().collect(), true),
-                    // (imdaveho) NOTE: Not going to handle complex
-                    // combiner chars until there is a better way to
-                    // detecting how many cells is going to be taken
-                    // up or until there is a consistent font to
-                    // recommend across platforms to handle them.
-                    _ => (),
+                    // (imdaveho) NOTE: We are not going to handle complex
+                    // combiner chars until there is a better way to detect
+                    // how many cells is going to be taken up or until there
+                    // is a consistent font / handling across terminal emulators
+                    // for these complex characters.
+                    // Instead, we will render all complex combiner characters
+                    // with this placeholder glyph: 🚧
+                    _ => self.set_cell(vec![self.placeholder,], true),
                 }
             }
         }
@@ -507,7 +539,7 @@ impl ScreenBuffer {
     }
 
     #[cfg(test)]
-    fn contents(&self) -> String {
+    fn check_contents(&self) -> String {
         let mut chars: Vec<char> = Vec::with_capacity(self.capacity);
         let mut length = 0;
         for c in self.cells.iter() {
@@ -546,19 +578,19 @@ mod tests {
         let mut buffer = ScreenBuffer::new();
         buffer.sync_size(5, 2);
         // Check default output:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, " ".repeat(10));
 
         // Insert wide char:
         buffer.sync_content("a㓘z");
         assert_eq!(buffer.cells.len(), 10);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!("a㓘z{}", " ".repeat(6)));
         assert_eq!(output.width(), 10);
         // Overwrite wide char:
         buffer.sync_coord(0, 0);
         buffer.sync_content("a$z");
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!("a$ z{}", " ".repeat(6)));
     }
 
@@ -567,14 +599,14 @@ mod tests {
         let mut buffer = ScreenBuffer::new();
         buffer.sync_size(5, 2);
         // Check default output:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, " ".repeat(10));
 
         // Insert \n char:
         // NOTE: Difference between Unix and Windows \n handling.
         buffer.sync_content("a\n㓘z");
         assert_eq!(buffer.cells.len(), 10);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         #[cfg(unix)]
         assert_eq!(output, format!(
             "a{}{}{}",
@@ -599,7 +631,7 @@ mod tests {
         // Overwrite \n char:
         buffer.sync_coord(0, 0);
         buffer.sync_content("a\n$z");
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         #[cfg(unix)]
         assert_eq!(output, format!(
             "a{}{}{}",
@@ -626,7 +658,7 @@ mod tests {
         buffer.sync_coord(1, 1);
 
         buffer.sync_clear(Clear::NewLn);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
 
         #[cfg(unix)]
         assert_eq!(output, format!("a{}$ z{}", " ".repeat(5), " ".repeat(1)));
@@ -636,7 +668,7 @@ mod tests {
         // Clear current line
         buffer.sync_coord(1, 1);
         buffer.sync_clear(Clear::CurrentLn);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!("a{}", " ".repeat(9)));
     }
 
@@ -645,7 +677,7 @@ mod tests {
         let mut buffer = ScreenBuffer::new();
         buffer.sync_size(15, 2);
         // Check default output:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, " ".repeat(30));
 
         // Insert tabs char:
@@ -653,7 +685,7 @@ mod tests {
         buffer.tab_size = 4;
         buffer.sync_content("a\t㓘\tzebra\t\t\t&");
         assert_eq!(buffer.cells.len(), 30);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!(
             "a{tab1}㓘{tab2}zebra{tab3}&{rest}",
             tab1=" ".repeat(3),
@@ -668,7 +700,7 @@ mod tests {
         buffer.sync_clear(Clear::All);
         buffer.sync_content("a\t㓘\tzebra\t\t\t&");
         assert_eq!(buffer.cells.len(), 30);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!(
             "a{tab1}㓘{tab2}zebra{tab3}&{rest}",
             tab1=" ".repeat(7),
@@ -716,7 +748,7 @@ mod tests {
         // │ 20│ 21│ S │ 23│ 24│
         // └───┴───┴───┴───┴───┘
 
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(&output[0..3], "--N");
         assert_eq!(&output[10..13], "W-0");
         assert_eq!(&output[12..15], "0-E");
@@ -738,7 +770,7 @@ mod tests {
         assert_eq!(buffer.getch(), "ष");
         buffer.sync_coord(4, 1);
         assert_eq!(buffer.getch(), " ");
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, "He㓘o, क्‍ष ");
         assert_eq!(output.width(), 10);
     }
@@ -749,7 +781,7 @@ mod tests {
         buffer.sync_size(5, 2);
         buffer.sync_content("He㓘o, क्‍ष");
         // Check contents right after entry:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         let length = output.len();
         // End should have single whitespace char:
         for (i, c) in output.chars().enumerate() {
@@ -762,12 +794,14 @@ mod tests {
         }
 
         // Remove 㓘 with 2 or 3:
-        buffer.sync_coord(2, 0);
+        // buffer.sync_coord(3, 0); // forcing an index on partial cell
+        buffer.cursor = 3;
+        assert_eq!(buffer.getch(), "㓘");
         buffer.delch();
         assert_eq!(buffer.getch(), "o");
 
         // Check contents after deletion:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         let length = output.len();
         // Should result in 2 more whitespace at the end:
         for (i, c) in output.chars().enumerate() {
@@ -784,7 +818,7 @@ mod tests {
         // Remove whitespace char, which appends another at end:
         buffer.sync_coord(3, 1);
         buffer.delch();
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, "Heo, क्‍ष   ");
         assert_eq!(output.width(), 10);
     }
@@ -794,12 +828,12 @@ mod tests {
         let mut buffer_a = ScreenBuffer::new();
         buffer_a.sync_size(5, 2);
         buffer_a.sync_content("a\r\n㓘z");
-        let output_a = buffer_a.contents();
+        let output_a = buffer_a.check_contents();
 
         let mut buffer_b = ScreenBuffer::new();
         buffer_b.sync_size(5, 2);
         buffer_b.sync_content("a\n㓘z");
-        let output_b = buffer_b.contents();
+        let output_b = buffer_b.check_contents();
 
         // NOTE: This demonstrates the difference
         // in OS specific ways of handling \n and \r\n.
@@ -823,5 +857,32 @@ mod tests {
             ::graphemes(content_b, true).collect();
 
         assert_ne!(segments_a, segments_b);
+    }
+
+    #[test]
+    fn test_complex_char_content() {
+        let mut buffer = ScreenBuffer::new();
+        buffer.sync_size(5, 2);
+        // Check default output:
+        let output = buffer.check_contents();
+        assert_eq!(output, " ".repeat(10));
+
+        // Insert wide char:
+        buffer.sync_content("a⚠️ 👨‍👩‍👧 ❤️z");
+        assert_eq!(buffer.cells.len(), 10);
+        let output = buffer.check_contents();
+        assert_eq!(output, format!("a⚠️ 🚧 ❤️z{}", " ".repeat(0)));
+        // \u{fe0f} characters are 1 cell wide...
+        assert_eq!(output.width(), 8);
+        // But we made it so that the character is 2 cell wide in the buffer:
+        assert_eq!(buffer.cells[1].as_ref().unwrap().glyph, 
+                   vec!['⚠', '\u{fe0f}']);
+        assert_eq!(buffer.cells[1].as_ref().unwrap().is_wide, true);
+        assert_eq!(buffer.cells[2].as_ref().unwrap().is_part, true);
+        // Overwrite wide char:
+        buffer.sync_coord(0, 0);
+        buffer.sync_content("a$z");
+        let output = buffer.check_contents();
+        assert_eq!(output, format!("a$ z🚧 ❤️z{}", " ".repeat(0)));
     }
 }
