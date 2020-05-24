@@ -1,5 +1,5 @@
 extern crate tuitty;
-use tuitty::common::unicode::wcwidth::UnicodeWidthChar;
+use tuitty::common::unicode::wcwidth::*;
 use tuitty::common::unicode::grapheme::UnicodeGraphemes;
 
 // use std::{ thread, time::Duration };
@@ -12,10 +12,13 @@ use tuitty::common::unicode::grapheme::UnicodeGraphemes;
 
 fn main() {
     // let original_input = "---- 👦🏿 ----";
-    let original_input = "---- 👨🏿‍🦰 ----";
-    let mut graphemes = UnicodeGraphemes::graphemes(original_input, true);
+    // let original_input = "---- 👨🏿‍🦰 ----";
+    // let original_input = "---- ⚠️ ----";
+    // let original_input= "---- ❤️ ----";
+    let original_input = "---- 👨‍👩‍👧 ----";
+    let graphemes = UnicodeGraphemes::graphemes(original_input, true);
     for g in graphemes {
-        println!("grapheme: {:?}, size: {}", g, std::mem::size_of_val(g));
+        println!("grapheme: {:?}, size: {}, width: {}", g, std::mem::size_of_val(g), g.width());
     }
 
 }
