@@ -3,7 +3,10 @@
 
 use crate::common::{
     unicode::{grapheme::*, wcwidth::*},
-    enums::{ Color::{*, self}, Effect, Style, Clear }
+    enums::{ 
+        Color::{*, self}, Effect, Style, Clear,
+        foreground, background, effects
+    }
 };
 
 #[cfg(unix)]
@@ -11,7 +14,10 @@ use crate::terminal::actions::posix;
 
 #[cfg(windows)]
 use crate::terminal::actions::win32;
-
+#[cfg(windows)]
+use winapi::shared::minwindef::WORD;
+#[cfg(windows)]
+use winapi::um::wincon::{WriteConsoleOutputAttribute, COORD};
 
 #[derive(Clone)]
 pub struct Cell {
@@ -19,6 +25,17 @@ pub struct Cell {
     is_wide: bool,
     is_part: bool,
     style: (Color, Color, u32),
+}
+
+impl Cell {
+    pub fn new(style: (Color, Color, u32)) -> Cell {
+        Cell {
+            glyph: vec![' '],
+            is_part: false,
+            is_wide: false,
+            style
+        }
+    }
 }
 
 
@@ -444,61 +461,112 @@ impl ScreenBuffer {
 
     #[cfg(windows)]
     pub fn render(&self, reset: u16, vte: bool) {
-        let (col, row) = self.coord();
-        win32::goto(0, 0, vte);
         let default = (Reset, Reset, Effect::Reset as u32);
         let mut style = (Reset, Reset, Effect::Reset as u32);
+
+        let (col, row) = self.coord();
+        win32::goto(0, 0, vte);
+
+        let mut change_index = 0;
+        let mut index = 0;
+        let mut current: WORD = reset as WORD;
+        // On Windows, we create the entire string to be printed at the end.
         let mut chunk = String::with_capacity(self.capacity);
-        for cell in &self.cells { match cell {
-            Some(c) => {
-                if c.is_part { continue }
-                // Complete reset.
-                if style != c.style && c.style == default {
-                    win32::prints(&chunk, vte);
-                    chunk.clear();
-                    win32::reset_styles(reset, vte);
-                    style = default;
-                    for ch in &c.glyph { chunk.push(*ch) }
+        // For styles, we keep track of the new styles and their starting and
+        // and finishing indices, so that we can apply them _after_ printing
+        // all the characters out. This reduces the amount of calls needed to
+        // the winconsole api, and improve rendering speed for each "frame"
+        let mut words: Vec<(WORD, i32, i32)> = vec![];
+        for cell in &self.cells {
+            let spc = Cell::new(style);
+            let data = match cell { Some(c) => c, None => &spc };
+            for ch in &data.glyph { chunk.push(*ch) }
+            if data.is_part { index += 1; continue }
+            
+            // Completely reset style back to default.
+            if style != data.style && data.style == default {
+                // Append previous style if it isn't the default.
+                if current != reset {
+                    words.push((current, change_index, index - 1));
                 }
-                // Some styles are different.
-                else if style != c.style {
-                    win32::prints(&chunk, vte);
-                    chunk.clear();
-                    // Different Fg.
-                    if style.0 != c.style.0 {
-                        win32::set_fg(c.style.0, reset, vte);
-                        style.0 = c.style.0;
+                // Reset the current attr.
+                current = reset as WORD;
+                // Update the last change to the current index.
+                change_index = index;
+                // Reset the conditional.
+                style = default;
+            }
+            // Some styles are different.
+            else if style != data.style {
+                // Different Fg.
+                if style.0 != data.style.0 {
+                    if current != reset {
+                        words.push((current, change_index, index - 1));
                     }
-                    // Different Bg.
-                    if style.1 != c.style.1 {
-                        win32::set_bg(c.style.1, reset, vte);
-                        style.1 = c.style.1;
-                    }
-                    // Different Fx.
-                    if style.2 != c.style.2 {
-                        win32::set_fx(c.style.2, vte);
-                        style.2 = c.style.2;
-                    }
-                    for ch in &c.glyph { chunk.push(*ch) }
+                    current = foreground(style.0, current, reset) as WORD;
+                    change_index = index;
+                    style.0 = data.style.0;
                 }
-                // Current style remains. Expand chunk.
-                else { for ch in &c.glyph { chunk.push(*ch) }}
-            },
-            None => {
-                // Already default style.
-                if style == default { chunk.push(' ') }
-                // Reset the previous style.
-                else {
-                    win32::prints(&chunk, vte);
-                    chunk.clear();
-                    win32::reset_styles(reset, vte);
-                    style = default;
-                    chunk.push(' ');
+                // Different Bg.
+                if style.1 != data.style.1 {
+                    if current != reset {
+                        words.push((current, change_index, index - 1));
+                    }
+                    current = background(style.1, current, reset) as WORD;
+                    change_index = index;
+                    style.1 = data.style.1;
+                }
+                // Different Fx.
+                if style.2 != data.style.2 {
+                    if current != reset {
+                        words.push((current, change_index, index - 1));
+                    }
+                    current = effects(style.2, current) as WORD;
+                    change_index = index;
+                    style.2 = data.style.2;
                 }
             }
-        }}
-        chunk.pop(); // Windows Console offsets at capacity.
+            // Current style remains. Do nothing.
+            else { () }
+            index += 1;    
+        };
+        // Windows Console creates a new line after printing
+        // the last character in the buffer. To prevent this,
+        // we offset the max buffer capacity by -1.
+        chunk.pop(); 
         if chunk.len() > 0 { win32::prints(&chunk, vte) }
+        // Styles are appended based on the _previous_ style. Append
+        // the last remaining style to the list.
+        if current != reset {
+            words.push((current, change_index, index - 1));
+        }
+
+        // TODO: move the below into actions
+        for set in words {
+            let (word, start, finish) = set;
+            let length = (finish - start) as u32;
+            let coord = (
+                finish as i16 % self.width(),
+                finish as i16 / self.width()
+            );            
+            win32::set_attrib(word, length, coord);
+
+
+            // let err = unsafe {
+            //     WriteConsoleOutputAttribute(
+            //         altern.0,
+            //         styles.as_ptr() as *const WORD,
+            //         length as u32,
+            //         COORD { X: col, Y: row},
+            //         &mut count
+            //     )
+            // };
+            // if err == 0 {
+            //     tuitty::terminal::actions::win32::cook();
+            //     tuitty::terminal::actions::win32::disable_alt(false);
+            //     panic!(format!("Something went wrong applying attr to buffer - response: {}", err));
+            // }
+        }
         win32::goto(col, row, vte);
     }
 

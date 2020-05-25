@@ -176,41 +176,41 @@ pub mod posix {
     }
 
 
-    // UNIFIED STRUCT W/ ACTIONS
-    pub struct Term { mode: Termios }
-    impl Term {
-        pub fn new() -> Self {
-            Self { mode: get_mode() }
-        }
-        pub fn goto(&self, col: i16, row: i16) { goto(col, row) }
-        pub fn up(&self, n: i16) { up(n) }
-        pub fn down(&self, n: i16) { down(n) }
-        pub fn left(&self, n: i16) { left(n) }
-        pub fn right(&self, n: i16) { right(n) }
-        pub fn query_pos(&self) { pos() }
-        pub fn pos_raw(&self) -> (i16, i16) { pos_raw() }
-        pub fn hide_cursor(&self) { hide_cursor() }
-        pub fn show_cursor(&self) { show_cursor() }
-        pub fn clear(&self, method: Clear) { clear(method) }
-        pub fn size(&self) -> (i16, i16) { size() }
-        pub fn resize(&self, w: i16, h: i16) { resize(w, h) }
-        pub fn enable_alt(&self) { enable_alt() }
-        pub fn disable_alt(&self) { disable_alt() }
-        pub fn prints(&self, content: &str) { prints(content) }
-        pub fn printf(&self, content: &str) { printf(content) }
-        pub fn flush(&self) { flush() }
-        pub fn raw(&self) { raw() }
-        pub fn cook(&self) { cook(&self.mode) }
-        pub fn enable_mouse(&self) { enable_mouse() }
-        pub fn disable_mouse(&self) { disable_mouse() }
-        pub fn set_fx(&self, effects: u32) { set_fx(effects) }
-        pub fn set_fg(&self, color: Color) { set_fg(color) }
-        pub fn set_bg(&self, color: Color) { set_bg(color) }
-        pub fn set_styles(&self, fg: Color, bg: Color, fx: u32) {
-            set_styles(fg, bg, fx)
-        }
-        pub fn reset_styles(&self) { reset_styles() }
-    }
+    // // UNIFIED STRUCT W/ ACTIONS
+    // pub struct Term { mode: Termios }
+    // impl Term {
+    //     pub fn new() -> Self {
+    //         Self { mode: get_mode() }
+    //     }
+    //     pub fn goto(&self, col: i16, row: i16) { goto(col, row) }
+    //     pub fn up(&self, n: i16) { up(n) }
+    //     pub fn down(&self, n: i16) { down(n) }
+    //     pub fn left(&self, n: i16) { left(n) }
+    //     pub fn right(&self, n: i16) { right(n) }
+    //     pub fn query_pos(&self) { pos() }
+    //     pub fn pos_raw(&self) -> (i16, i16) { pos_raw() }
+    //     pub fn hide_cursor(&self) { hide_cursor() }
+    //     pub fn show_cursor(&self) { show_cursor() }
+    //     pub fn clear(&self, method: Clear) { clear(method) }
+    //     pub fn size(&self) -> (i16, i16) { size() }
+    //     pub fn resize(&self, w: i16, h: i16) { resize(w, h) }
+    //     pub fn enable_alt(&self) { enable_alt() }
+    //     pub fn disable_alt(&self) { disable_alt() }
+    //     pub fn prints(&self, content: &str) { prints(content) }
+    //     pub fn printf(&self, content: &str) { printf(content) }
+    //     pub fn flush(&self) { flush() }
+    //     pub fn raw(&self) { raw() }
+    //     pub fn cook(&self) { cook(&self.mode) }
+    //     pub fn enable_mouse(&self) { enable_mouse() }
+    //     pub fn disable_mouse(&self) { disable_mouse() }
+    //     pub fn set_fx(&self, effects: u32) { set_fx(effects) }
+    //     pub fn set_fg(&self, color: Color) { set_fg(color) }
+    //     pub fn set_bg(&self, color: Color) { set_bg(color) }
+    //     pub fn set_styles(&self, fg: Color, bg: Color, fx: u32) {
+    //         set_styles(fg, bg, fx)
+    //     }
+    //     pub fn reset_styles(&self) { reset_styles() }
+    // }
 
 }
 
@@ -414,8 +414,18 @@ pub mod win32 {
     pub fn get_attrib() -> u16 {
         let conout_err = "Error fetching $CONOUT";
         let coninfo_err = "Error fetching ConsoleInfo from $CONOUT";
-        ConsoleInfo::of(&Handle::conout().expect(conout_err))
-            .expect(coninfo_err).attributes()
+        let handle = Handle::conout().expect(conout_err);
+        let attrib = ConsoleInfo::of(&handle).expect(coninfo_err).attributes();
+        let conout_err = "Error closing $CONOUT";
+        handle.close().expect(conout_err);
+        attrib
+    }
+
+    // Windows Console API specific. Allows you to update the text
+    // styles without having to re-print. 
+    pub fn set_attrib(word: u16, length: u32, coord: (i16, i16)) {
+        let err_msg = "Error setting console output attributes";
+        wincon::style::set_attribute(word, length, coord).expect(err_msg);    
     }
 
     pub fn is_ansi_enabled() -> bool {
@@ -452,47 +462,53 @@ pub mod win32 {
                 Err(_) => return false,
             };
             match handle.set_mode(&(mode | enable_vt)) {
-                Ok(_) => return true,
-                Err(_) => return false,
+                Ok(_) => {
+                    handle.close().expect("Error closing $STDOUT");
+                    return true;
+                }
+                Err(_) => {
+                    handle.close().expect("Error closing $STDOUT");
+                    return false;
+                }
             }
         }
     }
 
 
-    // UNIFIED STRUCT W/ ACTIONS
-    pub struct Term {
-        mode: u32,
-        #[cfg(windows)]
-        reset: ConsoleInfo,
-        #[cfg(windows)]
-        conout: Handle,
-        //conin: Handle,
-        cfg: bool
-    }
-    impl Term {
-        pub fn new() -> Self {
-            let conout = Handle::conout()
-                .expect("Error fetching CONOUT$");
-            let reset = ConsoleInfo::of(&conout)
-                .expect("Error fetching ConsoleInfo from CONOUT$");
-            Self {
-                mode: get_mode(),
-                reset, conout,
-                cfg: is_ansi_enabled()
-            }
-        }
-        pub fn goto(&self, col: i16, row: i16) { goto(col, row, self.cfg) }
-        pub fn up(&self, n: i16) { up(n, self.cfg) }
-        pub fn down(&self, n: i16) { down(n, self.cfg) }
-        pub fn left(&self, n: i16) { left(n, self.cfg) }
-        pub fn right(&self, n: i16) { right(n, self.cfg) }
-        // TODO TODO TODO - should pass in self.conout ???
-        pub fn pos_raw(&self) -> (i16, i16) {
-            let info = ConsoleInfo::of(&self.conout)
-                .expect("Error fetching cursor position from CONOUT$");
-            info.cursor_pos()
-        }
-        pub fn hide_cursor() { () }
+//     // UNIFIED STRUCT W/ ACTIONS
+//     pub struct Term {
+//         mode: u32,
+//         #[cfg(windows)]
+//         reset: ConsoleInfo,
+//         #[cfg(windows)]
+//         conout: Handle,
+//         //conin: Handle,
+//         cfg: bool
+//     }
+//     impl Term {
+//         pub fn new() -> Self {
+//             let conout = Handle::conout()
+//                 .expect("Error fetching CONOUT$");
+//             let reset = ConsoleInfo::of(&conout)
+//                 .expect("Error fetching ConsoleInfo from CONOUT$");
+//             Self {
+//                 mode: get_mode(),
+//                 reset, conout,
+//                 cfg: is_ansi_enabled()
+//             }
+//         }
+//         pub fn goto(&self, col: i16, row: i16) { goto(col, row, self.cfg) }
+//         pub fn up(&self, n: i16) { up(n, self.cfg) }
+//         pub fn down(&self, n: i16) { down(n, self.cfg) }
+//         pub fn left(&self, n: i16) { left(n, self.cfg) }
+//         pub fn right(&self, n: i16) { right(n, self.cfg) }
+//         // TODO TODO TODO - should pass in self.conout ???
+//         pub fn pos_raw(&self) -> (i16, i16) {
+//             let info = ConsoleInfo::of(&self.conout)
+//                 .expect("Error fetching cursor position from CONOUT$");
+//             info.cursor_pos()
+//         }
+//         pub fn hide_cursor() { () }
 
-    }
+//     }
 }
