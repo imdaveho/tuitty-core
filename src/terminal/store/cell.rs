@@ -541,7 +541,6 @@ impl ScreenBuffer {
             words.push((current, change_index, index - 1));
         }
 
-        // TODO: move the below into actions
         for set in words {
             let (word, start, finish) = set;
             let length = (finish - start) as u32;
@@ -550,22 +549,6 @@ impl ScreenBuffer {
                 finish as i16 / self.width()
             );            
             win32::set_attrib(word, length, coord);
-
-
-            // let err = unsafe {
-            //     WriteConsoleOutputAttribute(
-            //         altern.0,
-            //         styles.as_ptr() as *const WORD,
-            //         length as u32,
-            //         COORD { X: col, Y: row},
-            //         &mut count
-            //     )
-            // };
-            // if err == 0 {
-            //     tuitty::terminal::actions::win32::cook();
-            //     tuitty::terminal::actions::win32::disable_alt(false);
-            //     panic!(format!("Something went wrong applying attr to buffer - response: {}", err));
-            // }
         }
         win32::goto(col, row, vte);
     }
