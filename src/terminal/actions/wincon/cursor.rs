@@ -37,7 +37,7 @@ pub fn goto(col: i16, row: i16) -> Result<()> {
             return Err(Error::last_os_error());
         }
     }
-
+    handle.close()?;
     Ok(())
 }
 
@@ -72,6 +72,7 @@ pub fn hide_cursor() -> Result<()> {
             return Err(Error::last_os_error());
         }
     }
+    handle.close()?;
     Ok(())
 }
 
@@ -86,11 +87,13 @@ pub fn show_cursor() -> Result<()> {
             return Err(Error::last_os_error());
         }
     }
+    handle.close()?;
     Ok(())
 }
 
 pub fn pos() -> Result<(i16, i16)> {
     let handle = Handle::conout()?;
     let info = ConsoleInfo::of(&handle)?;
+    handle.close()?;
     Ok(info.cursor_pos())
 }

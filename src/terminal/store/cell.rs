@@ -3,7 +3,10 @@
 
 use crate::common::{
     unicode::{grapheme::*, wcwidth::*},
-    enums::{ Color::{*, self}, Effect, Style, Clear }
+    enums::{ 
+        Color::{*, self}, Effect, Style, Clear,
+        foreground, background, effects
+    }
 };
 
 #[cfg(unix)]
@@ -11,7 +14,10 @@ use crate::terminal::actions::posix;
 
 #[cfg(windows)]
 use crate::terminal::actions::win32;
-
+#[cfg(windows)]
+use winapi::shared::minwindef::WORD;
+#[cfg(windows)]
+use winapi::um::wincon::{WriteConsoleOutputAttribute, COORD};
 
 #[derive(Clone)]
 pub struct Cell {
@@ -19,6 +25,17 @@ pub struct Cell {
     is_wide: bool,
     is_part: bool,
     style: (Color, Color, u32),
+}
+
+impl Cell {
+    pub fn new(style: (Color, Color, u32)) -> Cell {
+        Cell {
+            glyph: vec![' '],
+            is_part: false,
+            is_wide: false,
+            style
+        }
+    }
 }
 
 
@@ -30,6 +47,7 @@ pub struct ScreenBuffer {
     window: (i16, i16),
     tab_size: usize,
     active_style: (Color, Color, u32),
+    placeholder: char,
 }
 
 impl ScreenBuffer {
@@ -43,10 +61,11 @@ impl ScreenBuffer {
             cursor: 0,
             marker: 0,
             cells: vec![None; capacity],
-            capacity: capacity,
+            capacity,
             window: (w, h),
             tab_size: 8,
             active_style: (Reset, Reset, Effect::Reset as u32),
+            placeholder: '🚧',
         }
     }
 
@@ -88,7 +107,6 @@ impl ScreenBuffer {
                 self.cursor = index;
             },
         }
-
         index
     }
 
@@ -186,6 +204,10 @@ impl ScreenBuffer {
         self.tab_size = n;
     }
 
+    pub fn sync_placeholder(&mut self, ch: char) {
+        self.placeholder = ch;
+    }
+
     pub fn sync_size(&mut self, w: i16, h: i16) {
         self.window = (w, h);
         self.capacity = (w * h) as usize;
@@ -195,7 +217,15 @@ impl ScreenBuffer {
     pub fn getch(&self) -> String {
         let index = self.cursor;
         match &self.cells[index] {
-            Some(cell) => cell.glyph.iter().collect(),
+            Some(cell) => match cell.is_part {
+                true => {
+                    match &self.cells[index - 1] {
+                        Some(cell) => return cell.glyph.iter().collect(),
+                        None => return format!(" ")
+                    }
+                },
+                false => cell.glyph.iter().collect(),
+            },
             None => format!(" "),
         }
     }
@@ -208,6 +238,12 @@ impl ScreenBuffer {
         match &self.cells[index] {
             Some(cell) => match cell.is_part {
                 true => {
+                    // Technically, impossible to hit since self.cursor()
+                    // should always land on a normal cell (vs a partial one).
+                    // However, in the case that somehow the index is a 
+                    // partial cell, we remove the normal cell left of it, 
+                    // and once it is deleted, the partial cell is now in 
+                    // index - 1 and ready for deletion as well.
                     for _ in 0..2 {
                         self.cells.remove(index - 1);
                         self.cells.push(None);
@@ -215,6 +251,9 @@ impl ScreenBuffer {
                     self.cursor = index - 1;
                 },
                 false => {
+                    // In this case, we delete the normal cell under the cursor,
+                    // and when the vec shifts to the left, the existing index
+                    // will remove the partial cell that has shifted into position.
                     if cell.is_wide {
                         for _ in 0..2 {
                             self.cells.remove(index);
@@ -267,11 +306,11 @@ impl ScreenBuffer {
                 self.cursor = index + 2;
             },
             false => {
-                let mut placeholder = false;
+                let mut from_wide = false;
                 // If cell below is wide and new cell is single,
-                // we would need to clear out the placeholder cell.
+                // we would need to clear out the partial cell.
                 if let Some(cell) = &self.cells[index] {
-                    if cell.is_wide { placeholder = true }
+                    if cell.is_wide { from_wide = true }
                 }
                 self.cells.remove(index);
                 self.cells.insert(index, Some(Cell {
@@ -281,9 +320,11 @@ impl ScreenBuffer {
                     style: self.active_style,
                 }));
                 self.cursor = index + 1;
-                if placeholder {
+                if from_wide {
                     self.cells.remove(index + 1);
                     self.cells.insert(index + 1, None);
+                    // Keep the spacing from 2 cells occupied to
+                    // the first cell updated and the second cell blank.
                     self.cursor = index + 2;
                 }
             }
@@ -337,14 +378,22 @@ impl ScreenBuffer {
             if s.is_ascii() { self.set_ascii(s) }
             else {
                 match s.width() {
-                    1 => self.set_cell(s.chars().collect(), false),
+                    1 => {
+                        if s.contains("\u{fe0f}") {
+                            self.set_cell(s.chars().collect(), true)
+                        } else {
+                            self.set_cell(s.chars().collect(), false)
+                        }
+                    },
                     2 => self.set_cell(s.chars().collect(), true),
-                    // (imdaveho) NOTE: Not going to handle complex
-                    // combiner chars until there is a better way to
-                    // detecting how many cells is going to be taken
-                    // up or until there is a consistent font to
-                    // recommend across platforms to handle them.
-                    _ => (),
+                    // (imdaveho) NOTE: We are not going to handle complex
+                    // combiner chars until there is a better way to detect
+                    // how many cells is going to be taken up or until there
+                    // is a consistent font / handling across terminal emulators
+                    // for these complex characters.
+                    // Instead, we will render all complex combiner characters
+                    // with this placeholder glyph: 🚧
+                    _ => self.set_cell(vec![self.placeholder,], true),
                 }
             }
         }
@@ -412,61 +461,95 @@ impl ScreenBuffer {
 
     #[cfg(windows)]
     pub fn render(&self, reset: u16, vte: bool) {
-        let (col, row) = self.coord();
-        win32::goto(0, 0, vte);
         let default = (Reset, Reset, Effect::Reset as u32);
         let mut style = (Reset, Reset, Effect::Reset as u32);
+
+        let (col, row) = self.coord();
+        win32::goto(0, 0, vte);
+
+        let mut change_index = 0;
+        let mut index = 0;
+        let mut current: WORD = reset as WORD;
+        // On Windows, we create the entire string to be printed at the end.
         let mut chunk = String::with_capacity(self.capacity);
-        for cell in &self.cells { match cell {
-            Some(c) => {
-                if c.is_part { continue }
-                // Complete reset.
-                if style != c.style && c.style == default {
-                    win32::prints(&chunk, vte);
-                    chunk.clear();
-                    win32::reset_styles(reset, vte);
-                    style = default;
-                    for ch in &c.glyph { chunk.push(*ch) }
+        // For styles, we keep track of the new styles and their starting and
+        // and finishing indices, so that we can apply them _after_ printing
+        // all the characters out. This reduces the amount of calls needed to
+        // the winconsole api, and improve rendering speed for each "frame"
+        let mut words: Vec<(WORD, i32, i32)> = vec![];
+        for cell in &self.cells {
+            let spc = Cell::new(style);
+            let data = match cell { Some(c) => c, None => &spc };
+            for ch in &data.glyph { chunk.push(*ch) }
+            if data.is_part { index += 1; continue }
+            
+            // Completely reset style back to default.
+            if style != data.style && data.style == default {
+                // Append previous style if it isn't the default.
+                if current != reset {
+                    words.push((current, change_index, index - 1));
                 }
-                // Some styles are different.
-                else if style != c.style {
-                    win32::prints(&chunk, vte);
-                    chunk.clear();
-                    // Different Fg.
-                    if style.0 != c.style.0 {
-                        win32::set_fg(c.style.0, reset, vte);
-                        style.0 = c.style.0;
+                // Reset the current attr.
+                current = reset as WORD;
+                // Update the last change to the current index.
+                change_index = index;
+                // Reset the conditional.
+                style = default;
+            }
+            // Some styles are different.
+            else if style != data.style {
+                // Different Fg.
+                if style.0 != data.style.0 {
+                    if current != reset {
+                        words.push((current, change_index, index - 1));
                     }
-                    // Different Bg.
-                    if style.1 != c.style.1 {
-                        win32::set_bg(c.style.1, reset, vte);
-                        style.1 = c.style.1;
-                    }
-                    // Different Fx.
-                    if style.2 != c.style.2 {
-                        win32::set_fx(c.style.2, vte);
-                        style.2 = c.style.2;
-                    }
-                    for ch in &c.glyph { chunk.push(*ch) }
+                    current = foreground(style.0, current, reset) as WORD;
+                    change_index = index;
+                    style.0 = data.style.0;
                 }
-                // Current style remains. Expand chunk.
-                else { for ch in &c.glyph { chunk.push(*ch) }}
-            },
-            None => {
-                // Already default style.
-                if style == default { chunk.push(' ') }
-                // Reset the previous style.
-                else {
-                    win32::prints(&chunk, vte);
-                    chunk.clear();
-                    win32::reset_styles(reset, vte);
-                    style = default;
-                    chunk.push(' ');
+                // Different Bg.
+                if style.1 != data.style.1 {
+                    if current != reset {
+                        words.push((current, change_index, index - 1));
+                    }
+                    current = background(style.1, current, reset) as WORD;
+                    change_index = index;
+                    style.1 = data.style.1;
+                }
+                // Different Fx.
+                if style.2 != data.style.2 {
+                    if current != reset {
+                        words.push((current, change_index, index - 1));
+                    }
+                    current = effects(style.2, current) as WORD;
+                    change_index = index;
+                    style.2 = data.style.2;
                 }
             }
-        }}
-        chunk.pop(); // Windows Console offsets at capacity.
+            // Current style remains. Do nothing.
+            else { () }
+            index += 1;    
+        };
+        // Windows Console creates a new line after printing
+        // the last character in the buffer. To prevent this,
+        // we offset the max buffer capacity by -1.
+        chunk.pop(); 
         if chunk.len() > 0 { win32::prints(&chunk, vte) }
+        // Styles are appended based on the _previous_ style. Append
+        // the last remaining style to the list.
+        if current != reset {
+            words.push((current, change_index, index - 1));
+        }
+
+        for set in words {
+            let (word, start, finish) = set;
+            let length = (finish - start) as u32;
+            let coord = (
+                finish as i16 % self.width(),
+                finish as i16 / self.width()
+            );            
+            win32::set_attrib(word, length, coord);
+        }
         win32::goto(col, row, vte);
     }
 
@@ -507,7 +590,7 @@ impl ScreenBuffer {
     }
 
     #[cfg(test)]
-    fn contents(&self) -> String {
+    fn check_contents(&self) -> String {
         let mut chars: Vec<char> = Vec::with_capacity(self.capacity);
         let mut length = 0;
         for c in self.cells.iter() {
@@ -546,19 +629,19 @@ mod tests {
         let mut buffer = ScreenBuffer::new();
         buffer.sync_size(5, 2);
         // Check default output:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, " ".repeat(10));
 
         // Insert wide char:
         buffer.sync_content("a㓘z");
         assert_eq!(buffer.cells.len(), 10);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!("a㓘z{}", " ".repeat(6)));
         assert_eq!(output.width(), 10);
         // Overwrite wide char:
         buffer.sync_coord(0, 0);
         buffer.sync_content("a$z");
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!("a$ z{}", " ".repeat(6)));
     }
 
@@ -567,14 +650,14 @@ mod tests {
         let mut buffer = ScreenBuffer::new();
         buffer.sync_size(5, 2);
         // Check default output:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, " ".repeat(10));
 
         // Insert \n char:
         // NOTE: Difference between Unix and Windows \n handling.
         buffer.sync_content("a\n㓘z");
         assert_eq!(buffer.cells.len(), 10);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         #[cfg(unix)]
         assert_eq!(output, format!(
             "a{}{}{}",
@@ -599,7 +682,7 @@ mod tests {
         // Overwrite \n char:
         buffer.sync_coord(0, 0);
         buffer.sync_content("a\n$z");
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         #[cfg(unix)]
         assert_eq!(output, format!(
             "a{}{}{}",
@@ -626,7 +709,7 @@ mod tests {
         buffer.sync_coord(1, 1);
 
         buffer.sync_clear(Clear::NewLn);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
 
         #[cfg(unix)]
         assert_eq!(output, format!("a{}$ z{}", " ".repeat(5), " ".repeat(1)));
@@ -636,7 +719,7 @@ mod tests {
         // Clear current line
         buffer.sync_coord(1, 1);
         buffer.sync_clear(Clear::CurrentLn);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!("a{}", " ".repeat(9)));
     }
 
@@ -645,7 +728,7 @@ mod tests {
         let mut buffer = ScreenBuffer::new();
         buffer.sync_size(15, 2);
         // Check default output:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, " ".repeat(30));
 
         // Insert tabs char:
@@ -653,7 +736,7 @@ mod tests {
         buffer.tab_size = 4;
         buffer.sync_content("a\t㓘\tzebra\t\t\t&");
         assert_eq!(buffer.cells.len(), 30);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!(
             "a{tab1}㓘{tab2}zebra{tab3}&{rest}",
             tab1=" ".repeat(3),
@@ -668,7 +751,7 @@ mod tests {
         buffer.sync_clear(Clear::All);
         buffer.sync_content("a\t㓘\tzebra\t\t\t&");
         assert_eq!(buffer.cells.len(), 30);
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, format!(
             "a{tab1}㓘{tab2}zebra{tab3}&{rest}",
             tab1=" ".repeat(7),
@@ -716,7 +799,7 @@ mod tests {
         // │ 20│ 21│ S │ 23│ 24│
         // └───┴───┴───┴───┴───┘
 
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(&output[0..3], "--N");
         assert_eq!(&output[10..13], "W-0");
         assert_eq!(&output[12..15], "0-E");
@@ -738,7 +821,7 @@ mod tests {
         assert_eq!(buffer.getch(), "ष");
         buffer.sync_coord(4, 1);
         assert_eq!(buffer.getch(), " ");
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, "He㓘o, क्‍ष ");
         assert_eq!(output.width(), 10);
     }
@@ -749,7 +832,7 @@ mod tests {
         buffer.sync_size(5, 2);
         buffer.sync_content("He㓘o, क्‍ष");
         // Check contents right after entry:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         let length = output.len();
         // End should have single whitespace char:
         for (i, c) in output.chars().enumerate() {
@@ -762,12 +845,14 @@ mod tests {
         }
 
         // Remove 㓘 with 2 or 3:
-        buffer.sync_coord(2, 0);
+        // buffer.sync_coord(3, 0); // forcing an index on partial cell
+        buffer.cursor = 3;
+        assert_eq!(buffer.getch(), "㓘");
         buffer.delch();
         assert_eq!(buffer.getch(), "o");
 
         // Check contents after deletion:
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         let length = output.len();
         // Should result in 2 more whitespace at the end:
         for (i, c) in output.chars().enumerate() {
@@ -784,7 +869,7 @@ mod tests {
         // Remove whitespace char, which appends another at end:
         buffer.sync_coord(3, 1);
         buffer.delch();
-        let output = buffer.contents();
+        let output = buffer.check_contents();
         assert_eq!(output, "Heo, क्‍ष   ");
         assert_eq!(output.width(), 10);
     }
@@ -794,12 +879,12 @@ mod tests {
         let mut buffer_a = ScreenBuffer::new();
         buffer_a.sync_size(5, 2);
         buffer_a.sync_content("a\r\n㓘z");
-        let output_a = buffer_a.contents();
+        let output_a = buffer_a.check_contents();
 
         let mut buffer_b = ScreenBuffer::new();
         buffer_b.sync_size(5, 2);
         buffer_b.sync_content("a\n㓘z");
-        let output_b = buffer_b.contents();
+        let output_b = buffer_b.check_contents();
 
         // NOTE: This demonstrates the difference
         // in OS specific ways of handling \n and \r\n.
@@ -823,5 +908,32 @@ mod tests {
             ::graphemes(content_b, true).collect();
 
         assert_ne!(segments_a, segments_b);
+    }
+
+    #[test]
+    fn test_complex_char_content() {
+        let mut buffer = ScreenBuffer::new();
+        buffer.sync_size(5, 2);
+        // Check default output:
+        let output = buffer.check_contents();
+        assert_eq!(output, " ".repeat(10));
+
+        // Insert wide char:
+        buffer.sync_content("a⚠️ 👨‍👩‍👧 ❤️z");
+        assert_eq!(buffer.cells.len(), 10);
+        let output = buffer.check_contents();
+        assert_eq!(output, format!("a⚠️ 🚧 ❤️z{}", " ".repeat(0)));
+        // \u{fe0f} characters are 1 cell wide...
+        assert_eq!(output.width(), 8);
+        // But we made it so that the character is 2 cell wide in the buffer:
+        assert_eq!(buffer.cells[1].as_ref().unwrap().glyph, 
+                   vec!['⚠', '\u{fe0f}']);
+        assert_eq!(buffer.cells[1].as_ref().unwrap().is_wide, true);
+        assert_eq!(buffer.cells[2].as_ref().unwrap().is_part, true);
+        // Overwrite wide char:
+        buffer.sync_coord(0, 0);
+        buffer.sync_content("a$z");
+        let output = buffer.check_contents();
+        assert_eq!(output, format!("a$ z🚧 ❤️z{}", " ".repeat(0)));
     }
 }

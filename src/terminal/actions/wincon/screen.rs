@@ -25,7 +25,7 @@ pub fn clear(clr: Clear) -> Result<()> {
     let (w, h) = info.buffer_size();
 
     // Inputs to FillConsoleOutput.
-    let conout = Handle::conout()?;
+    // let conout = Handle::conout()?;
     let ch = ' ' as i8;
     // Because the current Handle could have attributes that modify the
     // surrounding console cell (eg. underscore or left vertical), we
@@ -66,23 +66,27 @@ pub fn clear(clr: Clear) -> Result<()> {
     }
 
     unsafe {
-        if FillConsoleOutputCharacterA(conout.0, ch, n, at, &mut len) == 0 {
+        if FillConsoleOutputCharacterA(handle.0, ch, n, at, &mut len) == 0 {
             return Err(Error::last_os_error())
         }
 
-        if FillConsoleOutputAttribute(conout.0, fx, n, at, &mut len) == 0 {
+        if FillConsoleOutputAttribute(handle.0, fx, n, at, &mut len) == 0 {
             return Err(Error::last_os_error())
         }
     }
+    handle.close()?;
     Ok(())
 }
 
 pub fn size() -> (i16, i16) {
+    let err_msg = "Error closing $CONOUT when getting console size";
     if let Ok(handle) = Handle::conout() {
         if let Ok(info) = ConsoleInfo::of(&handle) {
+            handle.close().expect(err_msg);
             let size = info.terminal_size();
             ((size.0 + 1), (size.1 + 1))
         } else {
+            handle.close().expect(err_msg);
             (0, 0)
         }
     } else {
@@ -184,11 +188,13 @@ pub fn resize(w: i16, h: i16) -> Result<()> {
                 "Argument h: {} out of range setting terminal height.", h)));
     }
 
+    handle.close()?;
     Ok(())
 }
 
 pub fn disable_alt() -> Result<()> {
     let handle = Handle::stdout()?;
     handle.show()?;
+    handle.close()?;
     Ok(())
 }

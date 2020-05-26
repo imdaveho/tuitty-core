@@ -45,6 +45,7 @@ pub fn prints(content: &str) -> Result<usize> {
             return Err(Error::last_os_error());
         }
     }
+    handle.close()?;
     Ok(size as usize)
 }
 
@@ -53,7 +54,10 @@ pub fn get_mode() -> Result<u32> {
     // Stdout because if you're creating a
     // new screen via alternate screen, you
     // want a default set of terminal settings
-    Handle::stdout().unwrap().get_mode()
+    let handle = Handle::stdout()?;
+    let mode = handle.get_mode();
+    handle.close()?;
+    mode
 }
 
 
@@ -63,6 +67,7 @@ pub fn enable_raw() -> Result<()> {
     let mask = ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_LINE_INPUT;
     let raw_mode = mode & !mask;
     handle.set_mode(&raw_mode)?;
+    handle.close()?;
     Ok(())
 }
 
@@ -72,5 +77,6 @@ pub fn disable_raw() -> Result<()> {
     let mask = ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_LINE_INPUT;
     let cooked_mode = mode | mask;
     handle.set_mode(&cooked_mode)?;
+    handle.close()?;
     Ok(())
 }

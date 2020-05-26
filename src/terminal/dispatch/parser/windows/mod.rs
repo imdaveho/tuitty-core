@@ -123,6 +123,13 @@ pub fn read_input_events() -> (u32, Vec<InputEvent>) {
         }
     }
 
+    // TODO: needs testing -- try to put in dispatcher and pass as ref
+    // as well as test rapid create/close/create/close/create/close...
+    // match conin.close() {
+    //     Ok() => (),
+    //     Err(_) => return (0, vec![InputEvent::Unsupported]),
+    // };
+
     let result = (
         buf_len,
         buf[..(buf_len as usize)]

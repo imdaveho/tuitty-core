@@ -12,6 +12,7 @@ pub fn enable_mouse_mode() -> Result<()> {
     let mode = handle.get_mode()?;
     let mouse_mode = (mode | MOUSE_MODE) & !0x0040;
     handle.set_mode(&mouse_mode)?;
+    handle.close()?;
     Ok(())
 }
 
@@ -20,5 +21,6 @@ pub fn disable_mouse_mode() -> Result<()> {
     let mode = handle.get_mode()?;
     let mouse_mode = (mode & !MOUSE_MODE) | 0x0040;
     handle.set_mode(&mouse_mode)?;
+    handle.close()?;
     Ok(())
 }
