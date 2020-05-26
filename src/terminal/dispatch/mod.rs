@@ -539,13 +539,13 @@ impl Dispatcher {
                                 else { continue }
                                 // Handle screen switch:
                                 // Disable if you are reverting back to main.
-                                if id == 0 { win32::disable_alt(vte) }
+                                if id == 0 { win32::disable_alt(vte).expect("TODO") }
                                 else {
                                     // Enable as you are on the main screen
                                     // switching to alternate.
                                     if vte { if current == 0 {
                                         win32::enable_alt(
-                                            &screen, &initial, true)
+                                            &screen, &initial, true).expect("TODO")
                                     }} else {
                                         // (imdaveho) NOTE: For unknown reason
                                         // that needs to be investigated TODO,
@@ -553,7 +553,7 @@ impl Dispatcher {
                                         // console handle as active every time
                                         // on Windows Console.
                                         win32::enable_alt(
-                                            &screen, &initial, false)
+                                            &screen, &initial, false).expect("TODO")
                                     }
                                     win32::clear(Clear::All, vte);
                                 }
@@ -564,17 +564,17 @@ impl Dispatcher {
                                     store.is_mouse(),
                                     store.is_cursor() );
 
-                                if raw { win32::raw() } else { win32::cook() }
-                                if mouse { win32::enable_mouse(vte) }
-                                else { win32::disable_mouse(vte) }
-                                if show { win32::show_cursor(vte) }
-                                else { win32::hide_cursor(vte) }
+                                if raw { win32::raw().expect("TODO") } else { win32::cook().expect("TODO") }
+                                if mouse { win32::enable_mouse(vte).expect("TODO") }
+                                else { win32::disable_mouse(vte).expect("TODO") }
+                                if show { win32::show_cursor(vte).expect("TODO") }
+                                else { win32::hide_cursor(vte).expect("TODO") }
                             },
                             Resized => {
                                 #[cfg(unix)]
                                 let (w, h) = posix::size();
                                 #[cfg(windows)]
-                                let (w, h) = win32::size();
+                                let (w, h) = win32::size().expect("TODO");
 
                                 store.sync_size(w, h);
                             },
@@ -637,7 +637,7 @@ impl Dispatcher {
                                     },
                                 };
                                 if let Some(tx) = roster.get(&id) {
-                                    let (col, row) = win32::pos();
+                                    let (col, row) = win32::pos().expect("TODO");
                                     let _ = tx.event_tx.send(Dispatch(
                                         SysPos(col, row)));
                                 }
@@ -925,11 +925,11 @@ fn fetch_defaults() -> (libc::termios, i16, i16, usize) {
 
 #[cfg(windows)]
 fn fetch_defaults(vte: bool) -> (u32, u16, i16, i16, usize) {
-    let initial = win32::get_mode();
-    let default = win32::get_attrib();
-    let (origin_col, origin_row) = win32::pos();
+    let initial = win32::get_mode().expect("TODO");
+    let default = win32::get_attrib().expect("TODO");
+    let (origin_col, origin_row) = win32::pos().expect("TODO");
     win32::printf("\t", vte);
-    let (tabbed_col, _) = win32::pos();
+    let (tabbed_col, _) = win32::pos().expect("TODO");
     let tab_size = (tabbed_col - origin_col) as usize;
     win32::printf("\r", vte);
 

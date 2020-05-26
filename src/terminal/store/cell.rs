@@ -55,7 +55,7 @@ impl ScreenBuffer {
         #[cfg(unix)]
         let (w, h) = posix::size();
         #[cfg(windows)]
-        let (w, h) = win32::size();
+        let (w, h) = win32::size().expect("TODO");
         let capacity = (w * h) as usize;
         ScreenBuffer {
             cursor: 0,
@@ -534,7 +534,7 @@ impl ScreenBuffer {
         // the last character in the buffer. To prevent this,
         // we offset the max buffer capacity by -1.
         chunk.pop(); 
-        if chunk.len() > 0 { win32::prints(&chunk, vte) }
+        if chunk.len() > 0 { win32::prints(&chunk, vte).expect("TODO") }
         // Styles are appended based on the _previous_ style. Append
         // the last remaining style to the list.
         if current != reset {

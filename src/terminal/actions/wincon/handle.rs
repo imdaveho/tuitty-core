@@ -127,17 +127,6 @@ impl Handle {
     // https://docs.microsoft.com/en-us/windows/win32/api/
     // handleapi/nf-handleapi-closehandle
     pub fn close(&self) -> Result<()> {
-        // let stdin = Handle::stdin()?;
-        // let stdout = Handle::stdout()?;
-        // if self.0 == stdin.0 || self.0 == stdout.0 {
-        //     return Ok(());
-        // } else {
-        //     unsafe {
-        //         if CloseHandle(self.0) == 0 {
-        //             return Err(Error::last_os_error())
-        //         }
-        //     }
-        // }
         unsafe {
             if CloseHandle(self.0) == 0 {
                 return Err(Error::last_os_error())

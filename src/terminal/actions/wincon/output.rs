@@ -27,7 +27,7 @@ use winapi::{
 use super::handle::Handle;
 
 
-pub fn prints(content: &str) -> Result<usize> {
+pub fn prints(content: &str) -> Result<()> {
     let handle = Handle::conout()?;
     let text = format!("{}", content).as_str()
         .encode_utf16()
@@ -46,7 +46,7 @@ pub fn prints(content: &str) -> Result<usize> {
         }
     }
     handle.close()?;
-    Ok(size as usize)
+    Ok(())
 }
 
 

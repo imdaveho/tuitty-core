@@ -78,20 +78,25 @@ pub fn clear(clr: Clear) -> Result<()> {
     Ok(())
 }
 
-pub fn size() -> (i16, i16) {
-    let err_msg = "Error closing $CONOUT when getting console size";
-    if let Ok(handle) = Handle::conout() {
-        if let Ok(info) = ConsoleInfo::of(&handle) {
-            handle.close().expect(err_msg);
-            let size = info.terminal_size();
-            ((size.0 + 1), (size.1 + 1))
-        } else {
-            handle.close().expect(err_msg);
-            (0, 0)
-        }
-    } else {
-        (0, 0)
-    }
+pub fn size() -> Result<(i16, i16)> {
+    let handle = Handle::conout()?;
+    let info = ConsoleInfo::of(&handle)?;
+    let size = info.terminal_size();
+    handle.close()?;
+    Ok((size.0 + 1, size.1 + 1))
+    // let err_msg = "Error closing $CONOUT when getting console size";
+    // if let Ok(handle) = Handle::conout() {
+    //     if let Ok(info) = ConsoleInfo::of(&handle) {
+    //         handle.close().expect(err_msg);
+    //         let size = info.terminal_size();
+    //         ((size.0 + 1), (size.1 + 1))
+    //     } else {
+    //         handle.close().expect(err_msg);
+    //         (0, 0)
+    //     }
+    // } else {
+    //     (0, 0)
+    // }
 }
 
 pub fn resize(w: i16, h: i16) -> Result<()> {
