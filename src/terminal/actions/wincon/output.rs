@@ -27,8 +27,7 @@ use winapi::{
 use super::handle::Handle;
 
 
-pub fn prints(content: &str) -> Result<()> {
-    let handle = Handle::conout()?;
+pub fn prints(content: &str, conout: &Handle) -> Result<()> {
     let text = format!("{}", content).as_str()
         .encode_utf16()
         .map(|x| x)
@@ -37,7 +36,7 @@ pub fn prints(content: &str) -> Result<()> {
     unsafe {
         // https://docs.microsoft.com/en-us/windows/console/writeconsole
         if WriteConsoleW(
-            handle.0,
+            conout.0,
             text.as_ptr() as *const VOID,
             text.len() as u32,
             &mut size, NULL
@@ -45,7 +44,6 @@ pub fn prints(content: &str) -> Result<()> {
             return Err(Error::last_os_error());
         }
     }
-    handle.close()?;
     Ok(())
 }
 
@@ -61,22 +59,18 @@ pub fn get_mode() -> Result<u32> {
 }
 
 
-pub fn enable_raw() -> Result<()> {
-    let handle = Handle::conout()?;
-    let mode = handle.get_mode()?;
+pub fn enable_raw(conout: &Handle) -> Result<()> {
+    let mode = conout.get_mode()?;
     let mask = ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_LINE_INPUT;
     let raw_mode = mode & !mask;
-    handle.set_mode(&raw_mode)?;
-    handle.close()?;
+    conout.set_mode(&raw_mode)?;
     Ok(())
 }
 
-pub fn disable_raw() -> Result<()> {
-    let handle = Handle::conout()?;
-    let mode = handle.get_mode()?;
+pub fn disable_raw(conout: &Handle) -> Result<()> {
+    let mode = conout.get_mode()?;
     let mask = ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_LINE_INPUT;
     let cooked_mode = mode | mask;
-    handle.set_mode(&cooked_mode)?;
-    handle.close()?;
+    conout.set_mode(&cooked_mode)?;
     Ok(())
 }

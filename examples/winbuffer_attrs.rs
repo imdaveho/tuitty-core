@@ -31,7 +31,7 @@ fn main() {
     // let attrs_mod = info.attributes();
     // let _ = tuitty::terminal::actions::win32::reset_styles(attrs, false);
     // let example_output = "qwertyuiopasd⚠️fghjkl😀園v明nmQWE👪RTY👨‍👩‍👧UIOPASDFGHJKLZXCVBNM";
-    tuitty::terminal::actions::win32::goto(0, 0, false);
+    tuitty::terminal::actions::win32::goto(0, 0, &altern, false);
     // tuitty::terminal::actions::win32::printf(example_output, false);
     let size = info.terminal_size();
     // println!("X: {}, Y: {}", size.0, size.1);
@@ -50,7 +50,7 @@ fn main() {
 
         // thread::sleep(Duration::from_millis(2000));
 
-        tuitty::terminal::actions::win32::goto(0, 12, false);
+        tuitty::terminal::actions::win32::goto(0, 12, &altern, false);
         let emoji_string = "👪".repeat(size.0 as usize / 2);
         tuitty::terminal::actions::win32::printf(&emoji_string, false);
 

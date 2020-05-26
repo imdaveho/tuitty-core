@@ -9,7 +9,7 @@ use winapi::um::wincon::{
 use super::handle::{ConsoleInfo, Handle};
 
 
-pub fn goto(col: i16, row: i16) -> Result<()> {
+pub fn goto(col: i16, row: i16, conout: &Handle) -> Result<()> {
     if col < 0 || col >= <i16>::max_value() {
         return Err(Error::new(
             ErrorKind::Other,
@@ -30,70 +30,61 @@ pub fn goto(col: i16, row: i16) -> Result<()> {
     }
 
     let pos = COORD { X: col, Y: row };
-    let handle = Handle::conout()?;
-
     unsafe {
-        if SetConsoleCursorPosition(handle.0, pos) == 0 {
+        if SetConsoleCursorPosition(conout.0, pos) == 0 {
             return Err(Error::last_os_error());
         }
     }
-    handle.close()?;
     Ok(())
 }
 
-pub fn move_up(n: i16) -> Result<()> {
-    let (col, row) = pos()?;
-    goto(col, row - n)
+pub fn move_up(n: i16, conout: &Handle) -> Result<()> {
+    let (col, row) = pos(conout)?;
+    goto(col, row - n, conout)
 }
 
-pub fn move_right(n: i16) -> Result<()> {
-    let (col, row) = pos()?;
-    goto(col + n, row)
+pub fn move_right(n: i16, conout: &Handle) -> Result<()> {
+    let (col, row) = pos(conout)?;
+    goto(col + n, row, conout)
 }
 
-pub fn move_down(n: i16) -> Result<()> {
-    let (col, row) = pos()?;
-    goto(col, row + n)
+pub fn move_down(n: i16, conout: &Handle) -> Result<()> {
+    let (col, row) = pos(conout)?;
+    goto(col, row + n, conout)
 }
 
-pub fn move_left(n: i16) -> Result<()> {
-    let (col, row) = pos()?;
-    goto(col - n, row)
+pub fn move_left(n: i16, conout: &Handle) -> Result<()> {
+    let (col, row) = pos(conout)?;
+    goto(col - n, row, conout)
 }
 
-pub fn hide_cursor() -> Result<()> {
+pub fn hide_cursor(conout: &Handle) -> Result<()> {
     let cursor_info = CONSOLE_CURSOR_INFO {
         dwSize: 100,
         bVisible: 0,
     };
-    let handle = Handle::conout()?;
     unsafe {
-        if SetConsoleCursorInfo(handle.0, &cursor_info) == 0 {
+        if SetConsoleCursorInfo(conout.0, &cursor_info) == 0 {
             return Err(Error::last_os_error());
         }
     }
-    handle.close()?;
     Ok(())
 }
 
-pub fn show_cursor() -> Result<()> {
+pub fn show_cursor(conout: &Handle) -> Result<()> {
     let cursor_info = CONSOLE_CURSOR_INFO {
         dwSize: 100,
         bVisible: 1,
     };
-    let handle = Handle::conout()?;
     unsafe {
-        if SetConsoleCursorInfo(handle.0, &cursor_info) == 0 {
+        if SetConsoleCursorInfo(conout.0, &cursor_info) == 0 {
             return Err(Error::last_os_error());
         }
     }
-    handle.close()?;
     Ok(())
 }
 
-pub fn pos() -> Result<(i16, i16)> {
-    let handle = Handle::conout()?;
-    let info = ConsoleInfo::of(&handle)?;
-    handle.close()?;
+pub fn pos(conout: &Handle) -> Result<(i16, i16)> {
+    let info = ConsoleInfo::of(&conout)?;
     Ok(info.cursor_pos())
 }

@@ -143,7 +143,7 @@ pub struct Dispatcher {
     // Handle graceful shutdown and clean up.
     is_running: Arc<AtomicBool>,
     #[cfg(windows)]
-    vt_enabled: bool,
+    defaults: (u32, u16, bool)
 }
 
 impl Dispatcher {
@@ -152,8 +152,8 @@ impl Dispatcher {
         let emitters = Arc::new(Mutex::new(HashMap::with_capacity(8)));
         let is_running = Arc::new(AtomicBool::new(true));
         let lock_owner = Arc::new(AtomicUsize::new(0));
-        #[cfg(windows)]
-        let vte = win32::is_ansi_enabled();
+        // #[cfg(windows)]
+        // let vte = win32::is_ansi_enabled();
 
         // Setup Arc's to move into thread.
         let emitters_arc = emitters.clone();
@@ -165,7 +165,7 @@ impl Dispatcher {
         let (initial, col, row, tab_size) = fetch_defaults();
 
         #[cfg(windows)]
-        let (initial, default, col, row, tab_size) = fetch_defaults(vte);
+        let (mode, reset, ansi, col, row, tab_size) = fetch_defaults();
 
         // Start signal loop.
         let (signal_tx, signal_rx) = channel();
@@ -175,6 +175,8 @@ impl Dispatcher {
             store.sync_tab_size(tab_size);
             // Store inits with main screen buffer,
             // so we align the main cursor position.
+            // Initialize the Term.
+            let term = win32::Term::new(mode, reset, ansi).expect("TODO");
             store.sync_goto(col, row);
 
             // Windows *mut c_void cannot be safely moved into thread. So
@@ -247,340 +249,341 @@ impl Dispatcher {
                             }
                         },
                         Cmd::Signal(a) => match a {
+                            _ => ()
                             // CURSOR
-                            Goto(col, row) => {
-                                // Prevent out-of-bounds.
-                                let (w, h) = store.size();
-                                let (mut col, mut row) = (col, row);
-                                if col < 0 { col = 0 }
-                                if col >= w { col = w - 1 }
-                                if row < 0 { row = 0 }
-                                if row >= h { row = h - 1 }
+                            // Goto(col, row) => {
+                            //     // Prevent out-of-bounds.
+                            //     let (w, h) = store.size();
+                            //     let (mut col, mut row) = (col, row);
+                            //     if col < 0 { col = 0 }
+                            //     if col >= w { col = w - 1 }
+                            //     if row < 0 { row = 0 }
+                            //     if row >= h { row = h - 1 }
 
-                                #[cfg(unix)]
-                                posix::goto(col, row);
-                                #[cfg(windows)]
-                                win32::goto(col, row, vte);
+                            //     #[cfg(unix)]
+                            //     posix::goto(col, row);
+                            //     #[cfg(windows)]
+                            //     win32::goto(col, row, vte);
 
-                                store.sync_goto(col, row);
-                            },
-                            Up(n) => {
-                                #[cfg(unix)]
-                                posix::up(n);
-                                // Prevent out-of-bounds
-                                // on winapi cursor movement.
-                                #[cfg(windows)] {
-                                    let (_, r) = store.coord();
-                                    let mut n = n;
-                                    if r - n < 0 { n = r }
-                                    #[cfg(windows)]
-                                    win32::up(n, vte);
-                                }
-                                store.sync_up(n);
-                            },
-                            Down(n) => {
-                                #[cfg(unix)]
-                                posix::down(n);
-                                // Prevent out-of-bounds
-                                // on winapi cursor movement.
-                                #[cfg(windows)] {
-                                    let (_, h) = store.size();
-                                    let (_, r) = store.coord();
-                                    let mut n = n;
-                                    if r + n >= h { n = (h - r) - 1 }
-                                    #[cfg(windows)]
-                                    win32::down(n, vte);
-                                }
-                                store.sync_down(n);
-                            },
-                            Left(n) => {
-                                #[cfg(unix)]
-                                posix::left(n);
-                                // Prevent out-of-bounds
-                                // on winapi cursor movement.
-                                #[cfg(windows)] {
-                                    let (c, _) = store.coord();
-                                    let mut n = n;
-                                    if c - n < 0 { n = c }
-                                    #[cfg(windows)]
-                                    win32::left(n, vte);
-                                }
+                            //     store.sync_goto(col, row);
+                            // },
+                            // Up(n) => {
+                            //     #[cfg(unix)]
+                            //     posix::up(n);
+                            //     // Prevent out-of-bounds
+                            //     // on winapi cursor movement.
+                            //     #[cfg(windows)] {
+                            //         let (_, r) = store.coord();
+                            //         let mut n = n;
+                            //         if r - n < 0 { n = r }
+                            //         #[cfg(windows)]
+                            //         win32::up(n, vte);
+                            //     }
+                            //     store.sync_up(n);
+                            // },
+                            // Down(n) => {
+                            //     #[cfg(unix)]
+                            //     posix::down(n);
+                            //     // Prevent out-of-bounds
+                            //     // on winapi cursor movement.
+                            //     #[cfg(windows)] {
+                            //         let (_, h) = store.size();
+                            //         let (_, r) = store.coord();
+                            //         let mut n = n;
+                            //         if r + n >= h { n = (h - r) - 1 }
+                            //         #[cfg(windows)]
+                            //         win32::down(n, vte);
+                            //     }
+                            //     store.sync_down(n);
+                            // },
+                            // Left(n) => {
+                            //     #[cfg(unix)]
+                            //     posix::left(n);
+                            //     // Prevent out-of-bounds
+                            //     // on winapi cursor movement.
+                            //     #[cfg(windows)] {
+                            //         let (c, _) = store.coord();
+                            //         let mut n = n;
+                            //         if c - n < 0 { n = c }
+                            //         #[cfg(windows)]
+                            //         win32::left(n, vte);
+                            //     }
 
-                                store.sync_left(n);
-                            },
-                            Right(n) => {
-                                #[cfg(unix)]
-                                posix::right(n);
-                                // Prevent out-of-bounds
-                                // on winapi cursor movement.
-                                #[cfg(windows)] {
-                                    let (w, _) = store.size();
-                                    let (c, _) = store.coord();
-                                    let mut n = n;
-                                    if c + n >= w { n = (w - c) - 1 }
-                                    #[cfg(windows)]
-                                    win32::right(n, vte);
-                                }
+                            //     store.sync_left(n);
+                            // },
+                            // Right(n) => {
+                            //     #[cfg(unix)]
+                            //     posix::right(n);
+                            //     // Prevent out-of-bounds
+                            //     // on winapi cursor movement.
+                            //     #[cfg(windows)] {
+                            //         let (w, _) = store.size();
+                            //         let (c, _) = store.coord();
+                            //         let mut n = n;
+                            //         if c + n >= w { n = (w - c) - 1 }
+                            //         #[cfg(windows)]
+                            //         win32::right(n, vte);
+                            //     }
 
-                                store.sync_right(n);
-                            },
-                            // SCREEN/OUTPUT
-                            Clear(clr) => {
-                                #[cfg(unix)]
-                                posix::clear(clr);
-                                #[cfg(windows)]
-                                win32::clear(clr, vte);
+                            //     store.sync_right(n);
+                            // },
+                            // // SCREEN/OUTPUT
+                            // Clear(clr) => {
+                            //     #[cfg(unix)]
+                            //     posix::clear(clr);
+                            //     #[cfg(windows)]
+                            //     win32::clear(clr, vte);
 
-                                store.sync_clear(clr);
-                            },
-                            Resize(w, h) => {
-                                #[cfg(unix)]
-                                posix::resize(w, h);
-                                #[cfg(windows)]
-                                win32::resize(w, h, vte);
+                            //     store.sync_clear(clr);
+                            // },
+                            // Resize(w, h) => {
+                            //     #[cfg(unix)]
+                            //     posix::resize(w, h);
+                            //     #[cfg(windows)]
+                            //     win32::resize(w, h, vte);
 
-                                store.sync_size(w, h);
-                            },
-                            Prints(s) => {
-                                #[cfg(unix)]
-                                posix::prints(&s);
-                                #[cfg(windows)]
-                                win32::prints(&s, vte);
+                            //     store.sync_size(w, h);
+                            // },
+                            // Prints(s) => {
+                            //     #[cfg(unix)]
+                            //     posix::prints(&s);
+                            //     #[cfg(windows)]
+                            //     win32::prints(&s, vte);
 
-                                store.sync_content(&s);
-                            },
-                            Printf(s) => {
-                                #[cfg(unix)]
-                                posix::printf(&s);
-                                #[cfg(windows)]
-                                win32::printf(&s, vte);
+                            //     store.sync_content(&s);
+                            // },
+                            // Printf(s) => {
+                            //     #[cfg(unix)]
+                            //     posix::printf(&s);
+                            //     #[cfg(windows)]
+                            //     win32::printf(&s, vte);
 
-                                store.sync_content(&s);
-                            },
-                            Flush => {
-                                #[cfg(unix)]
-                                posix::flush();
-                                #[cfg(windows)]
-                                win32::flush(vte);
-                            },
-                            // STYLE
-                            SetFx(fx) => {
-                                #[cfg(unix)]
-                                posix::set_fx(fx);
-                                #[cfg(windows)]
-                                win32::set_fx(fx, vte);
+                            //     store.sync_content(&s);
+                            // },
+                            // Flush => {
+                            //     #[cfg(unix)]
+                            //     posix::flush();
+                            //     #[cfg(windows)]
+                            //     win32::flush(vte);
+                            // },
+                            // // STYLE
+                            // SetFx(fx) => {
+                            //     #[cfg(unix)]
+                            //     posix::set_fx(fx);
+                            //     #[cfg(windows)]
+                            //     win32::set_fx(fx, vte);
 
-                                store.sync_style(Style::Fx(fx));
-                            },
-                            SetFg(c) => {
-                                #[cfg(unix)]
-                                posix::set_fg(c);
-                                #[cfg(windows)]
-                                win32::set_fg(c, default, vte);
+                            //     store.sync_style(Style::Fx(fx));
+                            // },
+                            // SetFg(c) => {
+                            //     #[cfg(unix)]
+                            //     posix::set_fg(c);
+                            //     #[cfg(windows)]
+                            //     win32::set_fg(c, default, vte);
 
-                                store.sync_style(Style::Fg(c));
-                            },
-                            SetBg(c) => {
-                                #[cfg(unix)]
-                                posix::set_bg(c);
-                                #[cfg(windows)]
-                                win32::set_bg(c, default, vte);
+                            //     store.sync_style(Style::Fg(c));
+                            // },
+                            // SetBg(c) => {
+                            //     #[cfg(unix)]
+                            //     posix::set_bg(c);
+                            //     #[cfg(windows)]
+                            //     win32::set_bg(c, default, vte);
 
-                                store.sync_style(Style::Bg(c));
-                            },
-                            SetStyles(f, b, fx) => {
-                                #[cfg(unix)]
-                                posix::set_styles(f, b, fx);
-                                #[cfg(windows)]
-                                win32::set_styles(f, b, fx, default, vte);
+                            //     store.sync_style(Style::Bg(c));
+                            // },
+                            // SetStyles(f, b, fx) => {
+                            //     #[cfg(unix)]
+                            //     posix::set_styles(f, b, fx);
+                            //     #[cfg(windows)]
+                            //     win32::set_styles(f, b, fx, default, vte);
 
-                                store.sync_styles(f, b, fx);
-                            },
-                            ResetStyles => {
-                                #[cfg(unix)]
-                                posix::reset_styles();
-                                #[cfg(windows)]
-                                win32::reset_styles(default, vte);
+                            //     store.sync_styles(f, b, fx);
+                            // },
+                            // ResetStyles => {
+                            //     #[cfg(unix)]
+                            //     posix::reset_styles();
+                            //     #[cfg(windows)]
+                            //     win32::reset_styles(default, vte);
 
-                                let (c, fx) = (Reset, Effect::Reset as u32);
-                                store.sync_styles(c, c, fx);
-                            },
-                            // STATEFUL/MODES
-                            HideCursor => {
-                                #[cfg(unix)]
-                                posix::hide_cursor();
-                                #[cfg(windows)]
-                                win32::hide_cursor(vte);
+                            //     let (c, fx) = (Reset, Effect::Reset as u32);
+                            //     store.sync_styles(c, c, fx);
+                            // },
+                            // // STATEFUL/MODES
+                            // HideCursor => {
+                            //     #[cfg(unix)]
+                            //     posix::hide_cursor();
+                            //     #[cfg(windows)]
+                            //     win32::hide_cursor(vte);
 
-                                store.sync_cursor(false);
-                            },
-                            ShowCursor => {
-                                #[cfg(unix)]
-                                posix::show_cursor();
-                                #[cfg(windows)]
-                                win32::show_cursor(vte);
+                            //     store.sync_cursor(false);
+                            // },
+                            // ShowCursor => {
+                            //     #[cfg(unix)]
+                            //     posix::show_cursor();
+                            //     #[cfg(windows)]
+                            //     win32::show_cursor(vte);
 
-                                store.sync_cursor(true);
-                            },
-                            EnableMouse => {
-                                #[cfg(unix)]
-                                posix::enable_mouse();
-                                #[cfg(windows)]
-                                win32::enable_mouse(vte);
+                            //     store.sync_cursor(true);
+                            // },
+                            // EnableMouse => {
+                            //     #[cfg(unix)]
+                            //     posix::enable_mouse();
+                            //     #[cfg(windows)]
+                            //     win32::enable_mouse(vte);
 
-                                store.sync_mouse(true);
-                            },
-                            DisableMouse => {
-                                #[cfg(unix)]
-                                posix::disable_mouse();
-                                #[cfg(windows)]
-                                win32::disable_mouse(vte);
+                            //     store.sync_mouse(true);
+                            // },
+                            // DisableMouse => {
+                            //     #[cfg(unix)]
+                            //     posix::disable_mouse();
+                            //     #[cfg(windows)]
+                            //     win32::disable_mouse(vte);
 
-                                store.sync_mouse(false);
-                            },
-                            EnableAlt => {
-                                #[cfg(unix)]
-                                posix::enable_alt();
-                                #[cfg(windows)]
-                                win32::enable_alt(&screen, &initial, vte);
-                            },
-                            DisableAlt => {
-                                #[cfg(unix)]
-                                posix::disable_alt();
-                                #[cfg(windows)]
-                                win32::disable_alt(vte);
-                            },
-                            Raw => {
-                                #[cfg(unix)]
-                                posix::raw();
-                                #[cfg(windows)]
-                                win32::raw();
+                            //     store.sync_mouse(false);
+                            // },
+                            // EnableAlt => {
+                            //     #[cfg(unix)]
+                            //     posix::enable_alt();
+                            //     #[cfg(windows)]
+                            //     win32::enable_alt(&screen, &initial, vte);
+                            // },
+                            // DisableAlt => {
+                            //     #[cfg(unix)]
+                            //     posix::disable_alt();
+                            //     #[cfg(windows)]
+                            //     win32::disable_alt(vte);
+                            // },
+                            // Raw => {
+                            //     #[cfg(unix)]
+                            //     posix::raw();
+                            //     #[cfg(windows)]
+                            //     win32::raw();
 
-                                store.sync_raw(true);
-                            },
-                            Cook => {
-                                #[cfg(unix)]
-                                posix::cook(&initial);
-                                #[cfg(windows)]
-                                win32::cook();
+                            //     store.sync_raw(true);
+                            // },
+                            // Cook => {
+                            //     #[cfg(unix)]
+                            //     posix::cook(&initial);
+                            //     #[cfg(windows)]
+                            //     win32::cook();
 
-                                store.sync_raw(false);
-                            },
-                            // STORE OPS
-                            #[cfg(unix)]
-                            Switch => {
-                                if store.id() == 0 {
-                                    posix::enable_alt();
-                                } else {
-                                    posix::clear(Clear::All);
-                                }
-                                store.new_screen();
-                                posix::cook(&initial);
-                                posix::disable_mouse();
-                                posix::show_cursor();
-                                posix::reset_styles();
-                                posix::goto(0, 0);
-                                posix::flush();
-                            },
-                            #[cfg(windows)]
-                            Switch => {
-                                if store.id() == 0 {
-                                    win32::enable_alt(
-                                        &screen, &initial, vte);
-                                    win32::clear(Clear::All, vte);
-                                } else {
-                                    win32::clear(Clear::All, vte);
-                                }
-                                store.new_screen();
-                                win32::cook();
-                                win32::disable_mouse(vte);
-                                win32::show_cursor(vte);
-                                win32::reset_styles(default, vte);
-                                win32::goto(0, 0, vte);
-                            },
-                            #[cfg(unix)]
-                            SwitchTo(id) => {
-                                let current = store.id();
-                                // Bounds checking:
-                                if current == id { continue }
-                                if store.exists(id) { store.set(id) }
-                                else { continue }
-                                // Handle screen switch:
-                                // Disable if you are reverting back to main.
-                                if id == 0 { posix::disable_alt() }
-                                else {
-                                    // Enable as you are on the main screen
-                                    // switching to alternate.
-                                    if current == 0 { posix::enable_alt() }
-                                    posix::clear(Clear::All);
-                                }
-                                store.render();
-                                // Restore settings based on metadata.
-                                let (raw, mouse, show) = (
-                                    store.is_raw(),
-                                    store.is_mouse(),
-                                    store.is_cursor() );
+                            //     store.sync_raw(false);
+                            // },
+                            // // STORE OPS
+                            // #[cfg(unix)]
+                            // Switch => {
+                            //     if store.id() == 0 {
+                            //         posix::enable_alt();
+                            //     } else {
+                            //         posix::clear(Clear::All);
+                            //     }
+                            //     store.new_screen();
+                            //     posix::cook(&initial);
+                            //     posix::disable_mouse();
+                            //     posix::show_cursor();
+                            //     posix::reset_styles();
+                            //     posix::goto(0, 0);
+                            //     posix::flush();
+                            // },
+                            // #[cfg(windows)]
+                            // Switch => {
+                            //     if store.id() == 0 {
+                            //         win32::enable_alt(
+                            //             &screen, &initial, vte);
+                            //         win32::clear(Clear::All, vte);
+                            //     } else {
+                            //         win32::clear(Clear::All, vte);
+                            //     }
+                            //     store.new_screen();
+                            //     win32::cook();
+                            //     win32::disable_mouse(vte);
+                            //     win32::show_cursor(vte);
+                            //     win32::reset_styles(default, vte);
+                            //     win32::goto(0, 0, vte);
+                            // },
+                            // #[cfg(unix)]
+                            // SwitchTo(id) => {
+                            //     let current = store.id();
+                            //     // Bounds checking:
+                            //     if current == id { continue }
+                            //     if store.exists(id) { store.set(id) }
+                            //     else { continue }
+                            //     // Handle screen switch:
+                            //     // Disable if you are reverting back to main.
+                            //     if id == 0 { posix::disable_alt() }
+                            //     else {
+                            //         // Enable as you are on the main screen
+                            //         // switching to alternate.
+                            //         if current == 0 { posix::enable_alt() }
+                            //         posix::clear(Clear::All);
+                            //     }
+                            //     store.render();
+                            //     // Restore settings based on metadata.
+                            //     let (raw, mouse, show) = (
+                            //         store.is_raw(),
+                            //         store.is_mouse(),
+                            //         store.is_cursor() );
 
-                                if raw { posix::raw() }
-                                else { posix::cook(&initial) }
-                                if mouse { posix::enable_mouse() }
-                                else { posix::disable_mouse() }
-                                if show { posix::show_cursor() }
-                                else { posix::hide_cursor() }
+                            //     if raw { posix::raw() }
+                            //     else { posix::cook(&initial) }
+                            //     if mouse { posix::enable_mouse() }
+                            //     else { posix::disable_mouse() }
+                            //     if show { posix::show_cursor() }
+                            //     else { posix::hide_cursor() }
 
-                                posix::flush();
-                            },
-                            #[cfg(windows)]
-                            SwitchTo(id) => {
-                                let current = store.id();
-                                // Bounds checking:
-                                if current == id { continue }
-                                if store.exists(id) { store.set(id) }
-                                else { continue }
-                                // Handle screen switch:
-                                // Disable if you are reverting back to main.
-                                if id == 0 { win32::disable_alt(vte).expect("TODO") }
-                                else {
-                                    // Enable as you are on the main screen
-                                    // switching to alternate.
-                                    if vte { if current == 0 {
-                                        win32::enable_alt(
-                                            &screen, &initial, true).expect("TODO")
-                                    }} else {
-                                        // (imdaveho) NOTE: For unknown reason
-                                        // that needs to be investigated TODO,
-                                        // we need to activate the alternate
-                                        // console handle as active every time
-                                        // on Windows Console.
-                                        win32::enable_alt(
-                                            &screen, &initial, false).expect("TODO")
-                                    }
-                                    win32::clear(Clear::All, vte);
-                                }
-                                store.render(default, vte);
-                                // Restore settings based on metadata.
-                                let (raw, mouse, show) = (
-                                    store.is_raw(),
-                                    store.is_mouse(),
-                                    store.is_cursor() );
+                            //     posix::flush();
+                            // },
+                            // #[cfg(windows)]
+                            // SwitchTo(id) => {
+                            //     let current = store.id();
+                            //     // Bounds checking:
+                            //     if current == id { continue }
+                            //     if store.exists(id) { store.set(id) }
+                            //     else { continue }
+                            //     // Handle screen switch:
+                            //     // Disable if you are reverting back to main.
+                            //     if id == 0 { win32::disable_alt(vte).expect("TODO") }
+                            //     else {
+                            //         // Enable as you are on the main screen
+                            //         // switching to alternate.
+                            //         if vte { if current == 0 {
+                            //             win32::enable_alt(
+                            //                 &screen, &initial, true).expect("TODO")
+                            //         }} else {
+                            //             // (imdaveho) NOTE: For unknown reason
+                            //             // that needs to be investigated TODO,
+                            //             // we need to activate the alternate
+                            //             // console handle as active every time
+                            //             // on Windows Console.
+                            //             win32::enable_alt(
+                            //                 &screen, &initial, false).expect("TODO")
+                            //         }
+                            //         win32::clear(Clear::All, vte);
+                            //     }
+                            //     store.render(default, vte);
+                            //     // Restore settings based on metadata.
+                            //     let (raw, mouse, show) = (
+                            //         store.is_raw(),
+                            //         store.is_mouse(),
+                            //         store.is_cursor() );
 
-                                if raw { win32::raw().expect("TODO") } else { win32::cook().expect("TODO") }
-                                if mouse { win32::enable_mouse(vte).expect("TODO") }
-                                else { win32::disable_mouse(vte).expect("TODO") }
-                                if show { win32::show_cursor(vte).expect("TODO") }
-                                else { win32::hide_cursor(vte).expect("TODO") }
-                            },
-                            Resized => {
-                                #[cfg(unix)]
-                                let (w, h) = posix::size();
-                                #[cfg(windows)]
-                                let (w, h) = win32::size().expect("TODO");
+                            //     if raw { win32::raw().expect("TODO") } else { win32::cook().expect("TODO") }
+                            //     if mouse { win32::enable_mouse(vte).expect("TODO") }
+                            //     else { win32::disable_mouse(vte).expect("TODO") }
+                            //     if show { win32::show_cursor(vte).expect("TODO") }
+                            //     else { win32::hide_cursor(vte).expect("TODO") }
+                            // },
+                            // Resized => {
+                            //     #[cfg(unix)]
+                            //     let (w, h) = posix::size();
+                            //     #[cfg(windows)]
+                            //     let (w, h) = win32::size().expect("TODO");
 
-                                store.sync_size(w, h);
-                            },
-                            SyncMarker(c,r) => store.sync_marker(c,r),
-                            Jump => store.jump(),
-                            SyncTabSize(n) => store.sync_tab_size(n),
+                            //     store.sync_size(w, h);
+                            // },
+                            // SyncMarker(c,r) => store.sync_marker(c,r),
+                            // Jump => store.jump(),
+                            // SyncTabSize(n) => store.sync_tab_size(n),
                         }
                         Cmd::Request(s) => match s {
                             State::Size(id) => {
@@ -629,18 +632,18 @@ impl Dispatcher {
                             },
                             #[cfg(windows)]
                             State::SysPos(id) => {
-                                let roster = match emitters_arc.lock() {
-                                    Ok(r) => r,
-                                    Err(_) => match emitters_arc.lock() {
-                                        Ok(r) => r,
-                                        Err(_) => continue
-                                    },
-                                };
-                                if let Some(tx) = roster.get(&id) {
-                                    let (col, row) = win32::pos().expect("TODO");
-                                    let _ = tx.event_tx.send(Dispatch(
-                                        SysPos(col, row)));
-                                }
+                                // let roster = match emitters_arc.lock() {
+                                //     Ok(r) => r,
+                                //     Err(_) => match emitters_arc.lock() {
+                                //         Ok(r) => r,
+                                //         Err(_) => continue
+                                //     },
+                                // };
+                                // if let Some(tx) = roster.get(&id) {
+                                //     let (col, row) = win32::pos().expect("TODO");
+                                //     let _ = tx.event_tx.send(Dispatch(
+                                //         SysPos(col, row)));
+                                // }
                             },
                             State::GetCh(id) => {
                                 let roster = match emitters_arc.lock() {
@@ -668,18 +671,17 @@ impl Dispatcher {
                 }
             }
             #[cfg(windows)]
+            let _ = term.close();
+            #[cfg(windows)]
             let _ = screen.close();
         });
 
         Dispatcher {
             input_handle: None,
-            emitters: emitters,
-            lock_owner: lock_owner,
-            signal_tx: signal_tx,
+            emitters, lock_owner,
+            signal_tx, is_running,
             signal_handle: Some(signal_handle),
-            is_running: is_running,
-            #[cfg(windows)]
-            vt_enabled: vte,
+            defaults: (mode, reset, ansi)
         }
     }
 
@@ -804,21 +806,14 @@ impl Dispatcher {
     }
 
     pub fn spawn(&self) -> EventHandle {
-        let err_msg = "Error obtaining emitter registry lock";
+        // let err_msg = "Error obtaining emitter registry lock";
         let (event_tx, event_rx) = channel();
         let id = self.randomish();
-        let mut roster = self.emitters.lock().expect(err_msg);
-        roster.insert(id, EventEmitter {
-            event_tx: event_tx,
-            is_suspend: false,
-            is_running: true,
-        });
-
-        EventHandle {
-            id: id,
-            event_rx: event_rx,
-            signal_tx: self.signal_tx.clone(),
-        }
+        let (is_suspend, is_running) = (false, true);
+        let mut roster = self.emitters.lock().expect("TODO");
+        roster.insert(id, EventEmitter { event_tx, is_suspend, is_running });
+        let signal_tx = self.signal_tx.clone(); 
+        EventHandle { id, event_rx, signal_tx }
     }
 
     pub fn signal(&self, action: Action) {
@@ -834,16 +829,21 @@ impl Dispatcher {
         // if let Some(t) = self.input_handle.take() { t.join()? }
 
         // Clear the emitters registery.
-        let lock_err = "Error obtaining emitters lock";
-        let mut roster = self.emitters.lock().expect(lock_err);
+        // let lock_err = "Error obtaining emitters lock";
+        let mut roster = self.emitters.lock().expect("TODO");
         roster.clear();
         if let Some(t) = self.signal_handle.take() { t.join()? }
 
         #[cfg(unix)]
         posix::printf("\r\n");
-        #[cfg(windows)]
-        win32::printf("\r\n", self.vt_enabled);
 
+        #[cfg(windows)]
+        let conout = win32::Handle::conout().expect("TODO");
+        #[cfg(windows)]
+        win32::printf("\r\n", &conout, self.defaults.2);
+        #[cfg(windows)]
+        let _ = conout.close();
+        
         Ok(())
     }
 }
@@ -924,14 +924,16 @@ fn fetch_defaults() -> (libc::termios, i16, i16, usize) {
 }
 
 #[cfg(windows)]
-fn fetch_defaults(vte: bool) -> (u32, u16, i16, i16, usize) {
-    let initial = win32::get_mode().expect("TODO");
-    let default = win32::get_attrib().expect("TODO");
-    let (origin_col, origin_row) = win32::pos().expect("TODO");
-    win32::printf("\t", vte);
-    let (tabbed_col, _) = win32::pos().expect("TODO");
-    let tab_size = (tabbed_col - origin_col) as usize;
-    win32::printf("\r", vte);
-
-    (initial, default, origin_col, origin_row, tab_size)
+fn fetch_defaults() -> (u32, u16, bool, i16, i16, usize) {
+    let conout = win32::Handle::conout().expect("TODO");
+    let reset = win32::get_attrib(&conout).expect("TODO");
+    let mode = win32::get_mode().expect("TODO");
+    let ansi = win32::is_ansi_enabled();
+    let (col, row) = win32::pos(&conout).expect("TODO");
+    win32::printf("\t", &conout, ansi);
+    let (tab_col, _) = win32::pos(&conout).expect("TODO");
+    let tab_size = (tab_col - col) as usize;
+    win32::printf("\r", &conout, ansi);
+    conout.close().expect("TODO");
+    (mode, reset, ansi, col, row, tab_size)
 }

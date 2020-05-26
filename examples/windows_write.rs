@@ -59,7 +59,7 @@ fn main() {
 
 
     // Write to buffer
-    tuitty::terminal::actions::win32::goto(0, 0, false);
+    tuitty::terminal::actions::win32::goto(0, 0, &altern, false);
     tuitty::terminal::actions::win32::printf(output, false);
 
     // tuitty::terminal::actions::win32::goto(0, 20, false);

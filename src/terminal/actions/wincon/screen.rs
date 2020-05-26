@@ -17,15 +17,13 @@ use super::handle::{Handle, ConsoleInfo};
 use crate::common::enums::Clear;
 
 
-pub fn clear(clr: Clear) -> Result<()> {
-    let handle = Handle::conout()?;
-    let info = ConsoleInfo::of(&handle)?;
+pub fn clear(clr: Clear, conout: &Handle) -> Result<()> {
+    let info = ConsoleInfo::of(&conout)?;
 
     let (mut col, mut row) = info.cursor_pos();
     let (w, h) = info.buffer_size();
 
     // Inputs to FillConsoleOutput.
-    // let conout = Handle::conout()?;
     let ch = ' ' as i8;
     // Because the current Handle could have attributes that modify the
     // surrounding console cell (eg. underscore or left vertical), we
@@ -66,40 +64,24 @@ pub fn clear(clr: Clear) -> Result<()> {
     }
 
     unsafe {
-        if FillConsoleOutputCharacterA(handle.0, ch, n, at, &mut len) == 0 {
+        if FillConsoleOutputCharacterA(conout.0, ch, n, at, &mut len) == 0 {
             return Err(Error::last_os_error())
         }
 
-        if FillConsoleOutputAttribute(handle.0, fx, n, at, &mut len) == 0 {
+        if FillConsoleOutputAttribute(conout.0, fx, n, at, &mut len) == 0 {
             return Err(Error::last_os_error())
         }
     }
-    handle.close()?;
     Ok(())
 }
 
-pub fn size() -> Result<(i16, i16)> {
-    let handle = Handle::conout()?;
-    let info = ConsoleInfo::of(&handle)?;
+pub fn size(conout: &Handle) -> Result<(i16, i16)> {
+    let info = ConsoleInfo::of(&conout)?;
     let size = info.terminal_size();
-    handle.close()?;
     Ok((size.0 + 1, size.1 + 1))
-    // let err_msg = "Error closing $CONOUT when getting console size";
-    // if let Ok(handle) = Handle::conout() {
-    //     if let Ok(info) = ConsoleInfo::of(&handle) {
-    //         handle.close().expect(err_msg);
-    //         let size = info.terminal_size();
-    //         ((size.0 + 1), (size.1 + 1))
-    //     } else {
-    //         handle.close().expect(err_msg);
-    //         (0, 0)
-    //     }
-    // } else {
-    //     (0, 0)
-    // }
 }
 
-pub fn resize(w: i16, h: i16) -> Result<()> {
+pub fn resize(w: i16, h: i16, conout: &Handle) -> Result<()> {
     if w <= 0 {
         return Err(Error::new(
             ErrorKind::Other,
@@ -112,8 +94,7 @@ pub fn resize(w: i16, h: i16) -> Result<()> {
             "Cannot set the terminal height lower then 1"));
     }
 
-    let handle = Handle::conout()?;
-    let info = ConsoleInfo::of(&handle)?;
+    let info = ConsoleInfo::of(&conout)?;
 
     let (buf_w, buf_h) = info.buffer_size();
     let (left, _, _, top) = info.window_pos();
@@ -153,12 +134,12 @@ pub fn resize(w: i16, h: i16) -> Result<()> {
         if resize_buffer {
             let new_coord = COORD {X: new_w - 1, Y: new_h - 1};
 
-            if SetConsoleScreenBufferSize(handle.0, new_coord) == 0 {
+            if SetConsoleScreenBufferSize(conout.0, new_coord) == 0 {
                 return Err(resize_error)
             }
         }
 
-        if SetConsoleWindowInfo(handle.0, 1, &SMALL_RECT {
+        if SetConsoleWindowInfo(conout.0, 1, &SMALL_RECT {
             Left: left,
             Right: left + w - 1,
             Bottom: top + h - 1,
@@ -170,14 +151,14 @@ pub fn resize(w: i16, h: i16) -> Result<()> {
         // If we resized the buffer, un-resize it.
         if resize_buffer {
             let buf_coord = COORD {X: buf_w - 1, Y: buf_h - 1};
-            if SetConsoleScreenBufferSize(handle.0, buf_coord) == 0 {
+            if SetConsoleScreenBufferSize(conout.0, buf_coord) == 0 {
                 return Err(resize_error)
             }
         }
     }
 
     let (bound_w, bound_h) = unsafe {
-        let bounds = GetLargestConsoleWindowSize(handle.0);
+        let bounds = GetLargestConsoleWindowSize(conout.0);
         (bounds.X, bounds.Y)
     };
 
@@ -193,7 +174,6 @@ pub fn resize(w: i16, h: i16) -> Result<()> {
                 "Argument h: {} out of range setting terminal height.", h)));
     }
 
-    handle.close()?;
     Ok(())
 }
 

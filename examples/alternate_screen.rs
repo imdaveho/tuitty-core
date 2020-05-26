@@ -28,13 +28,13 @@ fn direct_scenario() {
 
     #[cfg(windows)] {
         let vte = win32::is_ansi_enabled();
-        let initial = win32::get_mode();
+        let initial = win32::get_mode().expect("TODO");
         let screen = win32::Handle::buffer().unwrap();
 
         win32::enable_alt(&screen, &initial, vte);
         win32::raw();
 
-        win32::goto(0, 0, vte);
+        win32::goto(0, 0, &screen, vte);
         win32::printf("Hello, world!", vte);
         thread::sleep(Duration::from_secs(2));
 

@@ -41,7 +41,7 @@ fn main() {
 
     let example_output = "qwertyuiopasd⚠️fghjkl😀園v明nmQWE👪RTY👨‍👩‍👧UIOPASDFGHJKLZXCVBNM";
 
-    tuitty::terminal::actions::win32::goto(0, 0, false);
+    tuitty::terminal::actions::win32::goto(0, 0, &altern, false);
     // tuitty::terminal::actions::win32::printf(example_output, false);
     // Size within sub-terminal (eg. windows terminal or cmder) is incorrect...
     let size = info.terminal_size();
@@ -100,13 +100,13 @@ fn main() {
         }
     }
 
-    tuitty::terminal::actions::win32::goto(0, 0, false);
+    tuitty::terminal::actions::win32::goto(0, 0, &altern, false);
     let str_output = String::from_utf16(&output).unwrap();
     tuitty::terminal::actions::win32::printf(&str_output, false);
 
     thread::sleep(Duration::from_millis(2000));
 
-    tuitty::terminal::actions::win32::goto(0, 0, false);
+    tuitty::terminal::actions::win32::goto(0, 0, &altern, false);
     tuitty::terminal::actions::win32::printf(&format!("{}", "🔣".width()), false);
     tuitty::terminal::actions::win32::printf("🔣", false);
 
@@ -310,7 +310,7 @@ fn main() {
         }
     }
 
-    tuitty::terminal::actions::win32::goto(0, 0, false);
+    tuitty::terminal::actions::win32::goto(0, 0, &altern, false);
 
     // let mut written_chars = 0;
     // let write_err = unsafe {
@@ -333,7 +333,7 @@ fn main() {
 
     thread::sleep(Duration::from_millis(2000));
 
-    tuitty::terminal::actions::win32::goto(size.0 - 1, size.1 - 1, false);
+    tuitty::terminal::actions::win32::goto(size.0 - 1, size.1 - 1, &altern, false);
     tuitty::terminal::actions::win32::printf(" ", false);
 
     thread::sleep(Duration::from_millis(5000));

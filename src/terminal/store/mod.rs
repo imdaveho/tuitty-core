@@ -3,8 +3,10 @@
 
 mod cell;
 use cell::ScreenBuffer;
-
 use crate::common::enums::{ Clear, Color, Style };
+
+#[cfg(windows)]
+use crate::terminal::actions::win32::Handle;
 
 
 struct Screen {
@@ -78,9 +80,9 @@ impl Store {
     }
 
     #[cfg(windows)]
-    pub fn render(&self, reset: u16, vte: bool) {
+    pub fn render(&self, reset: u16, conout: &Handle, vte: bool) {
         if let Some(s) = self.data.get(self.id) {
-            s.buffer.render(reset, vte)
+            s.buffer.render(reset, conout, vte)
         }
     }
 

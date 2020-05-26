@@ -226,205 +226,201 @@ pub mod win32 {
     pub use super::wincon::handle::{ Handle, ConsoleInfo };
 
     // CURSOR FUNCTIONS
-    pub fn goto(col: i16, row: i16, vte: bool) -> Result<()> {
+    pub fn goto(col: i16, row: i16, conout: &Handle, ansi: bool) -> Result<()> {
         let (mut col, mut row) = (col, row);
         if col < 0 { col = col.abs() }
         if row < 0 { row = row.abs() }
 
-        if vte { ansi::output::prints(
+        if ansi { ansi::output::prints(
             &ansi::cursor::goto(col, row)); return Ok(()) }
         // let err_msg = "Error setting the cursor position";
-        wincon::cursor::goto(col, row)
+        wincon::cursor::goto(col, row, &conout)
     }
 
-    pub fn up(n: i16, vte: bool) -> Result<()> {
+    pub fn up(n: i16, conout: &Handle, ansi: bool) -> Result<()> {
         let mut n = n;
         if n < 0 { n = n.abs() }
 
-        if vte { ansi::output::prints(
+        if ansi { ansi::output::prints(
             &ansi::cursor::move_up(n)); return Ok(()) }
         // let err_msg = format!("Error moving the cursor up by {}", n);
-        wincon::cursor::move_up(n)
+        wincon::cursor::move_up(n, &conout)
     }
 
-    pub fn down(n: i16, vte: bool) -> Result<()> {
+    pub fn down(n: i16, conout: &Handle, ansi: bool) -> Result<()> {
         let mut n = n;
         if n < 0 { n = n.abs() }
 
-        if vte { ansi::output::prints(
+        if ansi { ansi::output::prints(
             &ansi::cursor::move_down(n)); return Ok(()) }
         // let err_msg = format!("Error moving the cursor up by {}", n);
-        wincon::cursor::move_down(n)
+        wincon::cursor::move_down(n, &conout)
     }
 
-    pub fn left(n: i16, vte: bool) -> Result<()> {
+    pub fn left(n: i16, conout: &Handle, ansi: bool) -> Result<()> {
         let mut n = n;
         if n < 0 { n = n.abs() }
 
-        if vte { ansi::output::prints(
+        if ansi { ansi::output::prints(
             &ansi::cursor::move_left(n)); return Ok(()) }
         // let err_msg = format!("Error moving the cursor up by {}", n);
-        wincon::cursor::move_left(n)
+        wincon::cursor::move_left(n, &conout)
     }
 
-    pub fn right(n: i16, vte: bool) -> Result<()> {
+    pub fn right(n: i16, conout: &Handle, ansi: bool) -> Result<()> {
         let mut n = n;
         if n < 0 { n = n.abs() }
 
-        if vte { ansi::output::prints(
+        if ansi { ansi::output::prints(
             &ansi::cursor::move_right(n)); return Ok(()) }
         // let err_msg = format!("Error moving the cursor up by {}", n);
-        wincon::cursor::move_right(n)
+        wincon::cursor::move_right(n, &conout)
     }
 
-    pub fn pos() -> Result<(i16, i16)> {
+    pub fn pos(conout: &Handle) -> Result<(i16, i16)> {
         // let err_msg = "Error getting cursor positions";
-        wincon::cursor::pos()
+        wincon::cursor::pos(&conout)
     }
 
-    pub fn hide_cursor(vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn hide_cursor(conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::cursor::hide_cursor()); return Ok(()) }
         // let err_msg = "Error setting cursor visibility to 0";
-        wincon::cursor::hide_cursor()
+        wincon::cursor::hide_cursor(&conout)
     }
 
-    pub fn show_cursor(vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn show_cursor(conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::cursor::show_cursor()); return Ok(()) }
         // let err_msg = "Error setting cursor visibility to 100";
-        wincon::cursor::show_cursor()
+        wincon::cursor::show_cursor(&conout)
     }
 
     // SCREEN FUNCTIONS
-    pub fn clear(method: Clear, vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn clear(method: Clear, conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::screen::clear(method)); return Ok(()) }
         // let err_msg = "Error clearing the screen";
-        wincon::screen::clear(method)
+        wincon::screen::clear(method, &conout)
     }
 
-    pub fn size() -> Result<(i16, i16)> {
+    pub fn size(conout: &Handle) -> Result<(i16, i16)> {
         // let err_msg = "Error getting screen size"
-        wincon::screen::size()
+        wincon::screen::size(&conout)
     }
 
-    pub fn resize(w: i16, h: i16, vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn resize(w: i16, h: i16, conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::screen::resize(w, h)); return Ok(()) }
         // let err_msg = "Error resizing the screen";
-        wincon::screen::resize(w, h)
+        wincon::screen::resize(w, h, &conout)
     }
 
-    pub fn enable_alt(screen: &Handle, initial: &u32, vte: bool) -> Result<()> {
-        if vte { ansi::output::printf(
+    pub fn enable_alt(screen: &Handle, initial: &u32, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::printf(
             &ansi::screen::enable_alt()); return Ok(()) }
         // let err_msg = "Error initializing alternate screen settings";
-        screen.set_mode(initial);
+        screen.set_mode(initial)?;
         // let err_msg = "Error showing the alternate screen"
         screen.show()
     }
 
-    pub fn disable_alt(vte: bool) -> Result<()> {
-        if vte { ansi::output::printf(
+    pub fn disable_alt(ansi: bool) -> Result<()> {
+        if ansi { ansi::output::printf(
             &ansi::screen::disable_alt()); return Ok(()) }
         // let err_msg = "Error switching back to $STDOUT";
         wincon::screen::disable_alt()
     }
 
     // OUTPUT FUNCTIONS
-    pub fn prints(content: &str, vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(content); return Ok(()) }
+    pub fn prints(content: &str, conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(content); return Ok(()) }
         // let err_msg = "Error writing to console";
-        wincon::output::prints(content)
+        wincon::output::prints(content, &conout)
     }
 
-    pub fn printf(content: &str, vte: bool) -> Result<()> {
-        if vte { ansi::output::printf(content); return Ok(()) }
+    pub fn printf(content: &str, conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::printf(content); return Ok(()) }
         // let err_msg = "Error writing to console";
-        wincon::output::prints(content)
+        wincon::output::prints(content, &conout)
     }
 
-    pub fn flush(vte: bool) {
-        if vte { ansi::output::flush(); return }
+    pub fn flush(ansi: bool) {
+        if ansi { ansi::output::flush(); return }
         () // (imdaveho) NOTE: Win32 flush is simply a no-op.
     }
 
-    pub fn raw() -> Result<()> {
+    pub fn raw(conout: &Handle) -> Result<()> {
         // let err_msg = "Error enabling raw mode";
-        wincon::output::enable_raw()
+        wincon::output::enable_raw(&conout)
     }
 
-    pub fn cook() -> Result<()> {
+    pub fn cook(conout: &Handle) -> Result<()> {
         // let err_msg = "Error disabling raw mode";
-        wincon::output::disable_raw()
+        wincon::output::disable_raw(&conout)
     }
 
     // MOUSE FUNCTIONS
-    pub fn enable_mouse(vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn enable_mouse(conin: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::mouse::enable_mouse_mode()); return Ok(()) }
         // let err_msg = "Error enabling mouse mode";
-        wincon::mouse::enable_mouse_mode()
+        wincon::mouse::enable_mouse_mode(&conin)
     }
 
-    pub fn disable_mouse(vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn disable_mouse(conin: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::mouse::disable_mouse_mode()); return Ok(()) }
-        let err_msg = "Error disabling mouse mode";
-        wincon::mouse::disable_mouse_mode()
+        // let err_msg = "Error disabling mouse mode";
+        wincon::mouse::disable_mouse_mode(&conin)
     }
 
     // STYLE FUNCTIONS
-    pub fn set_fx(effects: u32, vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn set_fx(effects: u32, conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::style::set_style(Style::Fx(effects))); return Ok(()) }
         // let err_msg = "Error setting console text attributes";
-        wincon::style::set_style(Style::Fx(effects), 0)
+        wincon::style::set_style(Style::Fx(effects), 0, &conout)
     }
 
-    pub fn set_fg(color: Color, reset: u16, vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn set_fg(color: Color, reset: u16, conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::style::set_style(Style::Fg(color))); return Ok(()) }
         // let err_msg = "Error setting console foreground";
-        wincon::style::set_style(Style::Fg(color), reset)
+        wincon::style::set_style(Style::Fg(color), reset, &conout)
     }
 
-    pub fn set_bg(color: Color, reset: u16, vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn set_bg(color: Color, reset: u16, conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::style::set_style(Style::Bg(color))); return Ok(()) }
         // let err_msg = "Error setting console background";
-        wincon::style::set_style(Style::Bg(color), reset)
+        wincon::style::set_style(Style::Bg(color), reset, &conout)
     }
 
-    pub fn set_styles(fg: Color, bg: Color, fx: u32, reset: u16, vte: bool) -> Result<()> {
-        if vte { ansi::output::prints(
+    pub fn set_styles(fg: Color, bg: Color, fx: u32, reset: u16, conout: &Handle, ansi: bool) -> Result<()> {
+        if ansi { ansi::output::prints(
             &ansi::style::set_styles(fg, bg, fx)); return Ok(()) }
         // let err_msg = "Error setting multiple console styles";
-        wincon::style::set_styles(fg, bg, fx, reset)
+        wincon::style::set_styles(fg, bg, fx, reset, &conout)
     }
 
     pub fn reset_styles(reset: u16, vte: bool) -> Result<()> {
         if vte { ansi::output::prints(
             &ansi::style::reset()); return Ok(()) }
         // let err_msg = "Error unsetting console styles";
-        wincon::style::reset(reset)
+        let handle = Handle::conout()?;
+        wincon::style::reset(reset, &handle)?;
+        handle.close()?;
+        Ok(())
     }
 
     // CONFIG FUNCTIONS
     pub fn get_mode() -> Result<u32> {
-        // let err_msg = "Error fetching mode from $STDOUT"
         wincon::output::get_mode()
     }
 
-    pub fn get_attrib() -> Result<u16> {
-        // let conout_err = "Error fetching $CONOUT";
-        let handle = Handle::conout()?;
-        // let coninfo_err = "Error fetching ConsoleInfo from $CONOUT";
-        let attrib = ConsoleInfo::of(&handle)?.attributes();
-        // let conout_err = "Error closing $CONOUT";
-        handle.close()?;
-        Ok(attrib)
+    pub fn get_attrib(conout: &Handle) -> Result<u16> {
+        Ok(ConsoleInfo::of(&conout)?.attributes())
     }
 
     // Windows Console API specific. Allows you to update the text
@@ -468,47 +464,122 @@ pub mod win32 {
                 Err(_) => return false,
             };
             match handle.set_mode(&(mode | enable_vt)) {
-                Ok(_) => { handle.close(); return true },
-                Err(_) => { handle.close(); return false }
+                Ok(_) => { let _ = handle.close(); return true },
+                Err(_) => { let _ = handle.close(); return false }
             }
         }
     }
 
 
-//     // UNIFIED STRUCT W/ ACTIONS
-//     pub struct Term {
-//         mode: u32,
-//         #[cfg(windows)]
-//         reset: ConsoleInfo,
-//         #[cfg(windows)]
-//         conout: Handle,
-//         //conin: Handle,
-//         cfg: bool
-//     }
-//     impl Term {
-//         pub fn new() -> Self {
-//             let conout = Handle::conout()
-//                 .expect("Error fetching CONOUT$");
-//             let reset = ConsoleInfo::of(&conout)
-//                 .expect("Error fetching ConsoleInfo from CONOUT$");
-//             Self {
-//                 mode: get_mode(),
-//                 reset, conout,
-//                 cfg: is_ansi_enabled()
-//             }
-//         }
-//         pub fn goto(&self, col: i16, row: i16) { goto(col, row, self.cfg) }
-//         pub fn up(&self, n: i16) { up(n, self.cfg) }
-//         pub fn down(&self, n: i16) { down(n, self.cfg) }
-//         pub fn left(&self, n: i16) { left(n, self.cfg) }
-//         pub fn right(&self, n: i16) { right(n, self.cfg) }
-//         // TODO TODO TODO - should pass in self.conout ???
-//         pub fn pos_raw(&self) -> (i16, i16) {
-//             let info = ConsoleInfo::of(&self.conout)
-//                 .expect("Error fetching cursor position from CONOUT$");
-//             info.cursor_pos()
-//         }
-//         pub fn hide_cursor() { () }
+    // UNIFIED STRUCT W/ ACTIONS
+    pub struct Term {
+        mode: u32,
+        reset: u16,
+        conout: Handle,
+        conin: Handle,
+        ansi: bool
+    }
 
-//     }
+    impl Term {
+        pub fn new(mode: u32, reset: u16, ansi: bool) -> Result<Self> {
+            // let err_msg = "Error fetching CONOUT$";
+            let conout = Handle::conout()?;
+            // let err_msg = "Error fetching CONIN$";
+            let conin = Handle::conin()?;
+            Ok(Self{ mode, reset, conout, conin, ansi })
+        }
+        // CURSOR FUNCTIONS    
+        pub fn goto(&self, col: i16, row: i16) -> Result<()> { 
+            goto(col, row, &self.conout, self.ansi) 
+        }
+        pub fn up(&self, n: i16) -> Result<()> { 
+            up(n, &self.conout, self.ansi)
+        }
+        pub fn down(&self, n: i16) -> Result<()> {
+            down(n, &self.conout, self.ansi) 
+        }
+        pub fn left(&self, n: i16) -> Result<()> {
+            left(n, &self.conout, self.ansi)
+        }
+        pub fn right(&self, n: i16) -> Result<()> { 
+            right(n, &self.conout, self.ansi) 
+        }
+        pub fn pos(&self) -> Result<(i16, i16)> {
+            pos(&self.conout)
+        }
+        pub fn hide_cursor(&self) -> Result<()> {
+            hide_cursor(&self.conout, self.ansi)
+        }
+        pub fn show_cursor(&self) -> Result<()> {
+            show_cursor(&self.conout, self.ansi)
+        }
+        // SCREEN FUNCTIONS
+        pub fn clear(&self, method: Clear) -> Result<()> {
+            clear(method, &self.conout, self.ansi)
+        }
+        pub fn size(&self) -> Result<(i16, i16)> {
+            size(&self.conout)
+        }
+        pub fn resize(&self, w: i16, h: i16) -> Result<()> {
+            resize(w, h, &self.conout, self.ansi)
+        }
+        pub fn enable_alt(&self, screen: &Handle) -> Result<()> {
+            enable_alt(screen, &self.mode, self.ansi)
+        }
+        pub fn disable_alt(&self) -> Result<()> {
+            disable_alt(self.ansi)
+        }
+        // OUTPUT FUNCTIONS
+        pub fn prints(&self, content: &str) -> Result<()> {
+            prints(content, &self.conout, self.ansi)
+        }
+        pub fn printf(&self, content: &str) -> Result<()> {
+            printf(content, &self.conout, self.ansi)
+        }
+        pub fn flush(&self) { flush(self.ansi) }
+        pub fn raw(&self) -> Result<()> {
+            raw(&self.conout)
+        }
+        pub fn cook(&self) -> Result<()> {
+            cook(&self.conout)
+        }
+        // MOUSE FUNCTIONS
+        pub fn enable_mouse(&self) -> Result<()> {
+            enable_mouse(&self.conin, self.ansi)
+        }
+        pub fn disable_mouse(&self) -> Result<()> {
+            disable_mouse(&self.conin, self.ansi)
+        }
+        // STYLE FUNCTIONS
+        pub fn set_fx(&self, effects: u32) -> Result<()> {
+            set_fx(effects, &self.conout, self.ansi)
+        }
+        pub fn set_fg(&self, color: Color) -> Result<()> {
+            set_fg(color, self.reset, &self.conout, self.ansi)
+        }
+        pub fn set_bg(&self, color: Color) -> Result<()> {
+            set_bg(color, self.reset, &self.conout, self.ansi)
+        }
+        pub fn set_styles(&self, fg: Color, bg: Color, fx: u32) -> Result<()> {
+            set_styles(fg, bg, fx, self.reset, &self.conout, self.ansi)
+        }
+        pub fn reset_styles(&self) -> Result<()> {
+            reset_styles(self.reset, self.ansi)
+        }
+        // CONFIG FUNCTIONS
+        pub fn get_mode(&self) -> Result<u32> {
+            get_mode()
+        }
+        pub fn get_attrib(&self) -> Result<u16> {
+            get_attrib(&self.conout)
+        }
+        pub fn set_attrib(word: u16, length: u32, coord: (i16, i16)) -> Result<()> {
+            set_attrib(word, length, coord)
+        }
+        pub fn close(&self) -> Result<()> {
+            self.conout.close()?; 
+            self.conin.close()?;
+            Ok(())
+        }
+    }
 }

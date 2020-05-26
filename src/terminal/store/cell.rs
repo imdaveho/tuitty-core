@@ -15,6 +15,8 @@ use crate::terminal::actions::posix;
 #[cfg(windows)]
 use crate::terminal::actions::win32;
 #[cfg(windows)]
+use crate::terminal::actions::win32::Handle;
+#[cfg(windows)]
 use winapi::shared::minwindef::WORD;
 #[cfg(windows)]
 use winapi::um::wincon::{WriteConsoleOutputAttribute, COORD};
@@ -55,7 +57,11 @@ impl ScreenBuffer {
         #[cfg(unix)]
         let (w, h) = posix::size();
         #[cfg(windows)]
-        let (w, h) = win32::size().expect("TODO");
+        let conout = Handle::conout().expect("TODO");
+        #[cfg(windows)]
+        let (w, h) = win32::size(&conout).expect("TODO");
+        #[cfg(windows)]
+        conout.close().expect("TODO");
         let capacity = (w * h) as usize;
         ScreenBuffer {
             cursor: 0,
@@ -460,12 +466,12 @@ impl ScreenBuffer {
     }
 
     #[cfg(windows)]
-    pub fn render(&self, reset: u16, vte: bool) {
+    pub fn render(&self, reset: u16, conout: &Handle, vte: bool) {
         let default = (Reset, Reset, Effect::Reset as u32);
         let mut style = (Reset, Reset, Effect::Reset as u32);
 
         let (col, row) = self.coord();
-        win32::goto(0, 0, vte);
+        win32::goto(0, 0, conout, vte);
 
         let mut change_index = 0;
         let mut index = 0;
@@ -534,7 +540,7 @@ impl ScreenBuffer {
         // the last character in the buffer. To prevent this,
         // we offset the max buffer capacity by -1.
         chunk.pop(); 
-        if chunk.len() > 0 { win32::prints(&chunk, vte).expect("TODO") }
+        if chunk.len() > 0 { win32::prints(&chunk, conout, vte).expect("TODO") }
         // Styles are appended based on the _previous_ style. Append
         // the last remaining style to the list.
         if current != reset {
@@ -550,7 +556,7 @@ impl ScreenBuffer {
             );            
             win32::set_attrib(word, length, coord);
         }
-        win32::goto(col, row, vte);
+        win32::goto(col, row, conout, vte);
     }
 
     pub fn sync_clear(&mut self, clr: Clear) {
