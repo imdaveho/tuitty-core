@@ -180,6 +180,5 @@ pub fn resize(w: i16, h: i16, conout: &Handle) -> Result<()> {
 pub fn disable_alt() -> Result<()> {
     let handle = Handle::stdout()?;
     handle.show()?;
-    handle.close()?;
     Ok(())
 }

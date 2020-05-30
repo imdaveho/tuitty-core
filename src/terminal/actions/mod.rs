@@ -220,13 +220,15 @@ pub mod posix {
 
 #[cfg(windows)]
 pub mod win32 {
-    use std::io::Result;
+    use std::io::{ Result, Error, ErrorKind };
     use super::{ ansi, wincon };
     use crate::common::enums::{ Clear, Style, Color };
     pub use super::wincon::handle::{ Handle, ConsoleInfo };
 
     // CURSOR FUNCTIONS
-    pub fn goto(col: i16, row: i16, conout: &Handle, ansi: bool) -> Result<()> {
+    pub fn goto(
+        col: i16, row: i16, conout: &Handle, ansi: bool
+    ) -> Result<()> {
         let (mut col, mut row) = (col, row);
         if col < 0 { col = col.abs() }
         if row < 0 { row = row.abs() }
@@ -316,13 +318,15 @@ pub mod win32 {
         wincon::screen::resize(w, h, &conout)
     }
 
-    pub fn enable_alt(screen: &Handle, initial: &u32, ansi: bool) -> Result<()> {
+    pub fn enable_alt(
+        altout: &Handle, initial: &u32, ansi: bool
+    ) -> Result<()> {
         if ansi { ansi::output::printf(
             &ansi::screen::enable_alt()); return Ok(()) }
         // let err_msg = "Error initializing alternate screen settings";
-        screen.set_mode(initial)?;
+        altout.set_mode(initial)?;
         // let err_msg = "Error showing the alternate screen"
-        screen.show()
+        altout.show()
     }
 
     pub fn disable_alt(ansi: bool) -> Result<()> {
@@ -383,21 +387,28 @@ pub mod win32 {
         wincon::style::set_style(Style::Fx(effects), 0, &conout)
     }
 
-    pub fn set_fg(color: Color, reset: u16, conout: &Handle, ansi: bool) -> Result<()> {
+    pub fn set_fg(
+        color: Color, reset: u16, conout: &Handle, ansi: bool
+    ) -> Result<()> {
         if ansi { ansi::output::prints(
             &ansi::style::set_style(Style::Fg(color))); return Ok(()) }
         // let err_msg = "Error setting console foreground";
         wincon::style::set_style(Style::Fg(color), reset, &conout)
     }
 
-    pub fn set_bg(color: Color, reset: u16, conout: &Handle, ansi: bool) -> Result<()> {
+    pub fn set_bg(
+        color: Color, reset: u16, conout: &Handle, ansi: bool
+    ) -> Result<()> {
         if ansi { ansi::output::prints(
             &ansi::style::set_style(Style::Bg(color))); return Ok(()) }
         // let err_msg = "Error setting console background";
         wincon::style::set_style(Style::Bg(color), reset, &conout)
     }
 
-    pub fn set_styles(fg: Color, bg: Color, fx: u32, reset: u16, conout: &Handle, ansi: bool) -> Result<()> {
+    pub fn set_styles(
+        fg: Color, bg: Color, fx: u32, 
+        reset: u16, conout: &Handle, ansi: bool
+    ) -> Result<()> {
         if ansi { ansi::output::prints(
             &ansi::style::set_styles(fg, bg, fx)); return Ok(()) }
         // let err_msg = "Error setting multiple console styles";
@@ -425,7 +436,9 @@ pub mod win32 {
 
     // Windows Console API specific. Allows you to update the text
     // styles without having to re-print. 
-    pub fn set_attrib(word: u16, length: u32, coord: (i16, i16)) -> Result<()> {
+    pub fn set_attrib(
+        word: u16, length: u32, coord: (i16, i16)
+    ) -> Result<()> {
         // let err_msg = "Error setting console output attributes";
         wincon::style::set_attribute(word, length, coord)
     }
@@ -464,8 +477,8 @@ pub mod win32 {
                 Err(_) => return false,
             };
             match handle.set_mode(&(mode | enable_vt)) {
-                Ok(_) => { let _ = handle.close(); return true },
-                Err(_) => { let _ = handle.close(); return false }
+                Ok(_) => true,
+                Err(_) => false
             }
         }
     }
@@ -477,16 +490,22 @@ pub mod win32 {
         reset: u16,
         conout: Handle,
         conin: Handle,
+        altout: Option<Handle>,
         ansi: bool
     }
 
     impl Term {
-        pub fn new(mode: u32, reset: u16, ansi: bool) -> Result<Self> {
+        pub fn new() -> Result<Self> {
+            let mode = get_mode()?;
+            // let ansi = is_ansi_enabled();
+            let ansi = false;
             // let err_msg = "Error fetching CONOUT$";
             let conout = Handle::conout()?;
+            let reset = get_attrib(&conout)?;
             // let err_msg = "Error fetching CONIN$";
             let conin = Handle::conin()?;
-            Ok(Self{ mode, reset, conout, conin, ansi })
+            let altout = None;
+            Ok(Self{ mode, reset, conout, conin, altout, ansi })
         }
         // CURSOR FUNCTIONS    
         pub fn goto(&self, col: i16, row: i16) -> Result<()> { 
@@ -523,11 +542,26 @@ pub mod win32 {
         pub fn resize(&self, w: i16, h: i16) -> Result<()> {
             resize(w, h, &self.conout, self.ansi)
         }
-        pub fn enable_alt(&self, screen: &Handle) -> Result<()> {
-            enable_alt(screen, &self.mode, self.ansi)
+        pub fn enable_alt(&mut self) -> Result<()> {
+            if self.altout.is_none() {
+                self.altout = Some(Handle::buffer()?)
+            }
+            match &self.altout {
+                Some(screen) => {
+                    enable_alt(screen, &self.mode, self.ansi)?;
+                    self.conout.close()?;
+                    self.conout = Handle::conout()?;
+                    Ok(())
+                },
+                None => Err(Error::new(ErrorKind::Other, 
+                    "Could not find the alternate screen."))
+            }
         }
-        pub fn disable_alt(&self) -> Result<()> {
-            disable_alt(self.ansi)
+        pub fn disable_alt(&mut self) -> Result<()> {
+            disable_alt(self.ansi)?;
+            self.conout.close()?;
+            self.conout = Handle::conout()?;
+            Ok(())
         }
         // OUTPUT FUNCTIONS
         pub fn prints(&self, content: &str) -> Result<()> {
@@ -576,9 +610,29 @@ pub mod win32 {
         pub fn set_attrib(word: u16, length: u32, coord: (i16, i16)) -> Result<()> {
             set_attrib(word, length, coord)
         }
-        pub fn close(&self) -> Result<()> {
+        // TERM STRUCT SPECIFIC
+        pub fn with(&mut self, mode: u32, reset: u16, ansi: bool) {
+            self.mode = mode;
+            self.reset = reset;
+            self.ansi = ansi;
+        }
+        pub fn conout(&mut self, conout: Handle) -> Result<()> {
+            self.conout.close()?;
+            self.conout = conout;
+            Ok(())
+        }
+        pub fn conin(&mut self, conin: Handle) -> Result<()> {
+            self.conin.close()?;
+            self.conin = conin;
+            Ok(())
+        }
+        pub fn close(&mut self) -> Result<()> {
             self.conout.close()?; 
             self.conin.close()?;
+            if let Some(altout) = &self.altout {
+                altout.close()?;
+                self.altout = None;
+            }
             Ok(())
         }
     }

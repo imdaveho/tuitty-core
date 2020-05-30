@@ -12,31 +12,49 @@ use std::time::Duration;
 
 
 fn main() {
-    // let stdout = tuitty::terminal::actions::win32::Handle::stdout().unwrap();
-    let mode = tuitty::terminal::actions::win32::get_mode().unwrap();
-    let ansi = tuitty::terminal::actions::win32::is_ansi_enabled();
-    let conout = tuitty::terminal::actions::win32::Handle::conout().unwrap();
-    // let _ = tuitty::terminal::actions::win32::goto(0, 0, &conout, ansi);
-    let _ = tuitty::terminal::actions::win32::prints("Hello, world!!!", &conout, ansi);
+    let mut term = tuitty::terminal::actions::win32::Term::new().expect("Error creating terminal struct");
+    term.prints("Hello, world!!!").expect("Error printing");
 
     thread::sleep(Duration::from_millis(2000));
 
-    let altern = tuitty::terminal::actions::win32::Handle::buffer().unwrap();
-    let _ = tuitty::terminal::actions::win32::enable_alt(&altern, &mode, false);
-    // let _ = tuitty::terminal::actions::win32::raw(&conout);
-
-    let conout = tuitty::terminal::actions::win32::Handle::conout().unwrap();
-    // let _ = tuitty::terminal::actions::win32::goto(0, 0, &conout, ansi);
-    let _ = tuitty::terminal::actions::win32::prints("Hello, alternate world!!!", &conout, ansi);
+    term.enable_alt().expect("Error entering alternate screen");
+    term.raw().expect("Error setting raw mode");
+    term.prints("Hello, alternate world!!!").expect("Error printing");
 
     thread::sleep(Duration::from_millis(2000));
 
-    let _ = tuitty::terminal::actions::win32::cook(&conout);
-    let _ = tuitty::terminal::actions::win32::disable_alt(ansi);
-
-    let _ = tuitty::terminal::actions::win32::prints("Hello, main world!!!", &conout, ansi);
-
+    term.cook().expect("Error setting cooked mode");
+    term.disable_alt().expect("Error exiting alternate screen");
+    term.prints("\n\rHello, main world!!!").expect("Error printing");
+    
     thread::sleep(Duration::from_millis(2000));
+
+    // // let stdout = tuitty::terminal::actions::win32::Handle::stdout().unwrap();
+    // let mode = tuitty::terminal::actions::win32::get_mode().unwrap();
+    // let ansi = tuitty::terminal::actions::win32::is_ansi_enabled();
+    // let conout = tuitty::terminal::actions::win32::Handle::conout().unwrap();
+    // // let _ = tuitty::terminal::actions::win32::goto(0, 0, &conout, ansi);
+    // let _ = tuitty::terminal::actions::win32::prints("Hello, world!!!", &conout, ansi);
+
+    // thread::sleep(Duration::from_millis(2000));
+
+    // let altern = tuitty::terminal::actions::win32::Handle::buffer().unwrap();
+    // let _ = tuitty::terminal::actions::win32::enable_alt(&altern, &mode, false);
+    // // let _ = tuitty::terminal::actions::win32::raw(&conout);
+
+    // let conout = tuitty::terminal::actions::win32::Handle::conout().unwrap();
+    // // let _ = tuitty::terminal::actions::win32::goto(0, 0, &conout, ansi);
+    // let _ = tuitty::terminal::actions::win32::prints("Hello, alternate world!!!", &conout, ansi);
+
+    // thread::sleep(Duration::from_millis(2000));
+
+    // let _ = tuitty::terminal::actions::win32::cook(&conout);
+    // let _ = tuitty::terminal::actions::win32::disable_alt(ansi);
+
+    // let conout = tuitty::terminal::actions::win32::Handle::conout().unwrap();
+    // let _ = tuitty::terminal::actions::win32::prints("\n\rHello, main world!!!", &conout, ansi);
+
+    // thread::sleep(Duration::from_millis(2000));
 }
 
 

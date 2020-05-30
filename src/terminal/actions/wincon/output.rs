@@ -54,7 +54,6 @@ pub fn get_mode() -> Result<u32> {
     // want a default set of terminal settings
     let handle = Handle::stdout()?;
     let mode = handle.get_mode();
-    handle.close()?;
     mode
 }
 

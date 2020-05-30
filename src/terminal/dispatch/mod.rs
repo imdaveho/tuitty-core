@@ -176,14 +176,16 @@ impl Dispatcher {
             // Store inits with main screen buffer,
             // so we align the main cursor position.
             // Initialize the Term.
-            let term = win32::Term::new(mode, reset, ansi).expect("TODO");
+            // let term = win32::Term::new(mode, reset, ansi).expect("TODO");
+            let mut term = win32::Term::new().expect("TODO");
             store.sync_goto(col, row);
 
             // Windows *mut c_void cannot be safely moved into thread. So
             // we create it within the thread.
-            #[cfg(windows)]
-            let screen = win32::Handle::buffer()
-                .expect("Error creating alternate Console buffer");
+            // #[cfg(windows)]
+            // let screen = win32::Handle::buffer()
+            //     .expect("Error creating alternate Console buffer");
+            term.with(mode, reset, ansi);
 
             loop {
                 // Include minor delay so the thread isn't blindly using CPU.
@@ -672,8 +674,8 @@ impl Dispatcher {
             }
             #[cfg(windows)]
             let _ = term.close();
-            #[cfg(windows)]
-            let _ = screen.close();
+            // #[cfg(windows)]
+            // let _ = screen.close();
         });
 
         Dispatcher {

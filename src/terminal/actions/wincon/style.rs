@@ -22,7 +22,9 @@ pub fn reset(reset_style: u16, conout: &Handle) -> Result<()> {
     Ok(())
 }
 
-pub fn set_style(style: Style, reset_style: u16, conout: &Handle) -> Result<()> {
+pub fn set_style(
+    style: Style, reset_style: u16, conout: &Handle
+) -> Result<()> {
     let info = ConsoleInfo::of(&conout)?;
     let current = info.attributes();
     // let (just_fg, just_bg, just_fx) = (
@@ -46,7 +48,10 @@ pub fn set_style(style: Style, reset_style: u16, conout: &Handle) -> Result<()> 
     Ok(())
 }
 
-pub fn set_styles(fg: Color, bg: Color, fx: u32, reset_style: u16, conout: &Handle) -> Result<()> {
+pub fn set_styles(
+    fg: Color, bg: Color, fx: u32, 
+    reset_style: u16, conout: &Handle
+) -> Result<()> {
     set_style(Style::Fg(fg), reset_style, conout)?;
     set_style(Style::Bg(bg), reset_style, conout)?;
     set_style(Style::Fx(fx), reset_style, conout)?;
@@ -55,7 +60,9 @@ pub fn set_styles(fg: Color, bg: Color, fx: u32, reset_style: u16, conout: &Hand
 
 // Windows Console API specific. Allows you to update the text
 // styles without having to re-print. 
-pub fn set_attribute(word: u16, length: u32, coord: (i16, i16)) -> Result<()> {
+pub fn set_attribute(
+    word: u16, length: u32, coord: (i16, i16)
+) -> Result<()> {
     let handle = Handle::conout()?;
 
     let mut count = 0;
