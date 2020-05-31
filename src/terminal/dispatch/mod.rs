@@ -2,6 +2,7 @@
 // user input and supports multithreaded programs through message passing.
 
 use std::{
+    io::Result,
     thread, collections::HashMap,
     time::{ SystemTime, UNIX_EPOCH, Duration },
     sync::{
@@ -162,10 +163,18 @@ impl Dispatcher {
 
         // Fetch terminal default state in main thread.
         #[cfg(unix)]
-        let (initial, col, row, tab_size) = fetch_defaults();
+        let (initial, col, row, tab_size) = match fetch_defaults() {
+            Ok((initial, col, row, tab_size)) => 
+                (initial, col, row, tab_size),
+            Err(e) => panic!("Error fetching terminal defaults: {:?}", e)
+        };
 
         #[cfg(windows)]
-        let (mode, reset, ansi, col, row, tab_size) = fetch_defaults();
+        let (initial, col, row, tab_size) = match fetch_defaults() {
+            Ok((mode, reset, ansi, col, row, tab_size)) =>
+                ((mode, reset, ansi), col, row, tab_size),
+            Err(e) => panic!("Error fetching terminal defaults: {:?}", e)
+        };
 
         // Start signal loop.
         let (signal_tx, signal_rx) = channel();
@@ -176,17 +185,12 @@ impl Dispatcher {
             // Store inits with main screen buffer,
             // so we align the main cursor position.
             // Initialize the Term.
-            // let term = win32::Term::new(mode, reset, ansi).expect("TODO");
+            #[cfg(windows)]
             let mut term = win32::Term::new().expect("TODO");
+            #[cfg(windows)]
+            term.with(initial.0, initial.1, initial.2);
             store.sync_goto(col, row);
-
-            // Windows *mut c_void cannot be safely moved into thread. So
-            // we create it within the thread.
-            // #[cfg(windows)]
-            // let screen = win32::Handle::buffer()
-            //     .expect("Error creating alternate Console buffer");
-            term.with(mode, reset, ansi);
-
+            
             loop {
                 // Include minor delay so the thread isn't blindly using CPU.
                 thread::sleep(Duration::from_millis(DELAY));
@@ -672,10 +676,6 @@ impl Dispatcher {
                     }
                 }
             }
-            #[cfg(windows)]
-            let _ = term.close();
-            // #[cfg(windows)]
-            // let _ = screen.close();
         });
 
         Dispatcher {
@@ -683,7 +683,8 @@ impl Dispatcher {
             emitters, lock_owner,
             signal_tx, is_running,
             signal_handle: Some(signal_handle),
-            defaults: (mode, reset, ansi)
+            #[cfg(windows)]
+            defaults: (initial.0, initial.1, initial.2)
         }
     }
 
@@ -826,8 +827,7 @@ impl Dispatcher {
         self.is_running.store(false, Ordering::SeqCst);
         // (imdaveho) TODO: Since reading /dev/tty is blocking
         // we ignore this for now as it will clean up when the
-        // program ends (and Dispatcher is dropped). HOWEVER!
-        // This should updated when Async/.Await gets released.
+        // program ends (and Dispatcher is dropped).
         // if let Some(t) = self.input_handle.take() { t.join()? }
 
         // Clear the emitters registery.
@@ -858,7 +858,7 @@ impl Drop for Dispatcher {
 
 
 #[cfg(unix)]
-fn fetch_defaults() -> (libc::termios, i16, i16, usize) {
+fn fetch_defaults() -> Result<(libc::termios, i16, i16, usize)> {
     // Raw mode is needed to fetch cursor report.
     let initial = posix::get_mode();
     posix::raw();
@@ -866,18 +866,18 @@ fn fetch_defaults() -> (libc::termios, i16, i16, usize) {
     let stdin = std::io::stdin();
 
     // Get original position.
-    std::io::Write::write_all(&mut stdout, b"\x1B[6n")
-        .expect("Error writing cursor report");
-    std::io::Write::flush(&mut stdout)
-        .expect("Error flushing cursor report");
-    std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])
-        .expect("Error reading");
+    std::io::Write::write_all(&mut stdout, b"\x1B[6n")?;
+        // .expect("Error writing cursor report");
+    std::io::Write::flush(&mut stdout)?;
+        // .expect("Error flushing cursor report");
+    std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])?;
+        // .expect("Error reading");
     let mut row = vec![];
-    std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut row)
-        .expect("Error reading row");
+    std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut row)?;
+        // .expect("Error reading row");
     let mut col = vec![];
-    std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut col)
-        .expect("Error reading col");
+    std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut col)?;
+        // .expect("Error reading col");
 
     row.pop(); col.pop();
 
@@ -886,27 +886,29 @@ fn fetch_defaults() -> (libc::termios, i16, i16, usize) {
         .fold(String::new(), |mut acc, n| {
             acc.push(n);
             acc
-        }).parse().expect("Error parsing origin row");
+        }).parse()?;
+        // .expect("Error parsing origin row");
     let origin_col: i16 = col.into_iter()
         .map(|b| (b as char))
         .fold(String::new(), |mut acc, n| {
             acc.push(n);
             acc
-        }).parse().expect("Error parsing origin col");
+        }).parse()?;
+        // .expect("Error parsing origin col");
 
     // Get tabbed column position.
-    std::io::Write::write_all(&mut stdout, b"\t\x1B[6n")
-        .expect("Error writing tab cursor report");
-    std::io::Write::flush(&mut stdout)
-        .expect("Error flushing tab cursor report");
-    std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])
-        .expect("Error reading tab report");
+    std::io::Write::write_all(&mut stdout, b"\t\x1B[6n")?;
+        // .expect("Error writing tab cursor report");
+    std::io::Write::flush(&mut stdout)?;
+        // .expect("Error flushing tab cursor report");
+    std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])?;
+        // .expect("Error reading tab report");
     let mut row = vec![];
-    std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut row)
-        .expect("Error reading tab report row");
+    std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut row)?;
+        // .expect("Error reading tab report row");
     let mut col = vec![];
-    std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut col)
-        .expect("Error reading tab report col");
+    std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut col)?;
+        // .expect("Error reading tab report col");
 
     col.pop();
 
@@ -915,27 +917,28 @@ fn fetch_defaults() -> (libc::termios, i16, i16, usize) {
         .fold(String::new(), |mut acc, n| {
             acc.push(n);
             acc
-        }).parse().expect("Error parsing tabbed col");
+        }).parse()?;
+        // .expect("Error parsing tabbed col");
     let tab_size = (tabbed_col - origin_col) as usize;
 
     // Revert back to original mode.
     posix::cook(&initial);
     posix::printf("\r");
 
-    (initial, origin_col - 1, origin_row - 1, tab_size)
+    Ok((initial, origin_col - 1, origin_row - 1, tab_size))
 }
 
 #[cfg(windows)]
-fn fetch_defaults() -> (u32, u16, bool, i16, i16, usize) {
+fn fetch_defaults() -> Result<(u32, u16, bool, i16, i16, usize)> {
     let conout = win32::Handle::conout().expect("TODO");
     let reset = win32::get_attrib(&conout).expect("TODO");
     let mode = win32::get_mode().expect("TODO");
     let ansi = win32::is_ansi_enabled();
     let (col, row) = win32::pos(&conout).expect("TODO");
-    win32::printf("\t", &conout, ansi);
+    win32::printf("\t", &conout, ansi)?;
     let (tab_col, _) = win32::pos(&conout).expect("TODO");
     let tab_size = (tab_col - col) as usize;
-    win32::printf("\r", &conout, ansi);
+    win32::printf("\r", &conout, ansi)?;
     conout.close().expect("TODO");
-    (mode, reset, ansi, col, row, tab_size)
+    Ok((mode, reset, ansi, col, row, tab_size))
 }

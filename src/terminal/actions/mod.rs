@@ -43,8 +43,7 @@ pub mod posix {
         output::prints(&cursor::move_right(n));
     }
 
-    pub fn pos() {
-        // TODO: rename to query_pos()
+    pub fn query_pos() {
         output::printf(&cursor::pos());
     }
 
@@ -179,42 +178,48 @@ pub mod posix {
     }
 
 
-    // // UNIFIED STRUCT W/ ACTIONS
-    // pub struct Term { mode: Termios }
-    // impl Term {
-    //     pub fn new() -> Self {
-    //         Self { mode: get_mode() }
-    //     }
-    //     pub fn goto(&self, col: i16, row: i16) { goto(col, row) }
-    //     pub fn up(&self, n: i16) { up(n) }
-    //     pub fn down(&self, n: i16) { down(n) }
-    //     pub fn left(&self, n: i16) { left(n) }
-    //     pub fn right(&self, n: i16) { right(n) }
-    //     pub fn query_pos(&self) { pos() }
-    //     pub fn pos_raw(&self) -> (i16, i16) { pos_raw() }
-    //     pub fn hide_cursor(&self) { hide_cursor() }
-    //     pub fn show_cursor(&self) { show_cursor() }
-    //     pub fn clear(&self, method: Clear) { clear(method) }
-    //     pub fn size(&self) -> (i16, i16) { size() }
-    //     pub fn resize(&self, w: i16, h: i16) { resize(w, h) }
-    //     pub fn enable_alt(&self) { enable_alt() }
-    //     pub fn disable_alt(&self) { disable_alt() }
-    //     pub fn prints(&self, content: &str) { prints(content) }
-    //     pub fn printf(&self, content: &str) { printf(content) }
-    //     pub fn flush(&self) { flush() }
-    //     pub fn raw(&self) { raw() }
-    //     pub fn cook(&self) { cook(&self.mode) }
-    //     pub fn enable_mouse(&self) { enable_mouse() }
-    //     pub fn disable_mouse(&self) { disable_mouse() }
-    //     pub fn set_fx(&self, effects: u32) { set_fx(effects) }
-    //     pub fn set_fg(&self, color: Color) { set_fg(color) }
-    //     pub fn set_bg(&self, color: Color) { set_bg(color) }
-    //     pub fn set_styles(&self, fg: Color, bg: Color, fx: u32) {
-    //         set_styles(fg, bg, fx)
-    //     }
-    //     pub fn reset_styles(&self) { reset_styles() }
-    // }
+    // UNIFIED STRUCT W/ ACTIONS
+    pub struct Term { mode: Termios }
+    impl Term {
+        pub fn new() -> Self {
+            Self { mode: get_mode() }
+        }
+        pub fn goto(&self, col: i16, row: i16) { goto(col, row) }
+        pub fn up(&self, n: i16) { up(n) }
+        pub fn down(&self, n: i16) { down(n) }
+        pub fn left(&self, n: i16) { left(n) }
+        pub fn right(&self, n: i16) { right(n) }
+        pub fn query_pos(&self) { query_pos() }
+        pub fn pos_raw(&self) -> (i16, i16) { pos_raw() }
+        pub fn hide_cursor(&self) { hide_cursor() }
+        pub fn show_cursor(&self) { show_cursor() }
+        pub fn clear(&self, method: Clear) { clear(method) }
+        pub fn size(&self) -> (i16, i16) { size() }
+        pub fn resize(&self, w: i16, h: i16) { resize(w, h) }
+        pub fn enable_alt(&self) { enable_alt() }
+        pub fn disable_alt(&self) { disable_alt() }
+        pub fn prints(&self, content: &str) { prints(content) }
+        pub fn printf(&self, content: &str) { printf(content) }
+        pub fn flush(&self) { flush() }
+        pub fn raw(&self) { raw() }
+        pub fn cook(&self) { cook(&self.mode) }
+        pub fn enable_mouse(&self) { enable_mouse() }
+        pub fn disable_mouse(&self) { disable_mouse() }
+        pub fn set_fx(&self, effects: u32) { set_fx(effects) }
+        pub fn set_fg(&self, color: Color) { set_fg(color) }
+        pub fn set_bg(&self, color: Color) { set_bg(color) }
+        pub fn set_styles(
+            &self, fg: Color, bg: Color, fx: u32
+        ) { set_styles(fg, bg, fx) }
+        pub fn reset_styles(&self) { reset_styles() }
+        pub fn get_mode(&self) -> Result<Termios> { get_mode() }
+    }
 
+    impl Drop for Term {
+        fn drop(&mut self) {
+            self.mode = 0;
+        }
+    }
 }
 
 
@@ -634,6 +639,12 @@ pub mod win32 {
                 self.altout = None;
             }
             Ok(())
+        }
+    }
+
+    impl Drop for Term {
+        fn drop(&mut self) {
+            self.close().expect("Error closing the terminal.");
         }
     }
 }
