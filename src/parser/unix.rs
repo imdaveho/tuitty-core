@@ -2,9 +2,8 @@
 // bytestream and map to the proper input event.
 
 use crate::common::enums::{
-    InputEvent::{*, self},
-    KeyEvent::*, MouseEvent::*,
-    MouseButton, StoreEvent::*,
+    InputEvent::{*, self}, KeyEvent::*,
+    MouseEvent::*, MouseButton
 };
 
 
@@ -340,5 +339,5 @@ fn parse_csi_cursor_position(buf: Vec<u8>) -> InputEvent {
     let row = nums[0] - 1;
     let col = nums[1] - 1;
 
-    Dispatch(SysPos(col, row))
+    CursorPos(col, row)
 }

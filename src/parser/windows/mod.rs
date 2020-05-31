@@ -12,7 +12,6 @@ use keyboard_event::KeyEventRecord;
 mod mouse_event;
 use mouse_event::{ MouseEventRecord, ButtonState };
 
-use std::{ borrow::ToOwned, io::{ Error, Result } };
 use winapi::shared::minwindef::DWORD;
 use winapi::um::{
     wincon::{
@@ -31,7 +30,7 @@ use winapi::um::{
         GetNumberOfConsoleInputEvents, ReadConsoleInputW,
     },
 };
-use crate::terminal::actions::win32::Handle;
+use crate::actions::wincon::handle::Handle;
 use crate::common::enums::{ InputEvent, KeyEvent, MouseEvent, MouseButton };
 
 
@@ -116,8 +115,10 @@ pub fn read_input_events() -> (u32, Vec<InputEvent>) {
     if unsafe {
         ReadConsoleInputW(conin.0, buf.as_mut_ptr(), buf_len, &mut size)
     } == 0 {
+        let _ = conin.close();
         return (0, vec![InputEvent::Unsupported])
     } else {
+        let _ = conin.close();
         unsafe {
             buf.set_len(buf_len as usize);
         }
@@ -253,7 +254,7 @@ fn parse_key_event(kevt: &KeyEventRecord) -> KeyEvent {
             let ctrl = LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED;
             let shift = SHIFT_PRESSED;
             // Modifier Keys (Ctrl, Alt, Shift) Support
-            let chraw = { (unsafe { *kevt.u_char.UnicodeChar() } as u16) };
+            let chraw = { (unsafe { *kevt.u_char.UnicodeChar() }) as u16 };
             // (imdaveho) NOTE: should there be u16 support?
             // ie. East Asian Characters?
             // if not, then we only consider u8, max: 255

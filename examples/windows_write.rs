@@ -12,20 +12,20 @@ use std::time::Duration;
 
 
 fn main() {
-    let mut term = tuitty::terminal::actions::win32::Term::new().expect("Error creating terminal struct");
-    term.prints("Hello, world!!!").expect("Error printing");
+    let mut term = tuitty::terminal::Term::new().expect("Error creating terminal struct");
+    term.printf("Hello, world!!!").expect("Error printing");
 
     thread::sleep(Duration::from_millis(2000));
 
     term.enable_alt().expect("Error entering alternate screen");
     term.raw().expect("Error setting raw mode");
-    term.prints("Hello, alternate world!!!").expect("Error printing");
+    term.printf("Hello, alternate world!!!").expect("Error printing");
 
     thread::sleep(Duration::from_millis(2000));
 
     term.cook().expect("Error setting cooked mode");
     term.disable_alt().expect("Error exiting alternate screen");
-    term.prints("\n\rHello, main world!!!").expect("Error printing");
+    term.printf("\n\rHello, main world!!!").expect("Error printing");
     
     thread::sleep(Duration::from_millis(2000));
 
