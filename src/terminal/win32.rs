@@ -293,6 +293,10 @@ impl Term {
     }
 
     pub fn close(&mut self) -> Result<()> {
+        // Revert back to original settings.
+        self.disable_alt()?;
+        self.reset_styles()?;
+        // Clean up Handles.
         self.conout.close()?; 
         self.conin.close()?;
         if let Some(altout) = &self.altout {
