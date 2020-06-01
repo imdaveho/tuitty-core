@@ -43,7 +43,7 @@ pub fn printf(content: &str) -> Result<()> {
 // the user or program to move it to where they would like the cursor to be.
 
 #[cfg(unix)]
-use std::{ mem, io::{ Error, Result } };
+use std::{ mem, io::Error };
 
 #[cfg(unix)]
 use libc::{
