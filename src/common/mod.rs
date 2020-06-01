@@ -2,8 +2,6 @@
 
 pub mod enums;
 pub mod unicode;
-pub const DELAY: u64 = 10;
-
 
 #[cfg(test)]
 mod tests;

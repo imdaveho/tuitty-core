@@ -1,12 +1,9 @@
-pub mod actions;
-pub mod dispatch;
-pub mod store;
+#[cfg(unix)]
+mod posix;
+#[cfg(windows)]
+mod win32;
 
-
-// #[cfg(unix)]
-// mod unix;
-
-// #[cfg(windows)]
-// mod windows;
-
-// pub use command::TerminalCmd;
+#[cfg(unix)]
+pub use posix::Term;
+#[cfg(windows)]
+pub use win32::Term;

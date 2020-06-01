@@ -98,7 +98,7 @@ pub fn foreground(color: Color, current: u16, reset: u16) -> u16 {
         Color::White => FG_RED | FG_GREEN | FG_BLUE,
         Color::Grey => FG_RED | FG_GREEN | FG_BLUE | FG_INTENSE,
         Color::Reset => RESET,
-        Color::Rgb{r, g, b} => IGNORE,
+        Color::Rgb{r: _, g: _, b: _} => IGNORE,
         Color::AnsiValue(_) => IGNORE,
     };
     if attrib == RESET {
@@ -135,7 +135,7 @@ pub fn background(color: Color, current: u16, reset: u16) -> u16 {
         Color::White => BG_RED | BG_GREEN | BG_BLUE,
         Color::Grey => BG_RED | BG_GREEN | BG_BLUE | BG_INTENSE,
         Color::Reset => RESET,
-        Color::Rgb{r, g, b} => IGNORE,
+        Color::Rgb{r: _, g: _, b: _} => IGNORE,
         Color::AnsiValue(_) => IGNORE,
     };
     if attrib == RESET {
@@ -257,18 +257,10 @@ impl BitAnd<Effect> for u32 {
 pub enum InputEvent {
     Keyboard(KeyEvent),
     Mouse(MouseEvent),
-    Dispatch(StoreEvent),
+    CursorPos(i16, i16),
     Unsupported,
 }
 
-
-#[derive(Clone)]
-pub enum StoreEvent {
-    Size(i16, i16),
-    Coord(i16, i16),
-    SysPos(i16, i16),
-    GetCh(String),
-}
 
 #[derive(Copy, Clone)]
 pub enum MouseEvent {
@@ -300,6 +292,7 @@ impl MouseEvent {
         }
     }
 }
+
 
 #[derive(Copy, Clone)]
 pub enum MouseButton {
@@ -386,63 +379,4 @@ impl KeyEvent {
             _ => 0,
         }
     }
-}
-
-
-pub enum Cmd {
-    Continue,
-    Suspend(usize),
-    Transmit(usize),
-    Stop(usize),
-    Lock(usize),
-    Unlock,
-    Signal(Action),
-    Request(State)
-}
-
-
-pub enum Action {
-    // CURSOR
-    Goto(i16, i16),
-    Up(i16),
-    Down(i16),
-    Left(i16),
-    Right(i16),
-    // SCREEN/OUTPUT
-    Clear(Clear),
-    Prints(String),
-    Printf(String),
-    Flush,
-    Resize(i16, i16),
-    // STYLE
-    SetFx(u32),
-    SetFg(Color),
-    SetBg(Color),
-    SetStyles(Color, Color, u32),
-    ResetStyles,
-    // STATEFUL/MODES
-    HideCursor,
-    ShowCursor,
-    EnableMouse,
-    DisableMouse,
-    EnableAlt,
-    DisableAlt,
-    Raw,
-    Cook,
-    // STORE OPS
-    Switch,
-    SwitchTo(usize),
-    Resized,
-    SyncMarker(i16, i16),
-    Jump,
-    SyncTabSize(usize),
-}
-
-
-pub enum State {
-    Size(usize),
-    Coord(usize),
-    SysPos(usize),
-    GetCh(usize),
-    // ScreenKey(usize),
 }
