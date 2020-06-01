@@ -276,10 +276,14 @@ impl Term {
         Ok(ConsoleInfo::of(&self.conout)?.attributes())
     }
 
+    pub fn init_data(&self) -> (u32, u16, bool) {
+        (self.mode, self.reset, self.ansi)
+    }
+
     // Windows Console API specific. Allows you to update the text
     // styles without having to re-print. 
     pub fn set_attrib(
-        word: u16, length: u32, coord: (i16, i16)
+        &self, word: u16, length: u32, coord: (i16, i16)
     ) -> Result<()> {
         // let err_msg = "Error setting console output attributes";
         wincon::style::set_attribute(word, length, coord)
@@ -305,18 +309,6 @@ impl Term {
         }
         Ok(())
     }
-
-    // pub fn conout(&mut self, conout: Handle) -> Result<()> {
-    //     self.conout.close()?;
-    //     self.conout = conout;
-    //     Ok(())
-    // }
-
-    // pub fn conin(&mut self, conin: Handle) -> Result<()> {
-    //     self.conin.close()?;
-    //     self.conin = conin;
-    //     Ok(())
-    // }
 }
 
 impl Drop for Term {

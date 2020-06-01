@@ -7,8 +7,8 @@ use crate::common::enums::{ Clear, Style, Color };
 pub struct Term { mode: Termios }
 
 impl Term {
-    pub fn new() -> Self {
-        Self { mode: get_mode() }
+    pub fn new() -> Result<Self> {
+        Ok(Self { mode: output::get_mode()? })
     }
 
     // CURSOR FUNCTIONS
@@ -47,26 +47,26 @@ impl Term {
         output::printf(&cursor::pos());
     }
 
-    pub fn pos_raw() -> (i16, i16) {
+    pub fn pos_raw() -> Result<(i16, i16)> {
         // Where is the cursor?
         // Use `ESC [ 6 n`.
         let mut stdout = std::io::stdout();
         let stdin = std::io::stdin();
 
         // Write command
-        std::io::Write::write_all(&mut stdout, b"\x1B[6n")
-            .expect("Error writing cursor report");
-        std::io::Write::flush(&mut stdout)
-            .expect("Error flushing cursor report");
-        std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])
-            .expect("Error reading cursor report");
+        std::io::Write::write_all(&mut stdout, b"\x1B[6n")?;
+            // .expect("Error writing cursor report");
+        std::io::Write::flush(&mut stdout)?;
+            // .expect("Error flushing cursor report");
+        std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])?;
+            // .expect("Error reading cursor report");
         let mut rows = vec![];
-        std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut rows)
-            .expect("Error reading cursor row");
+        std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut rows)?;
+            // .expect("Error reading cursor row");
         let mut cols = vec![];
-        std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut cols)
-            .expect("Error reading cursor col");
-        // remove delimiter
+        std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut cols)?;
+            // .expect("Error reading cursor col");
+        // Remove delimiter
         rows.pop(); cols.pop();
 
         let parsed_rows: i16 = rows
@@ -76,7 +76,8 @@ impl Term {
                 acc.push(n);
                 acc
             })
-            .parse().expect("Error parsing row position");
+            .parse()?;
+            // .expect("Error parsing row position");
         let parsed_cols: i16 = cols
             .into_iter()
             .map(|b| (b as char))
@@ -84,7 +85,8 @@ impl Term {
                 acc.push(n);
                 acc
             })
-            .parse().expect("Error parsing col position");
+            .parse()?;
+            // .expect("Error parsing col position");
 
         (parsed_cols.saturating_sub(1) , parsed_rows.saturating_sub(1))
     }
@@ -119,16 +121,16 @@ impl Term {
     }
 
     // OUTPUT FUNCTIONS
-    pub fn prints(content: &str) {
-        output::prints(content);
+    pub fn prints(content: &str) -> Result<()> {
+        output::prints(content)
     }
 
-    pub fn printf(content: &str) {
-        output::printf(content);
+    pub fn printf(content: &str) -> Result<()> {
+        output::printf(content)
     }
 
-    pub fn flush() {
-        output::flush();
+    pub fn flush() -> Result<()> {
+        output::flush()
     }
 
     pub fn raw() -> Result<()> {
@@ -173,6 +175,10 @@ impl Term {
     // pub fn get_mode() -> Result<Termios> {
     //     output::get_mode()
     // }
+
+    pub fn init_data(&self) -> Termios {
+        self.mode
+    }
 }
 
 impl Drop for Term {

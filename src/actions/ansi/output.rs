@@ -1,27 +1,32 @@
 // ANSI specific methods to print to the terminal.
 
-use std::io::{stdout, BufWriter, Write};
+use std::io::Result;
+use std::io::{ stdout, BufWriter, Write };
 
-pub fn prints(content: &str) {
+pub fn prints(content: &str) -> Result<()> {
     let output = stdout();
     let lock = output.lock();
     let mut outbuf = BufWriter::new(lock);
-    outbuf.write_all(content.as_bytes()).expect("I/O error on write");
+    outbuf.write_all(content.as_bytes())
+    // .expect("I/O error on write");
 }
 
-pub fn flush() {
+pub fn flush() -> Result<()> {
     let output = stdout();
     let lock = output.lock();
     let mut outbuf = BufWriter::new(lock);
-    outbuf.flush().expect("I/O error on flush");
+    outbuf.flush()
+    // .expect("I/O error on flush");
 }
 
-pub fn printf(content: &str) {
+pub fn printf(content: &str) -> Result<()> {
     let output = stdout();
     let lock = output.lock();
     let mut outbuf = BufWriter::new(lock);
-    outbuf.write_all(content.as_bytes()).expect("I/O error on write");
-    outbuf.flush().expect("I/O error on flush");
+    outbuf.write_all(content.as_bytes())?;
+    // .expect("I/O error on write");
+    outbuf.flush()
+    // .expect("I/O error on flush");
 }
 
 
