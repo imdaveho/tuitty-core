@@ -47,7 +47,7 @@ impl Term {
         output::printf(&cursor::pos())
     }
 
-    pub fn pos_raw(&self) -> Result<(i16, i16)> {
+    pub fn raw_pos(&self) -> Result<(i16, i16)> {
         // Where is the cursor?
         // Use `ESC [ 6 n`.
         let mut stdout = std::io::stdout();

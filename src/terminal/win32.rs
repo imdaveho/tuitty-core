@@ -72,7 +72,7 @@ impl Term {
         if row < 0 { row = row.abs() }
 
         if self.ansi { ansi::output::prints(
-            &ansi::cursor::goto(col, row)); return Ok(()) }
+            &ansi::cursor::goto(col, row))?; return Ok(()) }
         // let err_msg = "Error setting the cursor position";
         wincon::cursor::goto(col, row, &self.conout)
     }
@@ -82,7 +82,7 @@ impl Term {
         if n < 0 { n = n.abs() }
 
         if self.ansi { ansi::output::prints(
-            &ansi::cursor::move_up(n)); return Ok(()) }
+            &ansi::cursor::move_up(n))?; return Ok(()) }
         // let err_msg = format!("Error moving the cursor up by {}", n);
         wincon::cursor::move_up(n, &self.conout)
     }
@@ -92,7 +92,7 @@ impl Term {
         if n < 0 { n = n.abs() }
 
         if self.ansi { ansi::output::prints(
-            &ansi::cursor::move_down(n)); return Ok(()) }
+            &ansi::cursor::move_down(n))?; return Ok(()) }
         // let err_msg = format!("Error moving the cursor up by {}", n);
         wincon::cursor::move_down(n, &self.conout)
     }
@@ -102,7 +102,7 @@ impl Term {
         if n < 0 { n = n.abs() }
 
         if self.ansi { ansi::output::prints(
-            &ansi::cursor::move_left(n)); return Ok(()) }
+            &ansi::cursor::move_left(n))?; return Ok(()) }
         // let err_msg = format!("Error moving the cursor up by {}", n);
         wincon::cursor::move_left(n, &self.conout)
     }
@@ -112,7 +112,7 @@ impl Term {
         if n < 0 { n = n.abs() }
 
         if self.ansi { ansi::output::prints(
-            &ansi::cursor::move_right(n)); return Ok(()) }
+            &ansi::cursor::move_right(n))?; return Ok(()) }
         // let err_msg = format!("Error moving the cursor up by {}", n);
         wincon::cursor::move_right(n, &self.conout)
     }
@@ -124,14 +124,14 @@ impl Term {
 
     pub fn hide_cursor(&self) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::cursor::hide_cursor()); return Ok(()) }
+            &ansi::cursor::hide_cursor())?; return Ok(()) }
         // let err_msg = "Error setting cursor visibility to 0";
         wincon::cursor::hide_cursor(&self.conout)
     }
 
     pub fn show_cursor(&self) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::cursor::show_cursor()); return Ok(()) }
+            &ansi::cursor::show_cursor())?; return Ok(()) }
         // let err_msg = "Error setting cursor visibility to 100";
         wincon::cursor::show_cursor(&self.conout)
     }
@@ -139,7 +139,7 @@ impl Term {
     // SCREEN FUNCTIONS
     pub fn clear(&self, method: Clear) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::screen::clear(method)); return Ok(()) }
+            &ansi::screen::clear(method))?; return Ok(()) }
         // let err_msg = "Error clearing the screen";
         wincon::screen::clear(method, &self.conout)
     }
@@ -151,7 +151,7 @@ impl Term {
     
     pub fn resize(&self, w: i16, h: i16) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::screen::resize(w, h)); return Ok(()) }
+            &ansi::screen::resize(w, h))?; return Ok(()) }
         // let err_msg = "Error resizing the screen";
         wincon::screen::resize(w, h, &self.conout)
     }
@@ -163,7 +163,7 @@ impl Term {
         match &self.altout {
             Some(screen) => {
                 if self.ansi { ansi::output::printf(
-                    &ansi::screen::enable_alt()); return Ok(()) }
+                    &ansi::screen::enable_alt())?; return Ok(()) }
                 // let err_msg = "Error setting alternate screen mode";
                 screen.set_mode(&self.mode)?;
                 // let err_msg = "Error showing the alternate screen";
@@ -179,7 +179,7 @@ impl Term {
 
     pub fn disable_alt(&mut self) -> Result<()> {
         if self.ansi { ansi::output::printf(
-            &ansi::screen::disable_alt()); return Ok(()) }
+            &ansi::screen::disable_alt())?; return Ok(()) }
         // let err_msg = "Error switching back to $STDOUT";
         wincon::screen::disable_alt()?;
         self.conout.close()?;
@@ -189,21 +189,21 @@ impl Term {
 
     // OUTPUT FUNCTIONS
     pub fn prints(&self, content: &str) -> Result<()> {
-        if self.ansi { ansi::output::prints(content); return Ok(()) }
+        if self.ansi { ansi::output::prints(content)?; return Ok(()) }
         // let err_msg = "Error writing to console";
         wincon::output::prints(content, &self.conout)
     }
 
     pub fn printf(&self, content: &str) -> Result<()> {
-        if self.ansi { ansi::output::printf(content); return Ok(()) }
+        if self.ansi { ansi::output::printf(content)?; return Ok(()) }
         // let err_msg = "Error writing to console";
         wincon::output::prints(content, &self.conout)
     }
 
-    pub fn flush(&self) {
-        if self.ansi { ansi::output::flush(); return }
+    pub fn flush(&self) -> Result<()> {
+        if self.ansi { ansi::output::flush()?; return Ok(()) }
         // (imdaveho) NOTE: Win32 flush is simply a no-op.
-        ()
+        Ok(())
     }
 
     pub fn raw(&self) -> Result<()> {
@@ -219,14 +219,14 @@ impl Term {
     // MOUSE FUNCTIONS
     pub fn enable_mouse(&self) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::mouse::enable_mouse_mode()); return Ok(()) }
+            &ansi::mouse::enable_mouse_mode())?; return Ok(()) }
         // let err_msg = "Error enabling mouse mode";
         wincon::mouse::enable_mouse_mode(&self.conin)
     }
 
     pub fn disable_mouse(&self) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::mouse::disable_mouse_mode()); return Ok(()) }
+            &ansi::mouse::disable_mouse_mode())?; return Ok(()) }
         // let err_msg = "Error disabling mouse mode";
         wincon::mouse::disable_mouse_mode(&self.conin)
     }
@@ -234,35 +234,35 @@ impl Term {
     // STYLE FUNCTIONS
     pub fn set_fx(&self, effects: u32) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::style::set_style(Style::Fx(effects))); return Ok(()) }
+            &ansi::style::set_style(Style::Fx(effects)))?; return Ok(()) }
         // let err_msg = "Error setting console text attributes";
         wincon::style::set_style(Style::Fx(effects), 0, &self.conout)
     }
 
     pub fn set_fg(&self, color: Color) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::style::set_style(Style::Fg(color))); return Ok(()) }
+            &ansi::style::set_style(Style::Fg(color)))?; return Ok(()) }
         // let err_msg = "Error setting console foreground";
         wincon::style::set_style(Style::Fg(color), self.reset, &self.conout)
     }
 
     pub fn set_bg(&self, color: Color) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::style::set_style(Style::Bg(color))); return Ok(()) }
+            &ansi::style::set_style(Style::Bg(color)))?; return Ok(()) }
         // let err_msg = "Error setting console background";
         wincon::style::set_style(Style::Bg(color), self.reset, &self.conout)
     }
 
     pub fn set_styles(&self, fg: Color, bg: Color, fx: u32) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::style::set_styles(fg, bg, fx)); return Ok(()) }
+            &ansi::style::set_styles(fg, bg, fx))?; return Ok(()) }
         // let err_msg = "Error setting multiple console styles";
         wincon::style::set_styles(fg, bg, fx, self.reset, &self.conout)
     }
 
     pub fn reset_styles(&self) -> Result<()> {
         if self.ansi { ansi::output::prints(
-            &ansi::style::reset()); return Ok(()) }
+            &ansi::style::reset())?; return Ok(()) }
         // let err_msg = "Error unsetting console styles";
         wincon::style::reset(self.reset, &self.conout)
     }
