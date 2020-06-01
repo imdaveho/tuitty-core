@@ -5,6 +5,8 @@ use std::{thread, time::Duration };
 
 fn main() {
     let mut term = Term::new().expect("Error creating terminal");
+    let (_, _, ansi) = term.init_data();
+    println!("is_ansi: {}", ansi);
     term.printf("hello\n").unwrap();
     thread::sleep(Duration::from_millis(1500));
 
@@ -20,6 +22,7 @@ fn main() {
     term.show_cursor().unwrap();
 
     term.goto(12, 12).unwrap();
+    term.flush().unwrap();
     #[cfg(unix)]
     let (col, row) = term.raw_pos().unwrap();
     #[cfg(windows)]
@@ -33,6 +36,7 @@ fn main() {
     thread::sleep(Duration::from_millis(800));
 
     term.up(2).unwrap();
+    term.flush().unwrap();
     #[cfg(unix)]
     let (col, row) = term.raw_pos().unwrap();
     #[cfg(windows)]
@@ -47,6 +51,7 @@ fn main() {
     thread::sleep(Duration::from_millis(800));
 
     term.right(2).unwrap();
+    term.flush().unwrap();
     #[cfg(unix)]
     let (col, row) = term.raw_pos().unwrap();
     #[cfg(windows)]
@@ -61,6 +66,7 @@ fn main() {
     thread::sleep(Duration::from_millis(800));
 
     term.down(2).unwrap();
+    term.flush().unwrap();
     #[cfg(unix)]
     let (col, row) = term.raw_pos().unwrap();
     #[cfg(windows)]
@@ -74,6 +80,7 @@ fn main() {
     thread::sleep(Duration::from_millis(800));
 
     term.left(2).unwrap();
+    term.flush().unwrap();
     #[cfg(unix)]
     let (col, row) = term.raw_pos().unwrap();
     #[cfg(windows)]

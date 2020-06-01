@@ -55,17 +55,12 @@ impl Term {
 
         // Write command
         std::io::Write::write_all(&mut stdout, b"\x1B[6n")?;
-            // .expect("Error writing cursor report");
         std::io::Write::flush(&mut stdout)?;
-            // .expect("Error flushing cursor report");
         std::io::BufRead::read_until(&mut stdin.lock(), b'[', &mut vec![])?;
-            // .expect("Error reading cursor report");
         let mut rows = vec![];
         std::io::BufRead::read_until(&mut stdin.lock(), b';', &mut rows)?;
-            // .expect("Error reading cursor row");
         let mut cols = vec![];
         std::io::BufRead::read_until(&mut stdin.lock(),  b'R', &mut cols)?;
-            // .expect("Error reading cursor col");
         // Remove delimiter
         rows.pop(); cols.pop();
 
@@ -82,7 +77,7 @@ impl Term {
                     return Err(Error::new(ErrorKind::Other, err_msg));
                 }
             };
-            // .expect("Error parsing row position");
+
         let parsed_cols = match cols
             .into_iter()
             .map(|b| (b as char))
@@ -96,7 +91,6 @@ impl Term {
                     return Err(Error::new(ErrorKind::Other, err_msg));
                 }
             };
-            // .expect("Error parsing col position");
 
         Ok((parsed_cols.saturating_sub(1) , parsed_rows.saturating_sub(1)))
     }
