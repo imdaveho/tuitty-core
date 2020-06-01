@@ -5,7 +5,9 @@ use std::{thread, time::Duration };
 
 fn main() {
     let mut term = Term::new().expect("Error creating terminal");
+    #[cfg(windows)]
     let (_, _, ansi) = term.init_data();
+    #[cfg(windows)]
     println!("is_ansi: {}", ansi);
     term.printf("hello\n").unwrap();
     thread::sleep(Duration::from_millis(1500));
