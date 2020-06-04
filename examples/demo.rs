@@ -1,5 +1,5 @@
-use tuitty::terminal::Term;
-use tuitty::common::enums::{ Color, Effect };
+use tuitty_core::terminal::Term;
+use tuitty_core::common::enums::{ Color, Effect };
 use std::{thread, time::Duration };
 
 

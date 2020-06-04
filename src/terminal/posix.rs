@@ -108,7 +108,7 @@ impl Term {
         output::prints(&screen::clear(method))
     }
 
-    pub fn size(&self) -> (i16, i16) {
+    pub fn size(&self) -> Result<(i16, i16)> {
         screen::size()
     }
 

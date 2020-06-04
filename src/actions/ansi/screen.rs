@@ -41,7 +41,7 @@ pub fn disable_alt() -> String {
 use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 
 #[cfg(unix)]
-pub fn size() -> (i16, i16) {
+pub fn size() -> std::io::Result<(i16, i16)> {
     // Reference source:
     // http://rosettacode.org/wiki/Terminal_control/Dimensions#Library:_BSD_libc
     let mut size = winsize {
@@ -53,8 +53,8 @@ pub fn size() -> (i16, i16) {
     let r = unsafe { ioctl(STDOUT_FILENO, TIOCGWINSZ.into(), &mut size) };
 
     if r == 0 {
-        (size.ws_col as i16, size.ws_row as i16)
+        Ok((size.ws_col as i16, size.ws_row as i16))
     } else {
-        (0, 0)
+        Err(std::io::Error::last_os_error())
     }
 }

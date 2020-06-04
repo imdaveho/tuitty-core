@@ -1,5 +1,5 @@
 [package]
-name = "tuitty"
+name = "tuitty-core"
 version = "0.5.0"
 authors = ["imdaveho"]
 edition = "2018"
