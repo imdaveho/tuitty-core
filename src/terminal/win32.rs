@@ -299,6 +299,9 @@ impl Term {
     pub fn close(&mut self) -> Result<()> {
         // Revert back to original settings.
         self.disable_alt()?;
+        self.conout.set_mode(&self.mode)?;
+        self.disable_mouse()?;
+        self.show_cursor()?;
         self.reset_styles()?;
         // Clean up Handles.
         self.conout.close()?; 

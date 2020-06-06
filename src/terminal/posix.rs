@@ -183,4 +183,19 @@ impl Term {
     pub fn init_data(&self) -> Termios {
         self.mode
     }
+
+    pub fn close(&self) -> Result<()> {
+        self.disable_alt()?;
+        self.cook()?;
+        self.disable_mouse()?;
+        self.show_cursor()?;
+        self.reset_styles()?;
+        Ok(())
+    }
+}
+
+impl Drop for Term {
+    fn drop(&mut self) {
+        self.close().expect("Error closing the terminal.");
+    }
 }
