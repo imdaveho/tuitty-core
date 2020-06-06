@@ -19,7 +19,8 @@ use winapi::{
         consoleapi::WriteConsoleW,
         wincon::{
             ENABLE_LINE_INPUT,
-            ENABLE_WRAP_AT_EOL_OUTPUT
+            ENABLE_ECHO_INPUT,
+            ENABLE_PROCESSED_INPUT
         }
     },
     shared::ntdef::{ NULL, VOID }
@@ -58,18 +59,18 @@ pub fn get_mode() -> Result<u32> {
 }
 
 
-pub fn enable_raw(conout: &Handle) -> Result<()> {
-    let mode = conout.get_mode()?;
-    let mask = ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_LINE_INPUT;
+pub fn enable_raw(conin: &Handle) -> Result<()> {
+    let mode = conin.get_mode()?;
+    let mask = ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT;
     let raw_mode = mode & !mask;
-    conout.set_mode(&raw_mode)?;
+    conin.set_mode(&raw_mode)?;
     Ok(())
 }
 
-pub fn disable_raw(conout: &Handle) -> Result<()> {
-    let mode = conout.get_mode()?;
-    let mask = ENABLE_WRAP_AT_EOL_OUTPUT | ENABLE_LINE_INPUT;
+pub fn disable_raw(conin: &Handle) -> Result<()> {
+    let mode = conin.get_mode()?;
+    let mask = ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT;
     let cooked_mode = mode | mask;
-    conout.set_mode(&cooked_mode)?;
+    conin.set_mode(&cooked_mode)?;
     Ok(())
 }

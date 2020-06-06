@@ -208,12 +208,12 @@ impl Term {
 
     pub fn raw(&self) -> Result<()> {
         // let err_msg = "Error enabling raw mode";
-        wincon::output::enable_raw(&self.conout)
+        wincon::output::enable_raw(&self.conin)
     }
 
     pub fn cook(&self) -> Result<()> {
         // let err_msg = "Error disabling raw mode";
-        wincon::output::disable_raw(&self.conout)
+        wincon::output::disable_raw(&self.conin)
     }
 
     // MOUSE FUNCTIONS
