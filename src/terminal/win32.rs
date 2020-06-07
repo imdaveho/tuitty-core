@@ -2,6 +2,7 @@ use std::io::{ Result, Error, ErrorKind };
 use crate::actions::{ ansi, wincon };
 use crate::common::enums::{ Clear, Style, Color };
 use wincon::handle::{ Handle, ConsoleInfo };
+use wincon::output::{ CHAR_INFO, COORD, SMALL_RECT };
 
 
 pub fn is_ansi_enabled() -> bool {
@@ -198,6 +199,13 @@ impl Term {
         if self.ansi { ansi::output::printf(content)?; return Ok(()) }
         // let err_msg = "Error writing to console";
         wincon::output::prints(content, &self.conout)
+    }
+
+    pub fn writebuf(
+        &self, buffer: *const CHAR_INFO, size: COORD, 
+        coord: COORD, dest: &mut SMALL_RECT
+    ) -> Result<()> {
+        wincon::output::writebuf(buffer, size, coord, dest, &self.conout)
     }
 
     pub fn flush(&self) -> Result<()> {

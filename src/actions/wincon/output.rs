@@ -20,19 +20,19 @@ use winapi::{
         wincon::{
             ENABLE_LINE_INPUT,
             ENABLE_ECHO_INPUT,
-            ENABLE_PROCESSED_INPUT
+            ENABLE_PROCESSED_INPUT,
+            WriteConsoleOutputW
         }
     },
     shared::ntdef::{ NULL, VOID }
 };
 use super::handle::Handle;
 
+pub use winapi::um::wincon::{ CHAR_INFO, COORD, SMALL_RECT };
+
 
 pub fn prints(content: &str, conout: &Handle) -> Result<()> {
-    let text = format!("{}", content).as_str()
-        .encode_utf16()
-        .map(|x| x)
-        .collect::<Vec<u16>>();
+    let text: Vec<u16> = content.encode_utf16().collect();
     let mut size = 0;
     unsafe {
         // https://docs.microsoft.com/en-us/windows/console/writeconsole
@@ -42,6 +42,19 @@ pub fn prints(content: &str, conout: &Handle) -> Result<()> {
             text.len() as u32,
             &mut size, NULL
         ) == 0 {
+            return Err(Error::last_os_error());
+        }
+    }
+    Ok(())
+}
+
+pub fn writebuf(
+    buffer: *const CHAR_INFO, size: COORD, 
+    coord: COORD, dest: &mut SMALL_RECT,
+    conout: &Handle
+) -> Result<()> {
+    unsafe {
+        if WriteConsoleOutputW(conout.0, buffer, size, coord, dest) == 0 {
             return Err(Error::last_os_error());
         }
     }
