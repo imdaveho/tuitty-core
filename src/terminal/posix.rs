@@ -44,10 +44,13 @@ impl Term {
     }
 
     pub fn query_pos(&self) -> Result<()> {
+        // (imdaveho) NOTE: ansi/posix specific
         output::printf(&cursor::pos())
     }
 
     pub fn raw_pos(&self) -> Result<(i16, i16)> {
+        // (imdaveho) NOTE: ansi/posix specific
+
         // Where is the cursor?
         // Use `ESC [ 6 n`.
         let mut stdout = std::io::stdout();
@@ -134,14 +137,17 @@ impl Term {
     }
 
     pub fn flush(&self) -> Result<()> {
+        // (imdaveho) NOTE: ansi/posix specific
         output::flush()
     }
 
     pub fn raw(&self) -> Result<()> {
+        // (imdaveho) NOTE: ansi/posix specific
         output::enable_raw()
     }
 
     pub fn cook(&self) -> Result<()> {
+        // (imdaveho) NOTE: ansi/posix specific
         output::set_mode(&self.mode)
     }
 
