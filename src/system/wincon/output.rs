@@ -21,6 +21,7 @@ use winapi::{
             ENABLE_LINE_INPUT,
             ENABLE_ECHO_INPUT,
             ENABLE_PROCESSED_INPUT,
+            ENABLE_VIRTUAL_TERMINAL_PROCESSING as ENABLE_VT,
             WriteConsoleOutputW
         }
     },
@@ -61,17 +62,6 @@ pub fn writebuf(
     Ok(())
 }
 
-
-pub fn get_mode() -> Result<u32> {
-    // Stdout because if you're creating a
-    // new screen via alternate screen, you
-    // want a default set of terminal settings
-    let handle = Handle::stdout()?;
-    let mode = handle.get_mode();
-    mode
-}
-
-
 pub fn enable_raw(conin: &Handle) -> Result<()> {
     let mode = conin.get_mode()?;
     let mask = ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT;
@@ -86,4 +76,54 @@ pub fn disable_raw(conin: &Handle) -> Result<()> {
     let cooked_mode = mode | mask;
     conin.set_mode(&cooked_mode)?;
     Ok(())
+}
+
+
+pub fn get_mode() -> Result<u32> {
+    // Stdout because if you're creating a
+    // new screen via alternate screen, you
+    // want a default set of terminal settings
+    let handle = Handle::stdout()?;
+    let mode = handle.get_mode();
+    mode
+}
+
+
+pub fn is_ansi_enabled() -> bool {
+    const TERMS: [&'static str; 15] = [
+        "xterm",  // xterm, PuTTY, Mintty
+        "rxvt",   // RXVT
+        "eterm",  // Eterm
+        "screen", // GNU screen, tmux
+        "tmux",   // tmux
+        "vt100", "vt102", "vt220", "vt320",   // DEC VT series
+        "ansi",    // ANSI
+        "scoansi", // SCO ANSI
+        "cygwin",  // Cygwin, MinGW
+        "linux",   // Linux console
+        "konsole", // Konsole
+        "bvterm",  // Bitvise SSH Client
+    ];
+
+    let matched_terms = match std::env::var("TERM") {
+        Ok(val) => val != "dumb" || TERMS.contains(&val.as_str()),
+        Err(_) => false,
+    };
+
+    if matched_terms {
+        return true
+    } else {
+        let handle = match Handle::stdout() {
+            Ok(h) => h,
+            Err(_) => return false,
+        };
+        let mode = match handle.get_mode() {
+            Ok(m) => m,
+            Err(_) => return false,
+        };
+        match handle.set_mode(&(mode | ENABLE_VT)) {
+            Ok(_) => true,
+            Err(_) => false
+        }
+    }
 }

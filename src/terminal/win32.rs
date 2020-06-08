@@ -1,49 +1,8 @@
 use std::io::{ Result, Error, ErrorKind };
-use crate::actions::{ ansi, wincon };
+use crate::system::{ ansi, wincon };
 use crate::common::enums::{ Clear, Style, Color };
 use wincon::handle::{ Handle, ConsoleInfo };
-use wincon::output::{ CHAR_INFO, COORD, SMALL_RECT };
-
-
-pub fn is_ansi_enabled() -> bool {
-    const TERMS: [&'static str; 15] = [
-        "xterm",  // xterm, PuTTY, Mintty
-        "rxvt",   // RXVT
-        "eterm",  // Eterm
-        "screen", // GNU screen, tmux
-        "tmux",   // tmux
-        "vt100", "vt102", "vt220", "vt320",   // DEC VT series
-        "ansi",    // ANSI
-        "scoansi", // SCO ANSI
-        "cygwin",  // Cygwin, MinGW
-        "linux",   // Linux console
-        "konsole", // Konsole
-        "bvterm",  // Bitvise SSH Client
-    ];
-
-    let matched_terms = match std::env::var("TERM") {
-        Ok(val) => val != "dumb" || TERMS.contains(&val.as_str()),
-        Err(_) => false,
-    };
-
-    if matched_terms {
-        return true
-    } else {
-        let enable_vt = 0x0004;
-        let handle = match Handle::stdout() {
-            Ok(h) => h,
-            Err(_) => return false,
-        };
-        let mode = match handle.get_mode() {
-            Ok(m) => m,
-            Err(_) => return false,
-        };
-        match handle.set_mode(&(mode | enable_vt)) {
-            Ok(_) => true,
-            Err(_) => false
-        }
-    }
-}
+use wincon::output::{ CHAR_INFO, COORD, SMALL_RECT, is_ansi_enabled };
 
 
 pub struct Term {
@@ -270,14 +229,6 @@ impl Term {
     pub fn init_data(&self) -> (u32, u16, bool) {
         (self.mode, self.reset, self.ansi)
     }
-
-    // Windows Console API specific. Allows you to update the text
-    // styles without having to re-print. 
-    // pub fn set_attrib(
-    //     &self, word: u16, length: u32, coord: (i16, i16)
-    // ) -> Result<()> {
-    //     wincon::style::set_attribute(word, length, coord)
-    // }
 
     // TERM STRUCT SPECIFIC
     pub fn with(&mut self, mode: u32, reset: u16, ansi: bool) {
