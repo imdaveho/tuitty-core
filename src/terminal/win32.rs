@@ -151,11 +151,11 @@ impl Term {
         wincon::output::prints(content, &self.conout)
     }
 
-    pub fn writebuf(
+    pub fn paints(
         &self, buffer: *const CHAR_INFO, size: COORD, 
-        coord: COORD, dest: &mut SMALL_RECT
+        offset: COORD, dest: &mut SMALL_RECT
     ) -> Result<()> {
-        wincon::output::writebuf(buffer, size, coord, dest, &self.conout)
+        wincon::output::paints(buffer, size, offset, dest, &self.conout)
     }
 
     pub fn flush(&self) -> Result<()> {

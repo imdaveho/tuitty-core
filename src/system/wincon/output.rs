@@ -49,13 +49,13 @@ pub fn prints(content: &str, conout: &Handle) -> Result<()> {
     Ok(())
 }
 
-pub fn writebuf(
+pub fn paints(
     buffer: *const CHAR_INFO, size: COORD, 
-    coord: COORD, dest: &mut SMALL_RECT,
+    offset: COORD, dest: &mut SMALL_RECT,
     conout: &Handle
 ) -> Result<()> {
     unsafe {
-        if WriteConsoleOutputW(conout.0, buffer, size, coord, dest) == 0 {
+        if WriteConsoleOutputW(conout.0, buffer, size, offset, dest) == 0 {
             return Err(Error::last_os_error());
         }
     }

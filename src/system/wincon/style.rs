@@ -70,7 +70,7 @@ pub fn set_styles(
 }
 
 
-pub fn into_fg(color: Color, current: u16, reset: u16) -> u16 {
+fn into_fg(color: Color, current: u16, reset: u16) -> u16 {
     let mut attrib = match color {
         Color::Black => 0,
         Color::DarkGrey => FG_INTENSE,
@@ -106,7 +106,7 @@ pub fn into_fg(color: Color, current: u16, reset: u16) -> u16 {
     attrib | current & !0x000f
 }
 
-pub fn into_bg(color: Color, current: u16, reset: u16) -> u16 {
+fn into_bg(color: Color, current: u16, reset: u16) -> u16 {
     let mut attrib = match color {
         Color::Black => 0,
         Color::DarkGrey => BG_INTENSE,
@@ -143,7 +143,7 @@ pub fn into_bg(color: Color, current: u16, reset: u16) -> u16 {
     
 }
 
-pub fn into_fx(fx: u32, current: u16) -> u16 {
+fn into_fx(fx: u32, current: u16) -> u16 {
     let mut attrib = current;
     let available_effects = [
         Effect::Reset, 
@@ -179,4 +179,8 @@ pub fn into_fx(fx: u32, current: u16) -> u16 {
         }
     }
     attrib
+}
+
+pub fn into_attr(f: Color, b: Color, fx: u32, reset: u16) -> u16 {
+    into_fx(fx, into_bg(b, into_fg(f, reset, reset), reset))
 }
