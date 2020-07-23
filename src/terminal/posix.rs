@@ -1,6 +1,6 @@
 use std::io::{ Result, Error, ErrorKind };
 use libc::termios as Termios;
-use crate::actions::ansi::*;
+use crate::system::ansi::*;
 use crate::common::enums::{ Clear, Style, Color };
 
 
