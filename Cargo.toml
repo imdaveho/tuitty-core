@@ -13,6 +13,8 @@ readme = "README.md"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2.60"
+mio = { version = "0.7", features = ["os-poll"] }
+signal-hook = { version = "0.1.16", features = ["mio-0_7-support"] }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version =  "0.3.7", features = ["wincon", "winbase", "winuser", "winnt", "consoleapi", "processenv", "handleapi"] }
