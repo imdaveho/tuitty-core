@@ -257,8 +257,11 @@ impl BitAnd<Effect> for u32 {
 pub enum InputEvent {
     Keyboard(KeyEvent),
     Mouse(MouseEvent),
+    WinResize(i16, i16),
     CursorPos(i16, i16),
     Unsupported,
+    Empty,
+    Error,
 }
 
 
