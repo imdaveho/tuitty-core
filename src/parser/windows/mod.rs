@@ -151,16 +151,18 @@ pub fn read_input_events() -> (u32, Vec<InputEvent>) {
                         parse_key_event(&key_event));
                     events.push(event)
                 }
-            }
+            },
             InputEventType::MouseEvent => {
                 let mouse_event = unsafe {
                     MouseEventRecord::from(*input.event.MouseEvent())
                 };
                 let event = parse_mouse_event(&mouse_event);
                 events.push(event)
-            }
-            // TODO implement terminal resize event
-            InputEventType::WindowBufferSizeEvent => (),
+            },
+            InputEventType::WindowBufferSizeEvent => {
+                // TODO: fetch size and return
+                events.push(InputEvent::WinResize(0, 0))
+            },
             InputEventType::FocusEvent => (),
             InputEventType::MenuEvent => (),
         }
